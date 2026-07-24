@@ -1,0 +1,46 @@
+======================================================
+     BAKEWISE SYSTEM - COMPLETE STARTUP GUIDE
+======================================================
+
+If you ever restart your computer or need to run the system from scratch, follow this exact flow to get everything connected perfectly:
+
+STEP 1: START THE DATABASE (XAMPP)
+------------------------------------------------------
+1. Open the "XAMPP Control Panel" on your computer.
+2. Click the "Start" button next to "Apache".
+3. Click the "Start" button next to "MySQL".
+   (Both should turn green indicating they are running).
+
+STEP 2: VERIFY PHPMYADMIN
+------------------------------------------------------
+1. Open your web browser (Chrome, Edge, etc.).
+2. Type this URL into the address bar: 
+   http://localhost/phpmyadmin
+3. Look at the left sidebar and ensure you see your database named:
+   bakewise_db
+
+STEP 3: START THE BAKEWISE BACKEND SERVER
+------------------------------------------------------
+1. Open a Terminal or Command Prompt.
+2. Navigate to your project folder:
+   cd "c:\Users\Ruby Grace\Downloads\CAPSTONEbakewise_system"
+3. Type the following command and press Enter:
+   node server.js
+4. You should see a success message saying:
+   "CONNECTED TO XAMPP MYSQL DATABASE ('bakewise_db') SUCCESSFULLY!"
+
+STEP 4: OPEN THE APPLICATION
+------------------------------------------------------
+1. Keep the Terminal running in the background (do not close it).
+2. Open a new tab in your web browser.
+3. Type this URL to open the BakeWise system:
+   http://localhost:3000
+4. You should see a green dot at the top right saying "MySQL Connected (Local)".
+
+STEP 5: LOG IN
+------------------------------------------------------
+1. You can now log in using the Admin account:
+   Email: admin@bakewise.com
+   Password: password123
+
+You are now fully connected and ready to go! All products, branches, and users you add will save directly to phpMyAdmin.
