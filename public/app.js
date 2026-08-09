@@ -3,6 +3,22 @@
    AI-Powered Bakery Management System Client Code
    ========================================================================== */
 
+// --- PAGINATION STATE VARIABLES ---
+let usersCurrentPage = 1;
+let salesHistCurrentPage = 1;
+let inventoryCurrentPage = 1;
+let prodHistCurrentPage = 1;
+let wasteHistCurrentPage = 1;
+let productsCurrentPage = 1;
+let repSalesCurrentPage = 1;
+let repWasteCurrentPage = 1;
+let repEffCurrentPage = 1;
+const ITEMS_PER_PAGE = 10;
+let dashBranchesChartPage = 1;
+const CHART_BRANCHES_PER_PAGE = 15;
+let aiAlertsCurrentPage = 1;
+const AI_ALERTS_PER_PAGE = 4;
+
 // --- DATE UTILITY FUNCTIONS (LOCAL TIME SAFE) ---
 function parseLocalDate(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return new Date();
@@ -118,6 +134,7 @@ class BakeWiseStore {
 
     this.isBackendOnline = false;
     this.currentUser = JSON.parse(localStorage.getItem("bakewise_v2_session") || null);
+    this.notifications = this.load("bakewise_v2_notifications", []);
   }
 
   // Branch Filtering Getters
@@ -183,18 +200,10 @@ class BakeWiseStore {
         const statusData = await statusRes.json();
         if (statusData.dbConnection === 'healthy') {
           this.isBackendOnline = true;
-          const dot = document.getElementById("db-status-dot");
-          const text = document.getElementById("db-status-text");
-          if (dot) dot.style.backgroundColor = "#22c55e";
-          if (text) text.textContent = "MySQL Connected (" + (statusData.connectionStringUsed || "Local") + ")";
         }
       }
     } catch (e) {
       console.log("MySQL backend is OFFLINE. Using LocalStorage fallback.");
-      const dot = document.getElementById("db-status-dot");
-      const text = document.getElementById("db-status-text");
-      if (dot) dot.style.backgroundColor = "#ef4444";
-      if (text) text.textContent = "MySQL Offline (Local Fallback)";
     }
 
     if (this.isBackendOnline) {
@@ -308,6 +317,36 @@ class BakeWiseStore {
     return select ? select.value : 'all';
   }
 
+  logActivity(message, type = 'system', targetBranch = 'all') {
+    let finalMessage = message;
+    if (type === 'system') {
+      const branchId = this.getSelectedBranchId();
+      if (branchId !== 'all') {
+        const b = this.branches.find(br => br.id === parseInt(branchId));
+        if (b) {
+          finalMessage += ` [${b.name}]`;
+        } else {
+          finalMessage += ` [Branch ${branchId}]`;
+        }
+      } else if (this.currentUser && this.currentUser.role === 'admin') {
+        finalMessage += ` [Admin]`;
+      }
+    }
+
+    const notification = {
+      id: "n_" + Date.now(),
+      message: finalMessage,
+      type: type,
+      targetBranch: targetBranch,
+      timestamp: new Date().toISOString(),
+      readBy: []
+    };
+    this.notifications.unshift(notification);
+    if (this.notifications.length > 50) this.notifications.pop(); // Keep last 50
+    this.save("bakewise_v2_notifications", this.notifications);
+    if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+  }
+
   async login(email, password) {
     const cleanEmail = (email || '').trim().toLowerCase();
 
@@ -417,9 +456,16 @@ class BakeWiseStore {
         });
         if (res.ok) {
           const newP = await res.json();
-          newP.price = parseFloat(newP.price);
-          newP.cost = parseFloat(newP.cost);
-          this.products.push(newP);
+          const pToAdd = {
+            id: newP.id || id,
+            name: newP.name || name,
+            category: newP.category || category,
+            price: parseFloat(newP.price || price),
+            cost: parseFloat(newP.cost || cost),
+            shelfLifeDays: newP.shelfLifeDays !== undefined ? newP.shelfLifeDays : (newP.shelf_life_days !== undefined ? newP.shelf_life_days : parseInt(shelfLifeDays)),
+            repurposeRecipe: newP.repurposeRecipe !== undefined ? newP.repurposeRecipe : (newP.repurpose_recipe !== undefined ? newP.repurpose_recipe : repurposeRecipe)
+          };
+          this.products.push(pToAdd);
           this.commitAll();
           return true;
         }
@@ -428,6 +474,7 @@ class BakeWiseStore {
 
     this.products.push(product);
     this.commitAll();
+    this.logActivity(`Added new product: ${name}`);
     return true;
   }
 
@@ -470,6 +517,7 @@ class BakeWiseStore {
     if (idx !== -1) {
       this.products[idx] = { ...this.products[idx], ...productData };
       this.commitAll();
+      this.logActivity(`Updated product: ${productData.name}`);
       return true;
     }
     return false;
@@ -483,6 +531,7 @@ class BakeWiseStore {
     }
     this.products = this.products.filter(p => p.id !== id);
     this.commitAll();
+    this.logActivity(`Deleted product ID: ${id}`);
     return true;
   }
 
@@ -510,6 +559,7 @@ class BakeWiseStore {
     if (inv) inv.stockLevel = Math.max(0, inv.stockLevel - parsedQty);
 
     this.commitAll();
+    this.logActivity(`Logged sale: ${parsedQty}x ${product.name}`);
     return true;
   }
 
@@ -538,6 +588,7 @@ class BakeWiseStore {
     }
 
     this.commitAll();
+    this.logActivity(`Added inventory: ${parsedQty} pcs (Product ID: ${productId})`);
     return true;
   }
 
@@ -570,6 +621,7 @@ class BakeWiseStore {
 
     await this.addInventory(productId, parsedActual, date, expString);
     this.commitAll();
+    this.logActivity(`Logged production: ${parsedActual}x ${productId}`);
     return true;
   }
 
@@ -597,10 +649,11 @@ class BakeWiseStore {
     if (inv) inv.stockLevel = Math.max(0, inv.stockLevel - parsedQty);
 
     this.commitAll();
+    this.logActivity(`Logged waste: ${parsedQty}x ${product.name}`);
     return true;
   }
 
-  async addBranch(name, latitude, longitude, address) {
+  async addBranch(name, latitude, longitude, address, store_hours, contact_no) {
     const parsedLat = parseFloat(latitude);
     const parsedLng = parseFloat(longitude);
     if (isNaN(parsedLat) || isNaN(parsedLng)) return false;
@@ -610,7 +663,7 @@ class BakeWiseStore {
         const res = await fetch('/api/branches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address })
+          body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no })
         });
         if (res.ok) {
           const newBr = await res.json();
@@ -621,13 +674,14 @@ class BakeWiseStore {
       } catch (e) { console.error(e); }
     }
 
-    const newBr = { id: this.branches.length + 1, name, latitude: parsedLat, longitude: parsedLng, address, status: 'Active' };
+    const newBr = { id: this.branches.length + 1, name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no, status: 'Active' };
     this.branches.push(newBr);
     this.save("bakewise_v2_branches", this.branches);
+    this.logActivity(`Added new branch: ${name}`);
     return true;
   }
 
-  async updateBranch(id, name, latitude, longitude, address, status) {
+  async updateBranch(id, name, latitude, longitude, address, store_hours, contact_no, status) {
     const parsedLat = parseFloat(latitude);
     const parsedLng = parseFloat(longitude);
     const bId = parseInt(id);
@@ -637,7 +691,7 @@ class BakeWiseStore {
         await fetch(`/api/branches/${bId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address, status })
+          body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no, status })
         });
       } catch (e) { console.error(e); }
     }
@@ -648,8 +702,11 @@ class BakeWiseStore {
       br.latitude = parsedLat;
       br.longitude = parsedLng;
       br.address = address;
+      br.store_hours = store_hours;
+      br.contact_no = contact_no;
       br.status = status;
       this.save("bakewise_v2_branches", this.branches);
+      this.logActivity(`Updated branch: ${name}`);
     }
     return true;
   }
@@ -660,6 +717,7 @@ class BakeWiseStore {
     }
     this.branches = this.branches.filter(b => b.id.toString() !== id.toString());
     this.save("bakewise_v2_branches", this.branches);
+    this.logActivity(`Deleted branch ID: ${id}`);
     return true;
   }
 
@@ -684,6 +742,7 @@ class BakeWiseStore {
     const newUser = { id: this.users.length + 1, name, email, password, role, branch_id: bId };
     this.users.push(newUser);
     this.save("bakewise_v2_users", this.users);
+    this.logActivity(`Added new user: ${name}`);
     return true;
   }
 
@@ -709,6 +768,7 @@ class BakeWiseStore {
       usr.role = role;
       usr.branch_id = bId;
       this.save("bakewise_v2_users", this.users);
+      this.logActivity(`Updated user: ${name}`);
     }
     return true;
   }
@@ -719,6 +779,7 @@ class BakeWiseStore {
     }
     this.users = this.users.filter(u => u.id.toString() !== id.toString());
     this.save("bakewise_v2_users", this.users);
+    this.logActivity(`Deleted user ID: ${id}`);
     return true;
   }
 }
@@ -748,6 +809,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFormSubmissions();
   setupInventoryModal();
   setupProductModal();
+  setupShelfLifeModule();
+  setupNotifications();
 
   // Handle branch switcher changes
   const switcher = document.getElementById("branch-switcher-select");
@@ -796,6 +859,11 @@ function applyRolePermissions(role) {
   } else if (role === "admin") {
     if (document.getElementById("nav-branches")) document.getElementById("nav-branches").style.display = "flex";
     if (document.getElementById("nav-users")) document.getElementById("nav-users").style.display = "flex";
+  }
+
+  const branchChartContainer = document.getElementById("dashboard-branches-chart-container");
+  if (branchChartContainer) {
+    branchChartContainer.style.display = (role === "admin") ? "grid" : "none";
   }
 
   const lastPane = localStorage.getItem('bakewise_v2_last_pane');
@@ -866,7 +934,7 @@ function navigateToPane(paneId) {
       "pane-products": "Product Catalog & Pricing Directory",
       "pane-reports": "Performance Reporting Dashboard",
       "pane-admin-users": "Staff Directory & Accounts Manager",
-      "pane-admin-branches": "Bakeshop Network Branch Nodes"
+      "pane-admin-branches": "Bakeshop Network Branches"
     };
     document.getElementById("current-view-title").textContent = titleMap[paneId] || "BakeWise App";
     if (sidebar) sidebar.classList.remove("open");
@@ -901,13 +969,27 @@ async function checkSessionState() {
     const initials = store.currentUser.name.split(' ').map(n => n[0]).join('');
     document.getElementById("header-user-avatar").textContent = initials.toUpperCase();
 
-    const branchSwitcher = document.getElementById("header-branch-switcher");
-    if (branchSwitcher) {
-      branchSwitcher.style.display = store.currentUser.role === 'admin' ? 'flex' : 'none';
-    }
-
     applyRolePermissions(store.currentUser.role);
     await store.syncWithBackend();
+
+    const branchSwitcher = document.getElementById("header-branch-switcher");
+    const switcherSelect = document.getElementById("branch-switcher-select");
+    if (branchSwitcher && switcherSelect) {
+      if (store.currentUser.role === 'admin') {
+        branchSwitcher.style.display = 'flex';
+        switcherSelect.innerHTML = '<option value="all">All Network Branches</option>' + 
+          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        switcherSelect.disabled = false;
+      } else if (store.currentUser.role === 'manager') {
+        branchSwitcher.style.display = 'flex';
+        const userBranch = store.branches.find(b => b.id === store.currentUser.branch_id);
+        const branchName = userBranch ? userBranch.name : `Branch ${store.currentUser.branch_id}`;
+        switcherSelect.innerHTML = `<option value="${store.currentUser.branch_id}">${branchName}</option>`;
+        switcherSelect.disabled = true;
+      } else {
+        branchSwitcher.style.display = 'none';
+      }
+    }
 
     const activePane = document.querySelector(".view-pane.active");
     if (activePane) navigateToPane(activePane.id);
@@ -925,41 +1007,74 @@ function setupLoginActions() {
   const togglePassBtn = document.getElementById("btn-toggle-password");
   const iconEyeOpen = document.getElementById("icon-eye-open");
   const iconEyeClosed = document.getElementById("icon-eye-closed");
+  const forgotBtn = document.getElementById("link-forgot-password");
 
-  loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("email-input").value;
-    const password = document.getElementById("password-input").value;
+  if (forgotBtn) {
+    forgotBtn.addEventListener("click", () => {
+      showToast("Please contact your system administrator to reset your password.", "info");
+    });
+  }
 
-    const user = await store.login(email, password);
-    if (user) {
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("email-input").value;
+      const password = document.getElementById("password-input").value;
+
+      const user = await store.login(email, password);
+      if (user) {
+        await checkSessionState();
+        showToast("Welcome back! Credentials authenticated.", "success");
+      } else {
+        showToast("Authentication failed. Invalid email or password.", "error");
+      }
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      store.logout();
       await checkSessionState();
-      showToast("Welcome back! Credentials authenticated.", "success");
-    } else {
-      showToast("Authentication failed. Invalid email or password.", "error");
-    }
-  });
+      showToast("Session disconnected. Goodbye!", "info");
+    });
+  }
 
-  logoutBtn.addEventListener("click", async () => {
-    store.logout();
-    await checkSessionState();
-    showToast("Session disconnected. Goodbye!", "info");
-  });
+  if (togglePassBtn) {
+    togglePassBtn.addEventListener("click", () => {
+      const isPass = passwordInput.getAttribute("type") === "password";
+      if (isPass) {
+        passwordInput.setAttribute("type", "text");
+        iconEyeOpen.style.display = "block";
+        iconEyeClosed.style.display = "none";
+      } else {
+        passwordInput.setAttribute("type", "password");
+        iconEyeOpen.style.display = "none";
+        iconEyeClosed.style.display = "block";
+      }
+    });
+  }
 
-  togglePassBtn.addEventListener("click", () => {
-    const isPass = passwordInput.getAttribute("type") === "password";
-    if (isPass) {
-      passwordInput.setAttribute("type", "text");
-      iconEyeOpen.style.display = "block";
-      iconEyeClosed.style.display = "none";
-    } else {
-      passwordInput.setAttribute("type", "password");
-      iconEyeOpen.style.display = "none";
-      iconEyeClosed.style.display = "block";
-    }
-  });
+  const btnShowPrivacy = document.getElementById("btn-show-privacy-policy");
+  const privacyModal = document.getElementById("privacy-policy-modal");
+  const btnPrivacyClose = document.getElementById("btn-privacy-modal-close");
+  const btnPrivacyOk = document.getElementById("btn-privacy-modal-ok");
+  const confirmOverlay = document.getElementById("confirm-modal-overlay");
+
+  if (btnShowPrivacy && privacyModal) {
+    btnShowPrivacy.addEventListener("click", () => {
+      privacyModal.style.display = "block";
+      if(confirmOverlay) confirmOverlay.style.display = "block";
+    });
+    
+    const closePrivacy = () => {
+      privacyModal.style.display = "none";
+      if(confirmOverlay) confirmOverlay.style.display = "none";
+    };
+
+    if (btnPrivacyClose) btnPrivacyClose.addEventListener("click", closePrivacy);
+    if (btnPrivacyOk) btnPrivacyOk.addEventListener("click", closePrivacy);
+  }
 }
-
 
 function setupThemeToggles() {
   const toggleBtnLogin = document.getElementById("theme-toggle-login");
@@ -1058,6 +1173,8 @@ function setupFormSubmissions() {
   if (userForm) {
     userForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!(await showConfirmModal("Are you sure you want to register this user account?"))) return;
+
       const name = document.getElementById("usr-name-input").value;
       const email = document.getElementById("usr-email-input").value;
       const password = document.getElementById("usr-password-input").value;
@@ -1077,18 +1194,22 @@ function setupFormSubmissions() {
   if (branchForm) {
     branchForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!(await showConfirmModal("Are you sure you want to register this new branch?"))) return;
+
       const name = document.getElementById("br-name-input").value;
       const lat = document.getElementById("br-lat-input").value;
       const lng = document.getElementById("br-lng-input").value;
       const address = document.getElementById("br-address-input").value;
+      const storeHours = document.getElementById("br-hours-input").value;
+      const contactNo = document.getElementById("br-contact-input").value;
 
-      const success = await store.addBranch(name, lat, lng, address);
+      const success = await store.addBranch(name, lat, lng, address, storeHours, contactNo);
       if (success) {
-        showToast("Branch node registered.", "success");
+        showToast("Branch registered.", "success");
         branchForm.reset();
         populateSelectDropdowns();
         refreshAdminBranchesPane();
-      } else showToast("Error registering branch node.", "error");
+      } else showToast("Error registering branch.", "error");
     });
   }
 
@@ -1096,20 +1217,24 @@ function setupFormSubmissions() {
   if (branchEditForm) {
     branchEditForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!(await showConfirmModal("Are you sure you want to save changes to this branch?"))) return;
+
       const id = document.getElementById("edit-branch-id").value;
       const name = document.getElementById("edit-br-name").value;
       const status = document.getElementById("edit-br-status").value;
       const address = document.getElementById("edit-br-address").value;
+      const storeHours = document.getElementById("edit-br-hours").value;
+      const contactNo = document.getElementById("edit-br-contact").value;
       const branch = store.branches.find(b => b.id === parseInt(id));
       const lat = branch ? branch.latitude : 300;
       const lng = branch ? branch.longitude : 200;
 
-      await store.updateBranch(id, name, lat, lng, address, status);
+      await store.updateBranch(id, name, lat, lng, address, storeHours, contactNo, status);
       document.getElementById("branch-edit-modal").style.display = "none";
       document.getElementById("modal-overlay").classList.remove("visible");
       populateSelectDropdowns();
       await refreshAdminBranchesPane();
-      showToast("Branch node updated successfully.", "success");
+      showToast("Branch updated successfully.", "success");
     });
   }
 
@@ -1117,6 +1242,8 @@ function setupFormSubmissions() {
   if (userEditForm) {
     userEditForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!(await showConfirmModal("Are you sure you want to save changes to this staff account?"))) return;
+
       const id = document.getElementById("edit-user-id").value;
       const name = document.getElementById("edit-usr-name").value;
       const email = document.getElementById("edit-usr-email").value;
@@ -1143,7 +1270,7 @@ function setupFormSubmissions() {
         document.getElementById("branch-edit-modal").style.display = "none";
         document.getElementById("modal-overlay").classList.remove("visible");
         navigateToPane("pane-dashboard");
-        showToast("Switched active view to selected branch node.", "info");
+        showToast("Switched active view to selected branch.", "info");
       }
     });
   }
@@ -1155,6 +1282,8 @@ function setupFormSubmissions() {
       window.print();
     });
   }
+
+
 }
 
 // --- MODALS & DIALOGS ---
@@ -1260,6 +1389,8 @@ function setupProductModal() {
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!(await showConfirmModal("Are you sure you want to save this product?"))) return;
+
       const pId = document.getElementById("product-id-hidden").value;
       const name = document.getElementById("prod-name-input").value;
       const category = document.getElementById("prod-category-select").value;
@@ -1280,6 +1411,35 @@ function setupProductModal() {
       refreshProductsPane();
     });
   }
+}
+
+function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirm-modal");
+    const overlay = document.getElementById("confirm-modal-overlay");
+    const msgEl = document.getElementById("confirm-modal-message");
+    const okBtn = document.getElementById("btn-confirm-ok");
+    const cancelBtn = document.getElementById("btn-confirm-cancel");
+
+    msgEl.textContent = message;
+    modal.style.display = "block";
+    overlay.style.display = "block";
+    overlay.classList.add("visible");
+
+    const cleanup = () => {
+      modal.style.display = "none";
+      overlay.style.display = "none";
+      overlay.classList.remove("visible");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+    };
+
+    const onOk = () => { cleanup(); resolve(true); };
+    const onCancel = () => { cleanup(); resolve(false); };
+
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
 }
 
 function showToast(message, type = "success") {
@@ -1310,6 +1470,7 @@ function showToast(message, type = "success") {
 // ==========================================================================
 
 let dashSalesChartInstance = null;
+let dashBranchesChartInstance = null;
 let aiDemandChartInstance = null;
 
 function getFreshnessIndex(productionDateStr, expiryDateStr) {
@@ -1327,15 +1488,22 @@ function getFreshnessIndex(productionDateStr, expiryDateStr) {
 
 // 1. DASHBOARD REFRESHER
 function refreshDashboard() {
-  const todayStr = formatLocalDate(new Date());
+  let latestDate = new Date();
+  const allDates = [...store.sales.map(s => s.date), ...store.waste.map(w => w.date)].filter(d => d);
+  if (allDates.length > 0) {
+    const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
+    latestDate = new Date(maxTime);
+  }
+  if (latestDate > new Date()) latestDate = new Date(); // cap at today
+  const latestDateStr = formatLocalDate(latestDate);
 
   const salesToday = store.sales
-    .filter(s => s.date === todayStr)
+    .filter(s => s.date === latestDateStr)
     .reduce((sum, s) => sum + (s.qty * s.price), 0);
   document.getElementById("dash-sales-value").textContent = `₱${salesToday.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   const wasteToday = store.waste
-    .filter(w => w.date === todayStr)
+    .filter(w => w.date === latestDateStr)
     .reduce((sum, w) => sum + (w.qty * w.cost), 0);
   document.getElementById("dash-waste-value").textContent = `₱${wasteToday.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
@@ -1350,6 +1518,7 @@ function refreshDashboard() {
   document.getElementById("dash-stock-value").textContent = `${totalStock.toLocaleString()} pcs`;
 
   renderDashboardSalesWasteChart();
+  renderDashboardBranchesChart();
   renderRealtimeAlerts();
 }
 
@@ -1361,10 +1530,20 @@ function renderDashboardSalesWasteChart() {
   const salesData = [];
   const wasteData = [];
 
+  let latestDate = new Date();
+  const allDates = [...store.sales.map(s => s.date), ...store.waste.map(w => w.date)].filter(d => d);
+  if (allDates.length > 0) {
+    const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
+    latestDate = new Date(maxTime);
+  }
+  if (latestDate > new Date()) latestDate = new Date(); // cap at today
+
   for (let i = 6; i >= 0; i--) {
-    const dStr = getRelativeDateString(-i);
-    const dateObj = parseLocalDate(dStr);
-    labels.push(dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
+    const d = new Date(latestDate);
+    d.setDate(d.getDate() - i);
+    const dStr = formatLocalDate(d);
+    
+    labels.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
 
     const daySales = store.sales.filter(s => s.date === dStr).reduce((sum, s) => sum + (s.qty * s.price), 0);
     salesData.push(daySales);
@@ -1417,6 +1596,107 @@ function renderDashboardSalesWasteChart() {
   });
 }
 
+function renderDashboardBranchesChart() {
+  const ctx = document.getElementById("chart-dashboard-branches").getContext("2d");
+  if (dashBranchesChartInstance) dashBranchesChartInstance.destroy();
+
+  const totalPages = Math.ceil(store.branches.length / CHART_BRANCHES_PER_PAGE);
+  if (dashBranchesChartPage > totalPages && totalPages > 0) dashBranchesChartPage = totalPages;
+
+  const startIdx = (dashBranchesChartPage - 1) * CHART_BRANCHES_PER_PAGE;
+  const paginatedBranches = store.branches.slice(startIdx, startIdx + CHART_BRANCHES_PER_PAGE);
+
+  const branchLabels = paginatedBranches.map(b => b.name);
+  const salesData = paginatedBranches.map(b => {
+    return store.sales
+      .filter(s => s.branchId === b.id)
+      .reduce((sum, s) => sum + (s.qty * s.price), 0);
+  });
+  
+  const wasteData = paginatedBranches.map(b => {
+    return store.waste
+      .filter(w => w.branchId === b.id)
+      .reduce((sum, w) => sum + (w.qty * w.cost), 0);
+  });
+
+  const prevBtn = document.getElementById("chart-branches-prev");
+  const nextBtn = document.getElementById("chart-branches-next");
+  const infoSpan = document.getElementById("chart-branches-info");
+  
+  if (prevBtn) {
+    prevBtn.disabled = dashBranchesChartPage === 1;
+    prevBtn.onclick = () => {
+      if (dashBranchesChartPage > 1) {
+        dashBranchesChartPage--;
+        renderDashboardBranchesChart();
+      }
+    };
+  }
+  
+  if (nextBtn) {
+    nextBtn.disabled = dashBranchesChartPage >= totalPages;
+    nextBtn.onclick = () => {
+      if (dashBranchesChartPage < totalPages) {
+        dashBranchesChartPage++;
+        renderDashboardBranchesChart();
+      }
+    };
+  }
+  
+  if (infoSpan) {
+    infoSpan.textContent = `Page ${dashBranchesChartPage} of ${totalPages || 1}`;
+  }
+
+  dashBranchesChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: branchLabels,
+      datasets: [
+        {
+          label: 'Total Sales (₱)',
+          data: salesData,
+          backgroundColor: 'rgba(34, 197, 94, 0.7)',
+          borderColor: 'rgb(34, 197, 94)',
+          borderWidth: 1,
+          borderRadius: 4
+        },
+        {
+          label: 'Total Waste (₱)',
+          data: wasteData,
+          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          borderColor: 'rgb(239, 68, 68)',
+          borderWidth: 1,
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { 
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return '₱' + value.toLocaleString();
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ': ₱' + context.parsed.y.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 function renderRealtimeAlerts() {
   const container = document.getElementById("dashboard-ai-alerts-container");
   if (!container) return;
@@ -1428,18 +1708,19 @@ function renderRealtimeAlerts() {
       const p = store.products.find(x => x.id === item.productId);
       if (!p) return;
       const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
+      const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
 
       if (fIndex === 0) {
         alerts.push({
           type: "danger",
           title: "Critical Expiration Hazard",
-          description: `Batch of ${item.stockLevel} units of ${p.name} has expired! Record to waste log immediately.`
+          description: `[${b.name}] Batch of ${item.stockLevel} units of ${p.name} has expired! Record to waste log immediately.`
         });
       } else if (fIndex <= 30) {
         alerts.push({
           type: "warning",
           title: "Shelf-Life Expiry Imminent",
-          description: `${p.name} on shelf has only ${fIndex}% freshness left (${item.stockLevel} pcs). Suggested repurposing: "${p.repurposeRecipe}".`
+          description: `[${b.name}] ${p.name} on shelf has only ${fIndex}% freshness left (${item.stockLevel} pcs). Suggested repurposing: "${p.repurposeRecipe}".`
         });
       }
     }
@@ -1475,7 +1756,40 @@ function renderRealtimeAlerts() {
     return;
   }
 
-  container.innerHTML = alerts.map(a => `
+  const totalPages = Math.ceil(alerts.length / AI_ALERTS_PER_PAGE) || 1;
+  if (aiAlertsCurrentPage > totalPages) aiAlertsCurrentPage = totalPages;
+  const startIndex = (aiAlertsCurrentPage - 1) * AI_ALERTS_PER_PAGE;
+  const pagedAlerts = alerts.slice(startIndex, startIndex + AI_ALERTS_PER_PAGE);
+
+  const prevBtn = document.getElementById("ai-alerts-prev");
+  const nextBtn = document.getElementById("ai-alerts-next");
+  const infoSpan = document.getElementById("ai-alerts-info");
+  
+  if (prevBtn) {
+    prevBtn.disabled = aiAlertsCurrentPage === 1;
+    prevBtn.onclick = () => {
+      if (aiAlertsCurrentPage > 1) {
+        aiAlertsCurrentPage--;
+        renderRealtimeAlerts();
+      }
+    };
+  }
+  
+  if (nextBtn) {
+    nextBtn.disabled = aiAlertsCurrentPage >= totalPages;
+    nextBtn.onclick = () => {
+      if (aiAlertsCurrentPage < totalPages) {
+        aiAlertsCurrentPage++;
+        renderRealtimeAlerts();
+      }
+    };
+  }
+  
+  if (infoSpan) {
+    infoSpan.textContent = `Page ${aiAlertsCurrentPage} of ${totalPages}`;
+  }
+
+  container.innerHTML = pagedAlerts.map(a => `
     <div class="alert-box ${a.type}">
       <i data-lucide="${a.type === 'danger' ? 'x-circle' : a.type === 'warning' ? 'alert-triangle' : 'info'}" class="alert-icon"></i>
       <div class="alert-content">
@@ -1498,15 +1812,20 @@ function refreshSalesPane() {
     const dB = parseLocalDate(b.date);
     return dB.getTime() - dA.getTime();
   });
-  const recentSales = sortedSales.slice(0, 15);
+  const totalPages = Math.ceil(sortedSales.length / ITEMS_PER_PAGE) || 1;
+  if (salesHistCurrentPage > totalPages) salesHistCurrentPage = totalPages;
+  const startIndex = (salesHistCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedSales = sortedSales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = recentSales.map(s => {
+  tbody.innerHTML = pagedSales.map(s => {
     const p = store.products.find(x => x.id === s.productId) || { name: "Unknown", price: 0 };
+    const b = store.branches.find(x => x.id === s.branchId) || { name: "Unknown Branch" };
     const total = s.qty * s.price;
     const dateObj = parseLocalDate(s.date);
     return `
       <tr>
         <td style="font-weight: 600;">${p.name}</td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
         <td>${s.qty} packs/pcs</td>
         <td>₱${s.price.toFixed(2)}</td>
         <td style="font-weight: 600; color: var(--primary-color);">₱${total.toFixed(2)}</td>
@@ -1514,6 +1833,32 @@ function refreshSalesPane() {
       </tr>
     `;
   }).join('');
+
+  const prevBtn = document.getElementById("sales-hist-prev-page");
+  const nextBtn = document.getElementById("sales-hist-next-page");
+  const pageInfo = document.getElementById("sales-hist-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${salesHistCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = salesHistCurrentPage <= 1;
+    prevBtn.style.opacity = salesHistCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (salesHistCurrentPage > 1) {
+        salesHistCurrentPage--;
+        refreshSalesPane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = salesHistCurrentPage >= totalPages;
+    nextBtn.style.opacity = salesHistCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (salesHistCurrentPage < totalPages) {
+        salesHistCurrentPage++;
+        refreshSalesPane();
+      }
+    };
+  }
 }
 
 // 3. INVENTORY CHECK VIEW REFRESHER
@@ -1521,7 +1866,12 @@ function refreshInventoryPane() {
   const tbody = document.getElementById("inventory-tbody");
   if (!tbody) return;
 
-  tbody.innerHTML = store.inventory.map(item => {
+  const totalPages = Math.ceil(store.inventory.length / ITEMS_PER_PAGE) || 1;
+  if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
+  const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedInventory = store.inventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  tbody.innerHTML = pagedInventory.map(item => {
     const p = store.products.find(x => x.id === item.productId);
     if (!p) return '';
 
@@ -1542,10 +1892,12 @@ function refreshInventoryPane() {
 
     const pDate = parseLocalDate(item.productionDate);
     const eDate = parseLocalDate(item.expiryDate);
+    const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
 
     return `
       <tr>
         <td style="font-weight: 700;">${p.name}</td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
         <td>${p.category}</td>
         <td>${item.stockLevel} pcs</td>
         <td>${pDate.toLocaleDateString()}</td>
@@ -1562,6 +1914,32 @@ function refreshInventoryPane() {
       </tr>
     `;
   }).join('');
+
+  const prevBtn = document.getElementById("inventory-prev-page");
+  const nextBtn = document.getElementById("inventory-next-page");
+  const pageInfo = document.getElementById("inventory-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${inventoryCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = inventoryCurrentPage <= 1;
+    prevBtn.style.opacity = inventoryCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (inventoryCurrentPage > 1) {
+        inventoryCurrentPage--;
+        refreshInventoryPane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = inventoryCurrentPage >= totalPages;
+    nextBtn.style.opacity = inventoryCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (inventoryCurrentPage < totalPages) {
+        inventoryCurrentPage++;
+        refreshInventoryPane();
+      }
+    };
+  }
 }
 
 // 4. PRODUCTION LOGS VIEW REFRESHER
@@ -1575,13 +1953,20 @@ function refreshProductionPane() {
     return dB.getTime() - dA.getTime();
   });
 
-  tbody.innerHTML = sortedProd.map(pr => {
+  const totalPages = Math.ceil(sortedProd.length / ITEMS_PER_PAGE) || 1;
+  if (prodHistCurrentPage > totalPages) prodHistCurrentPage = totalPages;
+  const startIndex = (prodHistCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedProd = sortedProd.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  tbody.innerHTML = pagedProd.map(pr => {
     const p = store.products.find(x => x.id === pr.productId) || { name: "Unknown" };
+    const b = store.branches.find(x => x.id === pr.branchId) || { name: "Unknown Branch" };
     const efficiency = pr.planned > 0 ? Math.round((pr.actual / pr.planned) * 100) : 100;
 
     return `
       <tr>
         <td style="font-weight: 600;">${p.name}</td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
         <td>${pr.planned} pcs</td>
         <td>${pr.actual} pcs</td>
         <td style="font-weight: 600; color: ${efficiency >= 100 ? 'var(--color-success)' : 'var(--color-warning)'}">${efficiency}%</td>
@@ -1590,6 +1975,32 @@ function refreshProductionPane() {
       </tr>
     `;
   }).join('');
+
+  const prevBtn = document.getElementById("prod-hist-prev-page");
+  const nextBtn = document.getElementById("prod-hist-next-page");
+  const pageInfo = document.getElementById("prod-hist-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${prodHistCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = prodHistCurrentPage <= 1;
+    prevBtn.style.opacity = prodHistCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (prodHistCurrentPage > 1) {
+        prodHistCurrentPage--;
+        refreshProductionPane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = prodHistCurrentPage >= totalPages;
+    nextBtn.style.opacity = prodHistCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (prodHistCurrentPage < totalPages) {
+        prodHistCurrentPage++;
+        refreshProductionPane();
+      }
+    };
+  }
 }
 
 // 5. WASTE MONITORING VIEW REFRESHER
@@ -1603,14 +2014,21 @@ function refreshWastePane() {
     return dB.getTime() - dA.getTime();
   });
 
-  tbody.innerHTML = sortedWaste.map(w => {
+  const totalPages = Math.ceil(sortedWaste.length / ITEMS_PER_PAGE) || 1;
+  if (wasteHistCurrentPage > totalPages) wasteHistCurrentPage = totalPages;
+  const startIndex = (wasteHistCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedWaste = sortedWaste.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  tbody.innerHTML = pagedWaste.map(w => {
     const p = store.products.find(x => x.id === w.productId) || { name: "Unknown" };
+    const b = store.branches.find(x => x.id === w.branchId) || { name: "Unknown Branch" };
     const totalCost = w.qty * w.cost;
     const dateObj = parseLocalDate(w.date);
 
     return `
       <tr>
         <td style="font-weight: 600;">${p.name}</td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
         <td>${w.qty} pcs</td>
         <td style="font-weight: 600; color: var(--color-error)">₱${totalCost.toFixed(2)}</td>
         <td><span class="badge ${w.reason === 'Expired' ? 'danger' : 'warning'}">${w.reason}</span></td>
@@ -1618,26 +2036,66 @@ function refreshWastePane() {
       </tr>
     `;
   }).join('');
+
+  const prevBtn = document.getElementById("waste-hist-prev-page");
+  const nextBtn = document.getElementById("waste-hist-next-page");
+  const pageInfo = document.getElementById("waste-hist-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${wasteHistCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = wasteHistCurrentPage <= 1;
+    prevBtn.style.opacity = wasteHistCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (wasteHistCurrentPage > 1) {
+        wasteHistCurrentPage--;
+        refreshWastePane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = wasteHistCurrentPage >= totalPages;
+    nextBtn.style.opacity = wasteHistCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (wasteHistCurrentPage < totalPages) {
+        wasteHistCurrentPage++;
+        refreshWastePane();
+      }
+    };
+  }
 }
 
 // 6. AI ANALYTICS CONTROLLER
-function refreshAIAnalyticsPane() {
-  renderAIDemandForecastChart();
-  renderBakeRecommendations();
+async function refreshAIAnalyticsPane() {
+  await renderAIDemandForecastChart();
+  await renderBakeRecommendations();
   renderRepurposingAlerts();
 }
 
-function getAIPredictedDemand(productId) {
+async function getAIPredictedDemand(productId) {
   const salesHistory = store.sales.filter(s => s.productId === productId);
   if (salesHistory.length === 0) return 30;
 
+  try {
+    const response = await fetch('/api/forecast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sales: salesHistory })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.predicted_demand !== undefined ? data.predicted_demand : 30;
+    }
+  } catch (error) {
+    console.error("AI Forecast error:", error);
+  }
+
+  // Fallback
   const qtySum = salesHistory.slice(-3).reduce((sum, s) => sum + s.qty, 0);
   const avg = Math.round(qtySum / Math.min(3, salesHistory.length));
-  const coefficient = 1 + (Math.sin(Date.now() / 1000) * 0.05);
-  return Math.max(5, Math.round(avg * coefficient));
+  return Math.max(5, avg);
 }
 
-function renderAIDemandForecastChart() {
+async function renderAIDemandForecastChart() {
   const ctx = document.getElementById("chart-ai-demand-forecast").getContext("2d");
   if (aiDemandChartInstance) aiDemandChartInstance.destroy();
 
@@ -1648,7 +2106,7 @@ function renderAIDemandForecastChart() {
     return Math.round(pSales.reduce((sum, s) => sum + s.qty, 0) / pSales.length);
   });
 
-  const predictedDemand = store.products.map(p => getAIPredictedDemand(p.id));
+  const predictedDemand = await Promise.all(store.products.map(p => getAIPredictedDemand(p.id)));
 
   const isDark = document.body.classList.contains("dark-mode");
   const textColor = isDark ? "#a8a29e" : "#78716c";
@@ -1687,27 +2145,29 @@ function renderAIDemandForecastChart() {
   });
 }
 
-function renderBakeRecommendations() {
+async function renderBakeRecommendations() {
   const container = document.getElementById("ai-recs-container");
   if (!container) return;
   container.innerHTML = "";
 
-  const recs = store.products.map(p => {
+  const recsPromises = store.products.map(async p => {
     const currentStock = store.inventory
       .filter(i => i.productId === p.id)
       .reduce((sum, i) => sum + i.stockLevel, 0);
 
-    const prediction = getAIPredictedDemand(p.id);
+    const prediction = await getAIPredictedDemand(p.id);
     const safetyStock = 5; // Allowable safety quantity
     const recommendedBake = Math.max(0, prediction - currentStock + safetyStock);
 
-    let reason = `Logic: Recommended (${recommendedBake}) = Forecast (${prediction}) - Stock (${currentStock}) + Safety Buffer (${safetyStock})`;
+    let reason = `The predicted demand is ${prediction} pieces. With a current stock of ${currentStock} pieces and a required safety buffer of ${safetyStock} pieces, a production run of ${recommendedBake} pieces is recommended.`;
     if (recommendedBake === 0) {
-      reason = `Usable Stock (${currentStock} pcs) exceeds Forecast (${prediction} pcs) + Buffer (${safetyStock} pcs). 0 bake run recommended to prevent waste.`;
+      reason = `The current stock of ${currentStock} pieces is sufficient to fulfill the predicted demand of ${prediction} pieces, inclusive of a ${safetyStock}-piece safety buffer. No additional production is required, preventing excess waste.`;
     }
 
     return { product: p.name, recommended: recommendedBake, reason };
   });
+
+  const recs = await Promise.all(recsPromises);
 
   container.innerHTML = recs.map(r => `
     <div class="ai-recommendation-card" style="border-left-color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'}">
@@ -1727,15 +2187,22 @@ function renderRepurposingAlerts() {
   if (!container) return;
   container.innerHTML = "";
 
-  const itemsToRepurpose = [];
+  const itemsToRepurposeMap = new Map();
   store.inventory.forEach(item => {
     const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
     if (fIndex <= 30 && item.stockLevel > 0) {
       const p = store.products.find(x => x.id === item.productId);
       if (!p) return;
-      itemsToRepurpose.push({ name: p.name, qty: item.stockLevel, recipe: p.repurposeRecipe, freshness: fIndex });
+      if (itemsToRepurposeMap.has(p.id)) {
+        const existing = itemsToRepurposeMap.get(p.id);
+        existing.qty += item.stockLevel;
+        existing.freshness = Math.min(existing.freshness, fIndex);
+      } else {
+        itemsToRepurposeMap.set(p.id, { name: p.name, qty: item.stockLevel, recipe: p.repurposeRecipe, freshness: fIndex });
+      }
     }
   });
+  const itemsToRepurpose = Array.from(itemsToRepurposeMap.values());
 
   if (itemsToRepurpose.length === 0) {
     container.innerHTML = `
@@ -1757,7 +2224,7 @@ function renderRepurposingAlerts() {
       <p style="font-size: 0.85rem;">Available excess stock: <strong>${item.qty} pcs</strong></p>
       <div class="repurpose-recipe">Suggested Recipe: "${item.recipe}"</div>
       <button class="btn-primary btn-repurpose-action" data-idx="${idx}" style="margin-top: 10px; width: 100%; font-size: 0.8rem; padding: 6px 12px; background: linear-gradient(135deg, #0284c7, #0369a1);">
-        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed (${item.recipe})
+        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed
       </button>
     </div>
   `).join('');
@@ -1793,7 +2260,12 @@ function refreshProductsPane() {
 
   if (!tbody) return;
 
-  tbody.innerHTML = store.products.map(p => `
+  const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
+  if (productsCurrentPage > totalPages) productsCurrentPage = totalPages;
+  const startIndex = (productsCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  tbody.innerHTML = pagedProducts.map(p => `
     <tr>
       <td><code>${p.id}</code></td>
       <td style="font-weight: 700;">${p.name}</td>
@@ -1802,14 +2274,40 @@ function refreshProductsPane() {
       <td>₱${p.cost.toFixed(2)}</td>
       <td>${p.shelfLifeDays} Days</td>
       <td style="font-size: 0.85rem; color: var(--text-secondary);">${p.repurposeRecipe}</td>
-      <td>
-        <div style="display: flex; gap: 6px;">
+      <td style="vertical-align: middle;">
+        <div style="display: flex; gap: 6px; align-items: center;">
           <button class="kanban-action-btn edit-product-btn" data-id="${p.id}" title="Edit Product"><i data-lucide="edit-3" style="width: 14px; height: 14px;"></i></button>
           <button class="kanban-action-btn delete-product-btn" data-id="${p.id}" title="Delete Product" style="color: var(--color-error);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
         </div>
       </td>
     </tr>
   `).join('');
+
+  const prevBtn = document.getElementById("products-prev-page");
+  const nextBtn = document.getElementById("products-next-page");
+  const pageInfo = document.getElementById("products-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${productsCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = productsCurrentPage <= 1;
+    prevBtn.style.opacity = productsCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (productsCurrentPage > 1) {
+        productsCurrentPage--;
+        refreshProductsPane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = productsCurrentPage >= totalPages;
+    nextBtn.style.opacity = productsCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (productsCurrentPage < totalPages) {
+        productsCurrentPage++;
+        refreshProductsPane();
+      }
+    };
+  }
 
   document.querySelectorAll(".edit-product-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1824,7 +2322,7 @@ function refreshProductsPane() {
   document.querySelectorAll(".delete-product-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const pId = btn.getAttribute("data-id");
-      if (confirm("Are you sure you want to delete this product?")) {
+      if (await showConfirmModal("Are you sure you want to delete this product?")) {
         await store.deleteProduct(pId);
         showToast('Product deleted from catalog.', 'info');
         refreshProductsPane();
@@ -1840,7 +2338,12 @@ function refreshProductsPane() {
 function refreshReportsPane() {
   const reportSalesTbody = document.getElementById("report-sales-tbody");
   if (reportSalesTbody) {
-    reportSalesTbody.innerHTML = store.products.map(p => {
+    const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
+    if (repSalesCurrentPage > totalPages) repSalesCurrentPage = totalPages;
+    const startIndex = (repSalesCurrentPage - 1) * ITEMS_PER_PAGE;
+    const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    reportSalesTbody.innerHTML = pagedProducts.map(p => {
       const pSales = store.sales.filter(s => s.productId === p.id);
       const unitsSold = pSales.reduce((sum, s) => sum + s.qty, 0);
       const totalIncome = unitsSold * p.price;
@@ -1854,11 +2357,42 @@ function refreshReportsPane() {
         </tr>
       `;
     }).join('');
+
+    const prevBtn = document.getElementById("rep-sales-prev-page");
+    const nextBtn = document.getElementById("rep-sales-next-page");
+    const pageInfo = document.getElementById("rep-sales-page-info");
+
+    if (pageInfo) pageInfo.textContent = `Page ${repSalesCurrentPage} of ${totalPages}`;
+    if (prevBtn) {
+      prevBtn.disabled = repSalesCurrentPage <= 1;
+      prevBtn.style.opacity = repSalesCurrentPage <= 1 ? "0.5" : "1";
+      prevBtn.onclick = () => {
+        if (repSalesCurrentPage > 1) {
+          repSalesCurrentPage--;
+          refreshReportsPane();
+        }
+      };
+    }
+    if (nextBtn) {
+      nextBtn.disabled = repSalesCurrentPage >= totalPages;
+      nextBtn.style.opacity = repSalesCurrentPage >= totalPages ? "0.5" : "1";
+      nextBtn.onclick = () => {
+        if (repSalesCurrentPage < totalPages) {
+          repSalesCurrentPage++;
+          refreshReportsPane();
+        }
+      };
+    }
   }
 
   const reportWasteTbody = document.getElementById("report-waste-tbody");
   if (reportWasteTbody) {
-    reportWasteTbody.innerHTML = store.products.map(p => {
+    const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
+    if (repWasteCurrentPage > totalPages) repWasteCurrentPage = totalPages;
+    const startIndex = (repWasteCurrentPage - 1) * ITEMS_PER_PAGE;
+    const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    reportWasteTbody.innerHTML = pagedProducts.map(p => {
       const pWaste = store.waste.filter(w => w.productId === p.id);
       const totalWaste = pWaste.reduce((sum, w) => sum + w.qty, 0);
       const costLost = totalWaste * p.cost;
@@ -1874,11 +2408,42 @@ function refreshReportsPane() {
         </tr>
       `;
     }).join('');
+
+    const prevBtn = document.getElementById("rep-waste-prev-page");
+    const nextBtn = document.getElementById("rep-waste-next-page");
+    const pageInfo = document.getElementById("rep-waste-page-info");
+
+    if (pageInfo) pageInfo.textContent = `Page ${repWasteCurrentPage} of ${totalPages}`;
+    if (prevBtn) {
+      prevBtn.disabled = repWasteCurrentPage <= 1;
+      prevBtn.style.opacity = repWasteCurrentPage <= 1 ? "0.5" : "1";
+      prevBtn.onclick = () => {
+        if (repWasteCurrentPage > 1) {
+          repWasteCurrentPage--;
+          refreshReportsPane();
+        }
+      };
+    }
+    if (nextBtn) {
+      nextBtn.disabled = repWasteCurrentPage >= totalPages;
+      nextBtn.style.opacity = repWasteCurrentPage >= totalPages ? "0.5" : "1";
+      nextBtn.onclick = () => {
+        if (repWasteCurrentPage < totalPages) {
+          repWasteCurrentPage++;
+          refreshReportsPane();
+        }
+      };
+    }
   }
 
   const reportEffTbody = document.getElementById("report-efficiency-tbody");
   if (reportEffTbody) {
-    reportEffTbody.innerHTML = store.products.map(p => {
+    const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
+    if (repEffCurrentPage > totalPages) repEffCurrentPage = totalPages;
+    const startIndex = (repEffCurrentPage - 1) * ITEMS_PER_PAGE;
+    const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    reportEffTbody.innerHTML = pagedProducts.map(p => {
       const pRuns = store.production.filter(pr => pr.productId === p.id);
       const plannedSum = pRuns.reduce((sum, r) => sum + r.planned, 0);
       const actualSum = pRuns.reduce((sum, r) => sum + r.actual, 0);
@@ -1897,6 +2462,32 @@ function refreshReportsPane() {
         </tr>
       `;
     }).join('');
+
+    const prevBtn = document.getElementById("rep-eff-prev-page");
+    const nextBtn = document.getElementById("rep-eff-next-page");
+    const pageInfo = document.getElementById("rep-eff-page-info");
+
+    if (pageInfo) pageInfo.textContent = `Page ${repEffCurrentPage} of ${totalPages}`;
+    if (prevBtn) {
+      prevBtn.disabled = repEffCurrentPage <= 1;
+      prevBtn.style.opacity = repEffCurrentPage <= 1 ? "0.5" : "1";
+      prevBtn.onclick = () => {
+        if (repEffCurrentPage > 1) {
+          repEffCurrentPage--;
+          refreshReportsPane();
+        }
+      };
+    }
+    if (nextBtn) {
+      nextBtn.disabled = repEffCurrentPage >= totalPages;
+      nextBtn.style.opacity = repEffCurrentPage >= totalPages ? "0.5" : "1";
+      nextBtn.onclick = () => {
+        if (repEffCurrentPage < totalPages) {
+          repEffCurrentPage++;
+          refreshReportsPane();
+        }
+      };
+    }
   }
 }
 
@@ -1935,7 +2526,12 @@ async function refreshAdminUsersPane() {
     return matchQuery && matchRole;
   });
 
-  tbody.innerHTML = filteredUsers.map(u => {
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE) || 1;
+  if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+  const startIndex = (usersCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  tbody.innerHTML = pagedUsers.map(u => {
     const branch = store.branches.find(b => b.id === u.branch_id);
     const branchName = branch ? branch.name : (u.role === 'admin' ? 'Global Network' : 'Main Branch (Central)');
 
@@ -1945,25 +2541,60 @@ async function refreshAdminUsersPane() {
         <td><code>${u.email}</code></td>
         <td><span class="badge ${u.role === 'admin' ? 'danger' : u.role === 'manager' ? 'warning' : 'info'}">${store.getRoleLabel(u.role)}</span></td>
         <td>${branchName}</td>
-        <td style="display: flex; gap: 8px;">
-          <button class="kanban-action-btn edit-user-btn" data-id="${u.id}" title="Edit User Account" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
-            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-          </button>
-          <button class="kanban-action-btn delete-user-btn" data-id="${u.id}" title="Delete User Account" style="color: var(--color-error); border: none; background: transparent; cursor: pointer;">
-            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
-          </button>
+        <td style="vertical-align: middle;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="kanban-action-btn edit-user-btn" data-id="${u.id}" title="Edit User Account" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
+              <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+            </button>
+            <button class="kanban-action-btn delete-user-btn" data-id="${u.id}" title="Delete User Account" style="color: var(--color-error); border: none; background: transparent; cursor: pointer;">
+              <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
         </td>
       </tr>
     `;
   }).join('');
+  lucide.createIcons();
 
   if (searchInput && !searchInput.dataset.listening) {
     searchInput.dataset.listening = "true";
-    searchInput.addEventListener("input", () => refreshAdminUsersPane());
+    searchInput.addEventListener("input", () => {
+      usersCurrentPage = 1;
+      refreshAdminUsersPane();
+    });
   }
   if (roleFilter && !roleFilter.dataset.listening) {
     roleFilter.dataset.listening = "true";
-    roleFilter.addEventListener("change", () => refreshAdminUsersPane());
+    roleFilter.addEventListener("change", () => {
+      usersCurrentPage = 1;
+      refreshAdminUsersPane();
+    });
+  }
+
+  const prevBtn = document.getElementById("users-prev-page");
+  const nextBtn = document.getElementById("users-next-page");
+  const pageInfo = document.getElementById("users-page-info");
+
+  if (pageInfo) pageInfo.textContent = `Page ${usersCurrentPage} of ${totalPages}`;
+  if (prevBtn) {
+    prevBtn.disabled = usersCurrentPage <= 1;
+    prevBtn.style.opacity = usersCurrentPage <= 1 ? "0.5" : "1";
+    prevBtn.onclick = () => {
+      if (usersCurrentPage > 1) {
+        usersCurrentPage--;
+        refreshAdminUsersPane();
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = usersCurrentPage >= totalPages;
+    nextBtn.style.opacity = usersCurrentPage >= totalPages ? "0.5" : "1";
+    nextBtn.onclick = () => {
+      if (usersCurrentPage < totalPages) {
+        usersCurrentPage++;
+        refreshAdminUsersPane();
+      }
+    };
   }
 
   document.querySelectorAll(".edit-user-btn").forEach(btn => {
@@ -2001,7 +2632,7 @@ async function refreshAdminUsersPane() {
   document.querySelectorAll(".delete-user-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-id");
-      if (confirm("Are you sure you want to delete this staff account?")) {
+      if (await showConfirmModal("Are you sure you want to delete this staff account?")) {
         await store.deleteUser(id);
         await refreshAdminUsersPane();
         showToast("Staff account deleted.", "info");
@@ -2013,6 +2644,9 @@ async function refreshAdminUsersPane() {
 // 10. ADMIN BRANCHES PANE & REAL INTERACTIVE MAP MONITOR REFRESHER
 let realLeafletMapInstance = null;
 let leafletMarkersGroup = null;
+
+let branchCurrentPage = 1;
+const BRANCHES_PER_PAGE = 10;
 
 async function refreshAdminBranchesPane() {
   const tbody = document.getElementById("admin-branches-tbody");
@@ -2045,28 +2679,70 @@ async function refreshAdminBranchesPane() {
     return !query || b.name.toLowerCase().includes(query) || (b.address && b.address.toLowerCase().includes(query));
   });
 
+  const totalPages = Math.ceil(filteredBranches.length / BRANCHES_PER_PAGE) || 1;
+  if (branchCurrentPage > totalPages) branchCurrentPage = totalPages;
+  const startIndex = (branchCurrentPage - 1) * BRANCHES_PER_PAGE;
+  const pagedBranches = filteredBranches.slice(startIndex, startIndex + BRANCHES_PER_PAGE);
+
   if (tbody) {
-    tbody.innerHTML = filteredBranches.map(b => `
+    tbody.innerHTML = pagedBranches.map(b => `
       <tr>
         <td><code>#${b.id}</code></td>
         <td style="font-weight: 700;">${b.name}</td>
-        <td>GPS: ${b.latitude && b.latitude < 50 ? b.latitude : 7.0736}&deg; N, ${b.longitude && b.longitude < 200 ? b.longitude : 125.6110}&deg; E</td>
-        <td>${b.address}</td>
+        <td>${b.address || ''}</td>
+        <td>${b.store_hours || ''}</td>
+        <td>${b.contact_no || ''}</td>
         <td><span class="badge ${b.status === 'Active' ? 'success' : 'danger'}">${b.status || 'Active'}</span></td>
-        <td style="display: flex; gap: 8px;">
-          <button class="kanban-action-btn edit-branch-btn" data-id="${b.id}" title="Edit Branch Node" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
-            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-          </button>
-          <button class="kanban-action-btn delete-branch-btn" data-id="${b.id}" title="Remove Branch Node" style="color: var(--color-error); border: none; background: transparent; cursor: pointer;">
-            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
-          </button>
+        <td style="vertical-align: middle;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="kanban-action-btn edit-branch-btn" data-id="${b.id}" title="Edit Branch" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
+              <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+            </button>
+            <button class="kanban-action-btn delete-branch-btn" data-id="${b.id}" title="Remove Branch" style="color: var(--color-error); border: none; background: transparent; cursor: pointer;">
+              <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
         </td>
       </tr>
     `).join('');
+    lucide.createIcons();
 
     if (searchInput && !searchInput.dataset.listening) {
       searchInput.dataset.listening = "true";
-      searchInput.addEventListener("input", () => refreshAdminBranchesPane());
+      searchInput.addEventListener("input", () => {
+        branchCurrentPage = 1; // reset page on search
+        refreshAdminBranchesPane();
+      });
+    }
+
+    const prevBtn = document.getElementById("branch-prev-page");
+    const nextBtn = document.getElementById("branch-next-page");
+    const pageInfo = document.getElementById("branch-page-info");
+
+    if (pageInfo) {
+      pageInfo.textContent = `Page ${branchCurrentPage} of ${totalPages}`;
+    }
+
+    if (prevBtn) {
+      prevBtn.disabled = branchCurrentPage <= 1;
+      prevBtn.style.opacity = branchCurrentPage <= 1 ? "0.5" : "1";
+      prevBtn.onclick = () => {
+        if (branchCurrentPage > 1) {
+          branchCurrentPage--;
+          refreshAdminBranchesPane();
+        }
+      };
+    }
+
+    if (nextBtn) {
+      nextBtn.disabled = branchCurrentPage >= totalPages;
+      nextBtn.style.opacity = branchCurrentPage >= totalPages ? "0.5" : "1";
+      nextBtn.onclick = () => {
+        if (branchCurrentPage < totalPages) {
+          branchCurrentPage++;
+          refreshAdminBranchesPane();
+        }
+      };
     }
 
     document.querySelectorAll(".edit-branch-btn").forEach(btn => {
@@ -2078,6 +2754,8 @@ async function refreshAdminBranchesPane() {
           document.getElementById("edit-br-name").value = branch.name;
           document.getElementById("edit-br-status").value = branch.status || 'Active';
           document.getElementById("edit-br-address").value = branch.address || '';
+          document.getElementById("edit-br-hours").value = branch.store_hours || '';
+          document.getElementById("edit-br-contact").value = branch.contact_no || '';
           document.getElementById("branch-edit-modal").style.display = "block";
           document.getElementById("modal-overlay").classList.add("visible");
         }
@@ -2095,11 +2773,11 @@ async function refreshAdminBranchesPane() {
     document.querySelectorAll(".delete-branch-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-id");
-        if (confirm("Are you sure you want to remove this branch node?")) {
+        if (await showConfirmModal("Are you sure you want to remove this branch?")) {
           await store.deleteBranch(id);
           populateSelectDropdowns();
           await refreshAdminBranchesPane();
-          showToast("Branch node removed.", "info");
+          showToast("Branch removed.", "info");
         }
       });
     });
@@ -2152,4 +2830,322 @@ async function refreshAdminBranchesPane() {
   }
 
   lucide.createIcons();
+}
+
+// --- SHELF LIFE PREDICTION MODULE ---
+function setupShelfLifeModule() {
+  const btnPredict = document.getElementById("btn-predict-shelf");
+  if (!btnPredict) return;
+
+  const tempSlider = document.getElementById("shelf-temp");
+  const humidSlider = document.getElementById("shelf-humidity");
+  const tempVal = document.getElementById("shelf-temp-val");
+  const humidVal = document.getElementById("shelf-humidity-val");
+  const dateInput = document.getElementById("shelf-date");
+  
+  // Set default date to today
+  if (dateInput) {
+    const today = new Date();
+    dateInput.value = today.toISOString().split('T')[0];
+  }
+
+  // Update slider values dynamically
+  if (tempSlider && tempVal) {
+    tempSlider.addEventListener("input", (e) => {
+      tempVal.textContent = e.target.value;
+    });
+  }
+  if (humidSlider && humidVal) {
+    humidSlider.addEventListener("input", (e) => {
+      humidVal.textContent = e.target.value;
+    });
+  }
+
+  // Prediction Logic
+  btnPredict.addEventListener("click", () => {
+    const breadType = document.getElementById("shelf-bread-type").value;
+    const breadName = document.getElementById("shelf-bread-type").options[document.getElementById("shelf-bread-type").selectedIndex].text;
+    const storage = document.getElementById("shelf-storage").value;
+    const temp = parseInt(tempSlider.value, 10);
+    const humid = parseInt(humidSlider.value, 10);
+    const prodDateStr = dateInput.value;
+
+    if (!prodDateStr) {
+      alert("Please select a production date.");
+      return;
+    }
+
+    // Calculate days since production
+    const prodDate = new Date(prodDateStr);
+    const today = new Date();
+    const diffTime = today - prodDate;
+    let daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (daysSince < 0) daysSince = 0;
+
+    // Base Shelf Life Mapping
+    let baseShelfLife = 3; // default
+    if (breadType === "pandesal") baseShelfLife = 3;
+    else if (breadType === "sliced_bread") baseShelfLife = 7;
+    else if (breadType === "ensaymada") baseShelfLife = 4;
+    else if (breadType === "cake") baseShelfLife = 5;
+
+    // Apply storage modifiers
+    let storageMsg = "";
+    if (storage === "refrigerated") {
+      baseShelfLife += 2;
+      storageMsg = "Refrigeration extends shelf life.";
+    } else if (storage === "open") {
+      baseShelfLife -= 1;
+      storageMsg = "Open storage accelerates staling and spoilage.";
+    } else {
+      storageMsg = "Sealed storage is appropriate for this bread type.";
+    }
+
+    // Apply Temp/Humidity modifiers
+    let tempMsg = `Temperature ${temp}°C is within acceptable range.`;
+    if (temp > 30) {
+      baseShelfLife *= 0.7; // 30% reduction
+      tempMsg = `High temperature (${temp}°C) accelerates mold growth.`;
+    } else if (temp < 15 && storage !== "refrigerated") {
+      tempMsg = `Cooler temperature helps maintain freshness.`;
+    }
+
+    let humidMsg = `Humidity ${humid}% is acceptable for bread storage.`;
+    if (humid > 70) {
+      baseShelfLife *= 0.8; // 20% reduction
+      humidMsg = `High humidity (${humid}%) significantly increases spoilage risk.`;
+    } else if (humid < 40) {
+      baseShelfLife *= 0.9;
+      humidMsg = `Low humidity (${humid}%) may cause bread to stale faster.`;
+    }
+
+    // Calculate Final metrics
+    const remainingDays = Math.max(0, baseShelfLife - daysSince);
+    let freshnessScore = 0;
+    if (baseShelfLife > 0) {
+      freshnessScore = Math.max(0, Math.min(100, (remainingDays / baseShelfLife) * 100));
+    }
+
+    // Determine Risk
+    let risk = "Low Risk";
+    let riskColor = "#22c55e"; // green
+    if (freshnessScore <= 25) {
+      risk = "High Risk";
+      riskColor = "#ef4444"; // red
+    } else if (freshnessScore <= 75) {
+      risk = "Moderate Risk";
+      riskColor = "#eab308"; // yellow
+    }
+
+    // Update UI
+    document.getElementById("res-bread-name").textContent = breadName;
+    document.getElementById("res-freshness").textContent = `${Math.round(freshnessScore)}%`;
+    document.getElementById("res-freshness").style.color = riskColor;
+    
+    document.getElementById("res-days").textContent = `${remainingDays.toFixed(1)} Days`;
+    
+    document.getElementById("res-risk").textContent = risk;
+    document.getElementById("res-risk").style.color = riskColor;
+    document.getElementById("res-risk-icon").style.color = riskColor;
+    
+    if (risk === "High Risk") {
+      document.getElementById("res-risk-icon").setAttribute("data-lucide", "alert-triangle");
+    } else {
+      document.getElementById("res-risk-icon").setAttribute("data-lucide", "check-square");
+    }
+    lucide.createIcons();
+
+    // Update progress bar
+    document.getElementById("res-freshness-bar-text").textContent = `${Math.round(freshnessScore)}%`;
+    document.getElementById("res-freshness-bar-text").style.color = riskColor;
+    const bar = document.getElementById("res-freshness-bar");
+    bar.style.width = `${freshnessScore}%`;
+    bar.style.backgroundColor = riskColor;
+
+    // Update Messages
+    document.getElementById("res-msg-temp").textContent = tempMsg;
+    document.getElementById("res-msg-humid").textContent = humidMsg;
+    document.getElementById("res-msg-storage").textContent = storageMsg;
+
+  });
+}
+
+window.updateNotificationBadge = function() {
+  const badge = document.getElementById("alert-notification-badge");
+  if (!badge) return;
+  const user = store.currentUser;
+  
+  if (!user) {
+    badge.style.display = "none";
+    return;
+  }
+
+  const relevantNotifs = store.notifications.filter(n => {
+    if (n.type === 'announcement') {
+      return n.targetBranch === 'all' || parseInt(n.targetBranch) === parseInt(user.branch_id) || user.role === 'admin';
+    }
+    if (user.role === 'admin') return true;
+    return false;
+  });
+
+  const unreadCount = relevantNotifs.filter(n => !(n.readBy && n.readBy.includes(user.email))).length;
+  
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function setupNotifications() {
+  const bellBtn = document.getElementById("btn-notifications");
+  const dropdown = document.getElementById("notifications-dropdown");
+  const listContainer = document.getElementById("notifications-list");
+  const clearBtn = document.getElementById("btn-clear-notifications");
+  const announceBtn = document.getElementById("btn-new-announcement");
+
+  if (!bellBtn || !dropdown) return;
+
+  // Toggle dropdown
+  bellBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isVisible = dropdown.style.display === "flex";
+    dropdown.style.display = isVisible ? "none" : "flex";
+    if (!isVisible) {
+      renderNotificationsList();
+    }
+  });
+
+  // Close when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && !bellBtn.contains(e.target)) {
+      dropdown.style.display = "none";
+    }
+  });
+
+  // Clear all
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      store.notifications = [];
+      store.save("bakewise_v2_notifications", store.notifications);
+      renderNotificationsList();
+      window.updateNotificationBadge();
+    });
+  }
+
+  const announcementModal = document.getElementById("announcement-modal");
+  const announcementOverlay = document.getElementById("announcement-modal-overlay");
+  const announcementForm = document.getElementById("announcement-form");
+  const announcementTarget = document.getElementById("announcement-target");
+  const btnAnnouncementCancel = document.getElementById("btn-announcement-cancel");
+
+  function closeAnnouncementModal() {
+    if(announcementModal) announcementModal.style.display = "none";
+    if(announcementOverlay) announcementOverlay.style.display = "none";
+    if(announcementForm) announcementForm.reset();
+  }
+
+  if (announceBtn) {
+    announceBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.style.display = "none";
+      
+      if (announcementTarget) {
+        announcementTarget.innerHTML = '<option value="all">All Branches (Entire Business)</option>';
+        store.branches.forEach(b => {
+          announcementTarget.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+        });
+      }
+
+      if(announcementModal) announcementModal.style.display = "block";
+      if(announcementOverlay) announcementOverlay.style.display = "block";
+    });
+  }
+
+  if (btnAnnouncementCancel) {
+    btnAnnouncementCancel.addEventListener("click", closeAnnouncementModal);
+  }
+
+  if (announcementForm) {
+    announcementForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("announcement-message").value.trim();
+      const target = document.getElementById("announcement-target").value;
+      if (msg !== "") {
+        store.logActivity(msg, 'announcement', target);
+        closeAnnouncementModal();
+        renderNotificationsList();
+      }
+    });
+  }
+
+  function renderNotificationsList() {
+    if (!listContainer) return;
+    listContainer.innerHTML = "";
+    
+    const user = store.currentUser;
+    if (!user) return;
+
+    if (announceBtn) {
+      announceBtn.style.display = (user.role === 'admin') ? "block" : "none";
+    }
+
+    const relevantNotifs = store.notifications.filter(n => {
+      if (n.type === 'announcement') {
+        return n.targetBranch === 'all' || parseInt(n.targetBranch) === parseInt(user.branch_id) || user.role === 'admin';
+      }
+      if (user.role === 'admin') return true;
+      return false;
+    });
+    
+    if (relevantNotifs.length === 0) {
+      listContainer.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">No new notifications.</div>`;
+      return;
+    }
+
+    relevantNotifs.forEach(notif => {
+      const item = document.createElement("div");
+      const isRead = notif.readBy && notif.readBy.includes(user.email);
+      item.className = `notification-item ${isRead ? '' : 'unread'}`;
+      
+      const timeStr = formatRelativeTime(notif.timestamp);
+      const typeBadge = notif.type === 'announcement' ? '<span style="background:var(--accent-color);color:white;padding:2px 4px;border-radius:4px;font-size:0.6rem;margin-right:5px;">ANNOUNCEMENT</span> ' : '';
+      
+      item.innerHTML = `
+        <span class="notification-message">${typeBadge}${notif.message}</span>
+        <span class="notification-time">${timeStr}</span>
+      `;
+
+      item.addEventListener("click", () => {
+        if (!notif.readBy) notif.readBy = [];
+        if (!notif.readBy.includes(user.email)) {
+          notif.readBy.push(user.email);
+          store.save("bakewise_v2_notifications", store.notifications);
+          item.classList.remove("unread");
+          window.updateNotificationBadge();
+        }
+      });
+
+      listContainer.appendChild(item);
+    });
+  }
+
+  // Helper for relative time
+  function formatRelativeTime(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} days ago`;
+  }
+
+  // Initial badge update
+  window.updateNotificationBadge();
 }

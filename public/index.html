@@ -4,11 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BakeWise | AI-Powered Enterprise Bakery Management System</title>
+  <title>Rose Bakeshop | Enterprise Bakery Management System</title>
   <!-- SEO Meta Tags -->
   <meta name="description"
     content="BakeWise: AI-Powered Enterprise Bakery Management System for Waste Reduction, Inventory Analytics, Shelf-Life Prediction, and Production Enhancement.">
-  <link rel="icon" type="image/png" href="assets/bakewise_logo.png">
+  <link rel="icon" type="image/png" href="assets/rose_logo.png">
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css?v=11">
@@ -40,10 +40,11 @@
       <div class="hero-overlay"></div>
       
       <div class="hero-content">
-        <div class="hero-logo-container">
+        <div class="hero-logo-container" style="display: flex; gap: 20px; justify-content: center; align-items: center;">
+          <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="hero-logo-img">
           <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="hero-logo-img">
         </div>
-        <h1 class="hero-title">BakeWise</h1>
+        <h1 class="hero-title">Rose Bakeshop x BakeWise</h1>
         <p class="hero-subtitle-gold">AI-Driven Bakery Operations Platform</p>
         
         <div class="hero-divider-wheat">
@@ -101,10 +102,11 @@
 
       <div class="login-wrapper">
         <header class="login-header">
-          <div class="login-brand-logo-wrapper">
+          <div class="login-brand-logo-wrapper" style="display: flex; gap: 15px; justify-content: center; align-items: center;">
+            <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="login-brand-logo-img">
             <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="login-brand-logo-img">
           </div>
-          <h2 class="login-title">BakeWise System</h2>
+          <h2 class="login-title">Rose Bakeshop x BakeWise System</h2>
           <p class="login-subtitle">Enterprise Operations & Production Portal</p>
           <div class="login-divider">
             <div class="line"></div>
@@ -118,7 +120,7 @@
             <label for="email-input" class="form-label">Work Email Address</label>
             <div class="input-container">
               <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
-              <input type="email" id="email-input" class="form-input" placeholder="youremail@bakewise.com" required autocomplete="email">
+              <input type="email" id="email-input" class="form-input" placeholder="youremail@example.com" required autocomplete="email">
             </div>
           </div>
 
@@ -141,7 +143,7 @@
               <span class="checkmark"></span>
               Remember me
             </label>
-            <a href="#" class="forgot-password-link">Forgot password?</a>
+            <a href="javascript:void(0)" id="link-forgot-password" class="forgot-password-link">Forgot password?</a>
           </div>
 
           <button type="submit" class="btn-primary-gold" id="btn-login-submit">
@@ -150,7 +152,7 @@
             <i data-lucide="arrow-right" style="width: 18px; height: 18px; margin-left: 8px;"></i>
           </button>
           
-          <div class="security-badge">
+          <div class="security-badge" id="btn-show-privacy-policy" style="cursor: pointer; text-decoration: underline; text-underline-offset: 4px;" title="View Data Privacy Policy">
             <i data-lucide="shield-check"></i> Enterprise-grade security &bull; Encrypted connection
           </div>
         </form>
@@ -166,42 +168,49 @@
     <!-- Sidebar Navigation -->
     <aside class="app-sidebar" id="app-sidebar">
       <div class="sidebar-brand">
-        <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="sidebar-logo-img">
-        <span class="brand-name">BakeWise</span>
+        <div style="display: flex; gap: 5px;">
+          <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="sidebar-logo-img">
+          <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="sidebar-logo-img">
+        </div>
+        <span class="brand-name" style="margin-left: 10px; font-size: 1.1rem;">Rose Bakeshop x BakeWise</span>
       </div>
 
       <nav class="sidebar-nav">
         <a class="nav-item active" data-pane="pane-dashboard" id="nav-dashboard">
           <i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i>
-          <span>Dashboard</span>
+          <span>Dashboard & Reporting</span>
         </a>
         <a class="nav-item" data-pane="pane-admin-branches" id="nav-branches">
           <i data-lucide="store" style="width: 18px; height: 18px;"></i>
-          <span>Branch Network</span>
+          <span>Branch Management</span>
         </a>
         <a class="nav-item" data-pane="pane-admin-users" id="nav-users">
           <i data-lucide="users" style="width: 18px; height: 18px;"></i>
-          <span>User Accounts</span>
+          <span>User Management</span>
         </a>
         <a class="nav-item" data-pane="pane-sales" id="nav-sales">
           <i data-lucide="shopping-bag" style="width: 18px; height: 18px;"></i>
-          <span>Sales Record</span>
+          <span>Sales Management</span>
         </a>
         <a class="nav-item" data-pane="pane-inventory" id="nav-inventory">
           <i data-lucide="clipboard-list" style="width: 18px; height: 18px;"></i>
-          <span>Inventory Check</span>
+          <span>Inventory Management</span>
         </a>
         <a class="nav-item" data-pane="pane-production" id="nav-production">
           <i data-lucide="flame" style="width: 18px; height: 18px;"></i>
-          <span>Production Logs</span>
+          <span>Production Management</span>
         </a>
         <a class="nav-item" data-pane="pane-waste" id="nav-waste">
           <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
-          <span>Waste Tracker</span>
+          <span>Waste Analytics</span>
         </a>
         <a class="nav-item" data-pane="pane-ai-analytics" id="nav-ai-analytics">
           <i data-lucide="cpu" style="width: 18px; height: 18px;"></i>
-          <span>AI Analytics</span>
+          <span>AI & Demand Forecasting</span>
+        </a>
+        <a class="nav-item" data-pane="pane-shelf-life" id="nav-shelf-life">
+          <i data-lucide="sun-snow" style="width: 18px; height: 18px;"></i>
+          <span>Shelf Life Prediction</span>
         </a>
         <a class="nav-item" data-pane="pane-products" id="nav-products">
           <i data-lucide="package-search" style="width: 18px; height: 18px;"></i>
@@ -209,7 +218,7 @@
         </a>
         <a class="nav-item" data-pane="pane-reports" id="nav-reports">
           <i data-lucide="file-text" style="width: 18px; height: 18px;"></i>
-          <span>Reports Dashboard</span>
+          <span>Custom Reports</span>
         </a>
       </nav>
 
@@ -243,7 +252,7 @@
         <div class="topbar-right">
           <!-- Branch Switcher (Visible to Admin/Manager) -->
           <div class="branch-switcher-container" id="header-branch-switcher">
-            <span class="branch-switcher-label">Branch Node:</span>
+            <span class="branch-switcher-label">Branch:</span>
             <select id="branch-switcher-select" class="branch-switcher-select">
               <option value="all">All Network Branches</option>
               <option value="1">Main Branch (Central)</option>
@@ -253,18 +262,28 @@
             </select>
           </div>
 
-          <!-- Database Connection Status Badge -->
-          <div class="db-status-container" id="db-status-indicator"
-            style="display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 0.75rem; font-weight: 600; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-secondary);">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #22c55e;"
-              id="db-status-dot"></span>
-            <span id="db-status-text">MySQL Active</span>
-          </div>
 
-          <button class="notification-bell" aria-label="Notifications" id="btn-notifications">
-            <i data-lucide="bell" style="width: 22px; height: 22px;"></i>
-            <span class="bell-badge" id="alert-notification-badge" style="display: none;"></span>
-          </button>
+
+          <div style="position: relative;" id="notification-wrapper">
+            <button class="notification-bell" aria-label="Notifications" id="btn-notifications">
+              <i data-lucide="bell" style="width: 22px; height: 22px;"></i>
+              <span class="bell-badge" id="alert-notification-badge" style="display: none;">0</span>
+            </button>
+            <div id="notifications-dropdown" class="panel-card notifications-dropdown" style="display: none;">
+              <div class="notifications-header" style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Notifications</h3>
+                <div style="display:flex; gap:16px; align-items: center;">
+                  <button id="btn-new-announcement" style="color: var(--color-primary); font-size: 0.9rem; font-weight: 600; border: none; background: transparent; cursor: pointer; display: none; align-items: center; gap: 6px; padding: 0;">
+                    <i data-lucide="megaphone" style="width: 16px; height: 16px;"></i> Broadcast
+                  </button>
+                  <button id="btn-clear-notifications" style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; border: none; background: transparent; cursor: pointer; padding: 0; transition: color 0.2s;">Clear all</button>
+                </div>
+              </div>
+              <div id="notifications-list" class="notifications-list">
+                <!-- Notifications injected dynamically -->
+              </div>
+            </div>
+          </div>
 
           <button class="theme-toggle-header" id="theme-toggle-app" aria-label="Toggle Theme">
             <i data-lucide="moon" class="icon-moon" style="width: 22px; height: 22px;"></i>
@@ -275,8 +294,11 @@
 
       <!-- Printable Report Header -->
       <div class="print-header">
-        <img src="assets/bakewise_logo.png" alt="BakeWise Logo" style="height: 65px; margin-bottom: 8px; object-fit: contain;">
-        <h1>BAKEWISE ENTERPRISE SYSTEM REPORT</h1>
+        <div style="display: flex; justify-content: center; gap: 20px; align-items: center; margin-bottom: 8px;">
+          <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" style="height: 65px; object-fit: contain;">
+          <img src="assets/bakewise_logo.png" alt="BakeWise Logo" style="height: 65px; object-fit: contain;">
+        </div>
+        <h1>ROSE BAKESHOP x BAKEWISE ENTERPRISE SYSTEM REPORT</h1>
         <p>Bakery Operations & Production Management System</p>
         <p id="print-report-timestamp"></p>
       </div>
@@ -364,6 +386,38 @@
               <div id="dashboard-ai-alerts-container">
                 <!-- Actionable Alerts injected dynamically -->
               </div>
+              <div id="ai-alerts-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                <button id="ai-alerts-prev" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="ai-alerts-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="ai-alerts-next" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-layout-grid" id="dashboard-branches-chart-container" style="margin-top: 20px; grid-template-columns: 1fr;">
+            <div class="panel-card" style="margin-bottom: 0;">
+              <div class="panel-card-header">
+                <h2 class="panel-card-title">
+                  <i data-lucide="network" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
+                  <span>Branch Performance Overview (Sales vs. Waste)</span>
+                </h2>
+              </div>
+              <div class="chart-container" style="height: 350px;">
+                <canvas id="chart-dashboard-branches"></canvas>
+              </div>
+              <div id="chart-branches-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="chart-branches-prev" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="chart-branches-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="chart-branches-next" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -378,7 +432,7 @@
                 <i data-lucide="store" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Active Branch Nodes</span>
+                <span class="stats-label">Active Branches</span>
                 <span class="stats-value" id="branch-kpi-count">4 Nodes</span>
                 <span class="stats-trend up" style="color: var(--color-success);">XAMPP MySQL Persistent</span>
               </div>
@@ -435,7 +489,7 @@
           <div class="form-card-split">
             <div class="panel-card">
               <div class="panel-card-header">
-                <h2 class="panel-card-title">Add New Branch Node</h2>
+                <h2 class="panel-card-title">Add New Branch</h2>
               </div>
               <form id="admin-branch-form">
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -446,17 +500,17 @@
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="br-lat-input" class="form-label">Map Position (X Coord: 0-800)</label>
+                  <label for="br-hours-input" class="form-label">Store Hours</label>
                   <div class="input-container">
-                    <i data-lucide="navigation-2" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="br-lat-input" class="form-input" min="0" max="800" required value="300">
+                    <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
+                    <input type="text" id="br-hours-input" class="form-input" placeholder="e.g. 5 AM to 8 PM">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="br-lng-input" class="form-label">Map Position (Y Coord: 0-400)</label>
+                  <label for="br-contact-input" class="form-label">Contact No.</label>
                   <div class="input-container">
-                    <i data-lucide="navigation" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="br-lng-input" class="form-input" min="0" max="400" required value="200">
+                    <i data-lucide="phone" class="input-icon" style="width: 18px; height: 18px;"></i>
+                    <input type="text" id="br-contact-input" class="form-input" placeholder="e.g. 0912-345-6789">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -468,7 +522,7 @@
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">
                   <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
-                  <span>Register Branch Node</span>
+                  <span>Register Branch</span>
                 </button>
               </form>
             </div>
@@ -476,7 +530,7 @@
             <div class="panel-card">
               <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
                 <h2 class="panel-card-title">Network Nodes Directory</h2>
-                <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="max-width: 220px; padding: 6px 12px; font-size: 0.82rem;">
+                <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="max-width: 400px; width: 100%; padding: 6px 12px; font-size: 0.82rem;">
               </div>
               <div class="table-responsive">
                 <table class="data-table">
@@ -484,14 +538,24 @@
                     <tr>
                       <th>ID</th>
                       <th>Branch Name</th>
-                      <th>Map Coordinates</th>
                       <th>Address</th>
+                      <th>Store Hours</th>
+                      <th>Contact No.</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody id="admin-branches-tbody"></tbody>
                 </table>
+              </div>
+              <div id="branch-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="branch-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="branch-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="branch-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -633,6 +697,15 @@
                   <tbody id="admin-users-tbody"></tbody>
                 </table>
               </div>
+              <div id="users-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="users-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="users-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="users-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -681,6 +754,7 @@
                   <thead>
                     <tr>
                       <th>Product</th>
+                      <th>Branch</th>
                       <th>Quantity</th>
                       <th>Price/Unit</th>
                       <th>Total Sales</th>
@@ -689,6 +763,15 @@
                   </thead>
                   <tbody id="sales-history-tbody"></tbody>
                 </table>
+              </div>
+              <div id="sales-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="sales-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="sales-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="sales-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -713,6 +796,7 @@
                 <thead>
                   <tr>
                     <th>Product</th>
+                    <th>Branch</th>
                     <th>Category</th>
                     <th>Stock Level</th>
                     <th>Production Date</th>
@@ -723,6 +807,15 @@
                 </thead>
                 <tbody id="inventory-tbody"></tbody>
               </table>
+            </div>
+            <div id="inventory-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="inventory-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+              </button>
+              <span id="inventory-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+              <button id="inventory-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+              </button>
             </div>
           </div>
 
@@ -802,6 +895,7 @@
                   <thead>
                     <tr>
                       <th>Product</th>
+                      <th>Branch</th>
                       <th>Planned</th>
                       <th>Actual Prepared</th>
                       <th>Efficiency</th>
@@ -811,6 +905,15 @@
                   </thead>
                   <tbody id="production-history-tbody"></tbody>
                 </table>
+              </div>
+              <div id="production-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="prod-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="prod-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="prod-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -868,6 +971,7 @@
                   <thead>
                     <tr>
                       <th>Product</th>
+                      <th>Branch</th>
                       <th>Quantity</th>
                       <th>Disposal Cost</th>
                       <th>Reason</th>
@@ -876,6 +980,15 @@
                   </thead>
                   <tbody id="waste-history-tbody"></tbody>
                 </table>
+              </div>
+              <div id="waste-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="waste-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                </button>
+                <span id="waste-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+                <button id="waste-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -928,6 +1041,133 @@
         </section>
 
         <!-- ====================================================================
+             PANE: SHELF LIFE PREDICTION
+             ==================================================================== -->
+        <section class="view-pane" id="pane-shelf-life">
+          <div class="shelf-life-grid">
+            
+            <!-- Left Side: Parameters -->
+            <div class="panel-card" style="height: fit-content;">
+              <h3 style="margin-bottom: 20px; color: var(--text-primary); font-size: 1.1rem;">Prediction Parameters</h3>
+              
+              <div class="form-group">
+                <label class="form-label">Bread Type</label>
+                <select class="form-input" id="shelf-bread-type">
+                  <option value="pandesal">Pandesal</option>
+                  <option value="sliced_bread">Sliced Bread</option>
+                  <option value="ensaymada">Ensaymada</option>
+                  <option value="cake">Cake</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Storage Condition</label>
+                <select class="form-input" id="shelf-storage">
+                  <option value="sealed">Sealed</option>
+                  <option value="open">Open/Exposed</option>
+                  <option value="refrigerated">Refrigerated</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>Temperature (°C): <span id="shelf-temp-val" style="color: #ef4444; font-weight: bold;">27</span></span>
+                </label>
+                <input type="range" id="shelf-temp" min="10" max="40" value="27" style="width: 100%; accent-color: #ef4444;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                  <span>10</span><span>40</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>Humidity (%): <span id="shelf-humidity-val" style="color: #ef4444; font-weight: bold;">60</span></span>
+                </label>
+                <input type="range" id="shelf-humidity" min="20" max="100" value="60" style="width: 100%; accent-color: #ef4444;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                  <span>20</span><span>100</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Production Date</label>
+                <input type="date" class="form-input" id="shelf-date">
+              </div>
+
+              <button class="btn-primary" id="btn-predict-shelf" style="width: 100%; background: linear-gradient(135deg, #dc2626, #b91c1c); margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                <i data-lucide="activity" style="width: 18px; height: 18px;"></i> Predict Shelf Life
+              </button>
+            </div>
+
+            <!-- Right Side: Results -->
+            <div class="shelf-life-results">
+              
+              <div class="summary-cards-grid" style="margin-bottom: 24px;">
+                <div class="summary-card" style="text-align: center; padding: 20px;">
+                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+                    <i data-lucide="sun" style="color: #eab308; width: 32px; height: 32px;"></i>
+                  </div>
+                  <div class="summary-value" id="res-freshness" style="color: #22c55e;">--%</div>
+                  <div class="summary-label">Freshness Score</div>
+                </div>
+                <div class="summary-card" style="text-align: center; padding: 20px;">
+                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+                    <i data-lucide="clock" style="color: #6366f1; width: 32px; height: 32px;"></i>
+                  </div>
+                  <div class="summary-value" id="res-days" style="color: #3b82f6;">-- Days</div>
+                  <div class="summary-label">Remaining Shelf Life</div>
+                </div>
+                <div class="summary-card" style="text-align: center; padding: 20px;">
+                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+                    <i data-lucide="check-square" id="res-risk-icon" style="color: #22c55e; width: 32px; height: 32px;"></i>
+                  </div>
+                  <div class="summary-value" id="res-risk" style="color: #22c55e;">--</div>
+                  <div class="summary-label">Spoilage Risk</div>
+                </div>
+              </div>
+
+              <div class="panel-card" style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 20px; color: var(--text-primary); font-size: 1.1rem;">Freshness Scale &mdash; <span id="res-bread-name">Pandesal</span></h3>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-secondary);">
+                  <span>Current Freshness</span>
+                  <span id="res-freshness-bar-text" style="font-weight: bold; color: #22c55e;">--%</span>
+                </div>
+                
+                <div style="width: 100%; height: 12px; background-color: var(--bg-secondary); border-radius: 6px; overflow: hidden; margin-bottom: 16px;">
+                  <div id="res-freshness-bar" style="width: 0%; height: 100%; background-color: #22c55e; transition: width 0.5s ease, background-color 0.5s ease;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">
+                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#ef4444;"></div> Spoiled (0-25%)</div>
+                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#eab308;"></div> Moderate (25-75%)</div>
+                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#22c55e;"></div> Fresh (75-100%)</div>
+                </div>
+              </div>
+
+              <div class="panel-card">
+                <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1rem;">AI Analysis Summary</h3>
+                <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem; color: var(--text-secondary);">
+                  <li style="display: flex; align-items: center; gap: 12px;">
+                    <i data-lucide="thermometer" style="color: #ef4444; width: 18px; height: 18px;"></i>
+                    <span id="res-msg-temp">Awaiting prediction...</span>
+                  </li>
+                  <li style="display: flex; align-items: center; gap: 12px;">
+                    <i data-lucide="droplets" style="color: #3b82f6; width: 18px; height: 18px;"></i>
+                    <span id="res-msg-humid">Awaiting prediction...</span>
+                  </li>
+                  <li style="display: flex; align-items: center; gap: 12px;">
+                    <i data-lucide="package" style="color: #a8a29e; width: 18px; height: 18px;"></i>
+                    <span id="res-msg-storage">Awaiting prediction...</span>
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
              PANE: BAKERY PRODUCT CATALOG DIRECTORY
              ==================================================================== -->
         <section class="view-pane" id="pane-products">
@@ -960,6 +1200,15 @@
                 <tbody id="products-tbody"></tbody>
               </table>
             </div>
+            <div id="products-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="products-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+              </button>
+              <span id="products-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+              <button id="products-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -967,15 +1216,11 @@
              PANE: REPORTS VIEW
              ==================================================================== -->
         <section class="view-pane" id="pane-reports">
-          <div class="report-actions" style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <div class="report-actions" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
             <button class="btn-print" id="btn-print-report">
-              <i data-lucide="printer" style="width: 18px; height: 18px;"></i>
-              <span>Print Report / Export PDF</span>
+              <i data-lucide="download" style="width: 18px; height: 18px;"></i>
+              <span>Download</span>
             </button>
-            <a href="/api/backup" download="bakewise_db_backup.sql" class="btn-primary" id="btn-backup-db" style="width: auto; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #10b981, #059669);">
-              <i data-lucide="database" style="width: 18px; height: 18px;"></i>
-              <span>Export Database Backup SQL</span>
-            </a>
           </div>
 
           <div class="panel-card">
@@ -996,6 +1241,15 @@
                 <tbody id="report-sales-tbody"></tbody>
               </table>
             </div>
+            <div id="report-sales-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-sales-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+              </button>
+              <span id="rep-sales-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+              <button id="rep-sales-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+              </button>
+            </div>
           </div>
 
           <div class="panel-card">
@@ -1014,6 +1268,15 @@
                 </thead>
                 <tbody id="report-waste-tbody"></tbody>
               </table>
+            </div>
+            <div id="report-waste-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-waste-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+              </button>
+              <span id="rep-waste-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+              <button id="rep-waste-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+              </button>
             </div>
           </div>
 
@@ -1035,6 +1298,15 @@
                 <tbody id="report-efficiency-tbody"></tbody>
               </table>
             </div>
+            <div id="report-eff-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-eff-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+              </button>
+              <span id="rep-eff-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
+              <button id="rep-eff-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1045,7 +1317,7 @@
   <!-- Branch Edit / Intelligence Modal -->
   <div id="branch-edit-modal" class="panel-card modal-dialog" style="display: none;">
     <div class="panel-card-header">
-      <h2 class="panel-card-title" id="branch-modal-title">Edit Branch Node</h2>
+      <h2 class="panel-card-title" id="branch-modal-title">Edit Branch</h2>
       <button class="btn-secondary" id="btn-branch-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
     </div>
     <form id="branch-edit-form">
@@ -1065,6 +1337,14 @@
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-br-address" class="form-label">Physical Address</label>
         <input type="text" id="edit-br-address" class="form-input" style="padding-left: 14px;" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="edit-br-hours" class="form-label">Store Hours</label>
+        <input type="text" id="edit-br-hours" class="form-input" style="padding-left: 14px;">
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="edit-br-contact" class="form-label">Contact No.</label>
+        <input type="text" id="edit-br-contact" class="form-input" style="padding-left: 14px;">
       </div>
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button type="button" class="btn-secondary" id="btn-switch-to-branch" style="flex: 1;">
@@ -1117,7 +1397,7 @@
   </div>
 
   <!-- Edit/Add Product Modal -->
-  <div class="panel-card modal-dialog" id="product-modal" style="display: none;">
+  <div class="panel-card modal-dialog" id="product-modal" style="display: none; max-width: 600px; width: 95%;">
     <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center;">
       <h2 class="panel-card-title" id="product-modal-title">Add Bakery Product</h2>
       <button class="kanban-action-btn" id="btn-product-modal-close"><i data-lucide="x" style="width: 16px; height: 16px;"></i></button>
@@ -1178,6 +1458,63 @@
         <button type="submit" class="btn-primary" style="width: auto; padding: 10px 20px;">Save Product</button>
       </div>
     </form>
+  </div>
+
+  <!-- Announcement Modal -->
+  <div class="modal-overlay" id="announcement-modal-overlay"></div>
+  <div class="panel-card modal-dialog" id="announcement-modal" style="display: none; max-width: 500px; z-index: 2000; padding: 32px;">
+    <div class="panel-card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 16px; margin-bottom: 24px; display: flex; align-items: center;">
+      <i data-lucide="megaphone" style="width: 24px; height: 24px; margin-right: 12px; color: var(--color-primary);"></i>
+      <h2 class="panel-card-title" style="margin: 0; font-size: 1.25rem;">Broadcast Announcement</h2>
+    </div>
+    <form id="announcement-form">
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label class="form-label" for="announcement-message" style="font-weight: 600; color: var(--text-primary);">Announcement Message</label>
+        <textarea id="announcement-message" class="form-input" rows="4" placeholder="Enter your announcement here..." required style="resize: vertical; padding: 16px; border-radius: 8px;"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom: 32px;">
+        <label class="form-label" for="announcement-target" style="font-weight: 600; color: var(--text-primary);">Target Branch</label>
+        <select id="announcement-target" class="form-input" style="padding: 12px 16px; border-radius: 8px;">
+          <option value="all">All Branches (Entire Business)</option>
+          <!-- Dynamic branch options -->
+        </select>
+      </div>
+      <div class="form-actions" style="justify-content: flex-end; gap: 12px; margin-top: 0;">
+        <button type="button" class="btn-secondary" id="btn-announcement-cancel" style="padding: 10px 24px; border-radius: 8px; width: auto;">Cancel</button>
+        <button type="submit" class="btn-primary" style="width: auto; padding: 10px 24px; border-radius: 8px;">Send Announcement</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Global Confirmation Modal -->
+  <div class="modal-overlay" id="confirm-modal-overlay"></div>
+  <div class="panel-card modal-dialog" id="confirm-modal" style="display: none; max-width: 400px; text-align: center; z-index: 2000;">
+    <div style="margin-bottom: 20px;">
+      <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: var(--color-error); margin: 0 auto; display: block;"></i>
+    </div>
+    <h3 style="margin-bottom: 10px; font-weight: 600; font-size: 1.25rem;">Confirm Action</h3>
+    <p id="confirm-modal-message" style="margin-bottom: 24px; color: var(--text-secondary); line-height: 1.5;"></p>
+    <div class="form-actions" style="justify-content: center; gap: 12px;">
+      <button type="button" class="btn-secondary" id="btn-confirm-cancel" style="width: auto; padding: 10px 24px;">Cancel</button>
+      <button type="button" class="btn-primary" id="btn-confirm-ok" style="width: auto; padding: 10px 24px; background-color: var(--color-error);">Delete</button>
+    </div>
+  </div>
+
+  <!-- Privacy Policy Modal -->
+  <div class="panel-card modal-dialog" id="privacy-policy-modal" style="display: none; max-width: 500px; z-index: 2000;">
+    <div class="panel-card-header" style="justify-content: space-between;">
+      <h2 class="panel-card-title">Data Privacy & Security Statement</h2>
+      <button class="kanban-action-btn" id="btn-privacy-modal-close" style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;"><i data-lucide="x" style="width: 20px; height: 20px;"></i></button>
+    </div>
+    <div style="padding: 16px 0; color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem;">
+      <p style="margin-bottom: 12px;"><strong>BakeWise</strong> is committed to protecting the confidentiality and security of all enterprise data.</p>
+      <p style="margin-bottom: 12px;">By accessing this system, you acknowledge that all activities are monitored and that the information contained within (including inventory levels, production recipes, financial data, and user details) is strictly confidential.</p>
+      <p style="margin-bottom: 12px;">Your session is secured with end-to-end encryption. Unauthorized access, sharing of credentials, or data extraction is strictly prohibited and may result in disciplinary action.</p>
+      <p>For support or security concerns, please contact your System Administrator.</p>
+    </div>
+    <div class="form-actions" style="margin-top: 16px;">
+      <button type="button" class="btn-primary" id="btn-privacy-modal-ok" style="width: 100%;">I Understand</button>
+    </div>
   </div>
 
   <!-- Toast Notification Placement -->
