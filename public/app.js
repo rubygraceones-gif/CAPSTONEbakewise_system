@@ -1,6 +1,6 @@
 /* ==========================================================================
    BAKEWISE APPLICATION LOGIC
-   AI-Powered Bakery Management System Client Code
+   Advanced Bakery Management System Client Code
    ========================================================================== */
 
 // --- PAGINATION STATE VARIABLES ---
@@ -563,10 +563,10 @@ class BakeWiseStore {
     return true;
   }
 
-  async addInventory(productId, stockQty, prodDate, expDate) {
+  async addInventory(productId, stockQty, prodDate, expDate, targetBranchId) {
     const parsedQty = parseInt(stockQty);
     if (isNaN(parsedQty) || parsedQty <= 0) return false;
-    const branchId = this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId());
+    const branchId = targetBranchId ? parseInt(targetBranchId) : (this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId()));
 
     if (this.isBackendOnline) {
       try {
@@ -815,7 +815,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle branch switcher changes
   const switcher = document.getElementById("branch-switcher-select");
   if (switcher) {
-    switcher.addEventListener("change", () => {
+    switcher.addEventListener("focus", function() {
+      this.dataset.prevValue = this.value;
+    });
+    switcher.addEventListener("change", async function() {
+      const newValue = this.value;
+      const prevValue = this.dataset.prevValue || "all";
+      const branchName = this.options[this.selectedIndex].text;
+      
+      const confirmed = await showConfirmModal(`Are you sure you want to switch to ${branchName}?`, "Switch Branch", "arrow-right-left");
+      
+      if (!confirmed) {
+        this.value = prevValue;
+        return;
+      }
+      
+      this.dataset.prevValue = newValue;
       const activePane = document.querySelector(".view-pane.active");
       if (activePane) navigateToPane(activePane.id);
     });
@@ -930,7 +945,7 @@ function navigateToPane(paneId) {
       "pane-inventory": "Bakery Stock Inventory Check",
       "pane-production": "Baking & Production Logs",
       "pane-waste": "Unsold & Defect Waste Tracker",
-      "pane-ai-analytics": "Artificial Intelligence Analytics",
+      "pane-ai-analytics": "Optimization & Analytics",
       "pane-products": "Product Catalog & Pricing Directory",
       "pane-reports": "Performance Reporting Dashboard",
       "pane-admin-users": "Staff Directory & Accounts Manager",
@@ -1100,8 +1115,10 @@ function populateSelectDropdowns() {
   const selectProd = document.getElementById("prod-select-product");
   const selectWaste = document.getElementById("waste-select-product");
   const selectUsrBranch = document.getElementById("usr-branch-select");
+  const selectInvBranch = document.getElementById("inv-select-branch");
 
   const optionsHTML = store.products.map(p => `<option value="${p.id}">${p.name} (${p.category})</option>`).join('');
+  const branchOptionsHTML = store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
   if (selectSales) selectSales.innerHTML = optionsHTML;
   if (selectInv) selectInv.innerHTML = optionsHTML;
@@ -1109,7 +1126,10 @@ function populateSelectDropdowns() {
   if (selectWaste) selectWaste.innerHTML = optionsHTML;
 
   if (selectUsrBranch) {
-    selectUsrBranch.innerHTML = store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    selectUsrBranch.innerHTML = branchOptionsHTML;
+  }
+  if (selectInvBranch) {
+    selectInvBranch.innerHTML = branchOptionsHTML;
   }
 }
 
@@ -1197,8 +1217,8 @@ function setupFormSubmissions() {
       if (!(await showConfirmModal("Are you sure you want to register this new branch?"))) return;
 
       const name = document.getElementById("br-name-input").value;
-      const lat = document.getElementById("br-lat-input").value;
-      const lng = document.getElementById("br-lng-input").value;
+      const lat = document.getElementById("br-lat-input")?.value || 14.5995;
+      const lng = document.getElementById("br-lng-input")?.value || 120.9842;
       const address = document.getElementById("br-address-input").value;
       const storeHours = document.getElementById("br-hours-input").value;
       const contactNo = document.getElementById("br-contact-input").value;
@@ -1295,19 +1315,43 @@ function setupInventoryModal() {
   const cancelBtn = document.getElementById("btn-inventory-modal-cancel");
   const addForm = document.getElementById("inventory-add-form");
 
+  const updateExpDate = () => {
+    const prodSelect = document.getElementById("inv-select-product");
+    const pId = prodSelect ? prodSelect.value : null;
+    const product = store.products.find(p => p.id === pId);
+    const shelfLife = product ? product.shelfLifeDays : 2;
+
+    const prodDateStr = document.getElementById("inv-prod-date").value;
+    if (prodDateStr) {
+      const expDate = parseLocalDate(prodDateStr);
+      expDate.setDate(expDate.getDate() + shelfLife);
+      document.getElementById("inv-exp-date").value = formatLocalDate(expDate);
+    }
+  };
+
+  const prodSelectEl = document.getElementById("inv-select-product");
+  const prodDateEl = document.getElementById("inv-prod-date");
+  if (prodSelectEl) prodSelectEl.addEventListener("change", updateExpDate);
+  if (prodDateEl) prodDateEl.addEventListener("change", updateExpDate);
+
   const openModal = () => {
     modal.style.display = "block";
     overlay.style.display = "block";
     document.getElementById("inv-prod-date").value = formatLocalDate(new Date());
-
-    const prodSelect = document.getElementById("inv-select-product");
-    const pId = prodSelect.value;
-    const product = store.products.find(p => p.id === pId);
-    const shelfLife = product ? product.shelfLifeDays : 2;
-
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + shelfLife);
-    document.getElementById("inv-exp-date").value = formatLocalDate(expDate);
+    
+    const branchSelect = document.getElementById("inv-select-branch");
+    if (branchSelect && store.currentUser) {
+      if (store.currentUser.role === 'admin') {
+        branchSelect.disabled = false;
+        const currentBranch = store.getSelectedBranchId();
+        branchSelect.value = currentBranch === 'all' ? 1 : currentBranch;
+      } else {
+        branchSelect.value = store.currentUser.branch_id || 1;
+        branchSelect.disabled = true;
+      }
+    }
+    
+    updateExpDate();
   };
 
   const closeModal = () => {
@@ -1324,12 +1368,13 @@ function setupInventoryModal() {
   if (addForm) {
     addForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const bId = document.getElementById("inv-select-branch").value;
       const pId = document.getElementById("inv-select-product").value;
       const qty = document.getElementById("inv-stock-input").value;
       const prodDate = document.getElementById("inv-prod-date").value;
       const expDate = document.getElementById("inv-exp-date").value;
 
-      await store.addInventory(pId, qty, prodDate, expDate);
+      await store.addInventory(pId, qty, prodDate, expDate, bId);
       showToast("Inventory stock updated.", "success");
       closeModal();
       refreshInventoryPane();
@@ -1413,15 +1458,33 @@ function setupProductModal() {
   }
 }
 
-function showConfirmModal(message) {
+function showConfirmModal(message, title = "Confirm Action", iconType = "alert-triangle") {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirm-modal");
     const overlay = document.getElementById("confirm-modal-overlay");
+    const titleEl = document.getElementById("confirm-modal-title");
     const msgEl = document.getElementById("confirm-modal-message");
+    const iconContainer = document.getElementById("confirm-modal-icon-container");
     const okBtn = document.getElementById("btn-confirm-ok");
     const cancelBtn = document.getElementById("btn-confirm-cancel");
 
+    if (titleEl) titleEl.textContent = title;
     msgEl.textContent = message;
+    
+    if (iconContainer) {
+      const color = iconType === "alert-triangle" ? "var(--color-error)" : "var(--primary-color)";
+      iconContainer.innerHTML = `<i data-lucide="${iconType}" style="width: 48px; height: 48px; color: ${color}; margin: 0 auto; display: block;"></i>`;
+      if (window.lucide) window.lucide.createIcons({ root: iconContainer });
+    }
+    
+    if (message.toLowerCase().includes("delete") || message.toLowerCase().includes("remove")) {
+      okBtn.textContent = "Delete";
+      okBtn.style.backgroundColor = "var(--color-error)";
+    } else {
+      okBtn.textContent = "Confirm";
+      okBtn.style.backgroundColor = "var(--primary-color)";
+    }
+
     modal.style.display = "block";
     overlay.style.display = "block";
     overlay.classList.add("visible");
@@ -1518,6 +1581,7 @@ function refreshDashboard() {
   document.getElementById("dash-stock-value").textContent = `${totalStock.toLocaleString()} pcs`;
 
   renderDashboardSalesWasteChart();
+  renderDashboardNeededStockChart();
   renderDashboardBranchesChart();
   renderRealtimeAlerts();
 }
@@ -1591,6 +1655,95 @@ function renderDashboardSalesWasteChart() {
       scales: {
         x: { grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit' } } },
         y: { grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit' } } }
+      }
+    }
+  });
+}
+
+let dashNeededStockChartInstance = null;
+
+function renderDashboardNeededStockChart() {
+  const canvas = document.getElementById("chart-dashboard-needed-stock");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (dashNeededStockChartInstance) dashNeededStockChartInstance.destroy();
+
+  const branchId = store.getSelectedBranchId();
+  
+  const labels = [];
+  const neededStockData = [];
+  const currentStockData = [];
+
+  store.products.forEach(p => {
+    labels.push(p.name);
+    
+    // Calculate current stock for the selected branch (or all)
+    let currentStock = 0;
+    const inventoryItems = store.inventory.filter(i => 
+      i.productId === p.id && (branchId === 'all' || i.branchId === parseInt(branchId))
+    );
+    currentStock = inventoryItems.reduce((sum, i) => sum + i.stockLevel, 0);
+
+    // Estimate predicted demand based on recent sales in the selected branch
+    const salesHistory = store.sales.filter(s => 
+      s.productId === p.id && (branchId === 'all' || s.branchId === parseInt(branchId))
+    );
+    
+    let predictedDemand = 30; // default
+    if (salesHistory.length > 0) {
+      const qtySum = salesHistory.slice(-3).reduce((sum, s) => sum + s.qty, 0);
+      predictedDemand = Math.round(qtySum / Math.min(3, salesHistory.length));
+      predictedDemand = Math.max(5, predictedDemand);
+    }
+    
+    // Add a 10% buffer to demand
+    const targetStock = Math.ceil(predictedDemand * 1.1);
+    const needed = Math.max(0, targetStock - currentStock);
+    
+    currentStockData.push(currentStock);
+    neededStockData.push(needed);
+  });
+
+  const isDarkMode = document.body.classList.contains("dark-theme");
+  const textColor = isDarkMode ? "#e2e8f0" : "#1e293b";
+  const gridColor = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
+
+  dashNeededStockChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Current Stock",
+          data: currentStockData,
+          backgroundColor: "#3b82f6", // Blue
+          borderRadius: 4
+        },
+        {
+          label: "Needed Stock",
+          data: neededStockData,
+          backgroundColor: "#f59e0b", // Amber/Yellow
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: textColor, font: { family: 'Outfit' } } }
+      },
+      scales: {
+        x: { 
+          stacked: true,
+          grid: { color: gridColor }, 
+          ticks: { color: textColor, font: { family: 'Outfit' } } 
+        },
+        y: { 
+          stacked: true,
+          grid: { color: gridColor }, 
+          ticks: { color: textColor, font: { family: 'Outfit' } } 
+        }
       }
     }
   });
@@ -1738,7 +1891,7 @@ function renderRealtimeAlerts() {
     alerts.push({
       type: "info",
       title: "Waste Reduction Strategy Required",
-      description: `High waste (₱${last3DaysWaste.toLocaleString()}) logged over last 3 days. Check AI optimization model before scheduling tomorrow's bake.`
+      description: `High waste (₱${last3DaysWaste.toLocaleString()}) logged over last 3 days. Check optimization model before scheduling tomorrow's bake.`
     });
   }
 
@@ -2124,7 +2277,7 @@ async function renderAIDemandForecastChart() {
           borderRadius: 6
         },
         {
-          label: "AI Predicted Demand (Tomorrow)",
+          label: "Predicted Demand (Tomorrow)",
           data: predictedDemand,
           backgroundColor: "#d97706",
           borderRadius: 6
@@ -3148,4 +3301,145 @@ function setupNotifications() {
 
   // Initial badge update
   window.updateNotificationBadge();
+}
+
+// ==========================================================================
+// SHELF LIFE PREDICTOR UI & LOGIC
+// ==========================================================================
+function setupShelfLifePredictor() {
+  const shelfTemp = document.getElementById("shelf-temp");
+  const shelfTempVal = document.getElementById("shelf-temp-val");
+  const shelfHumid = document.getElementById("shelf-humidity");
+  const shelfHumidVal = document.getElementById("shelf-humidity-val");
+
+  if (shelfTemp && shelfTempVal) {
+    shelfTemp.addEventListener("input", (e) => shelfTempVal.textContent = e.target.value);
+  }
+  if (shelfHumid && shelfHumidVal) {
+    shelfHumid.addEventListener("input", (e) => shelfHumidVal.textContent = e.target.value);
+  }
+
+  const btnPredictShelf = document.getElementById("btn-predict-shelf");
+  if (btnPredictShelf) {
+    btnPredictShelf.addEventListener("click", () => {
+      const breadTypeEl = document.getElementById("shelf-bread-type");
+      const breadType = breadTypeEl.value;
+      const breadName = breadTypeEl.options[breadTypeEl.selectedIndex].text;
+      const storage = document.getElementById("shelf-storage").value;
+      const temp = parseInt(document.getElementById("shelf-temp").value);
+      const humid = parseInt(document.getElementById("shelf-humidity").value);
+      const prodDate = document.getElementById("shelf-date").value;
+
+      if (!prodDate) {
+        if (typeof showToast === 'function') showToast("Please select a Production Date.", "error");
+        return;
+      }
+
+      // Base shelf life in days based on Bread Type
+      let baseShelfLife = 3;
+      if (breadType === "pandesal") baseShelfLife = 3;
+      else if (breadType === "sliced_bread") baseShelfLife = 7;
+      else if (breadType === "ensaymada") baseShelfLife = 5;
+      else if (breadType === "cake") baseShelfLife = 4;
+
+      // Calculate Modifiers
+      let multiplier = 1.0;
+      if (storage === "refrigerated") multiplier *= 1.5;
+      else if (storage === "open") multiplier *= 0.5;
+
+      if (temp > 30) multiplier *= 0.7; 
+      else if (temp < 20) multiplier *= 1.1; 
+
+      if (humid > 70) multiplier *= 0.6; 
+      else if (humid < 40) multiplier *= 0.8; 
+      else multiplier *= 1.1; 
+
+      let totalShelfLife = Math.max(1, Math.round(baseShelfLife * multiplier));
+
+      // Calculate Remaining Days and Freshness
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const pDate = new Date(prodDate);
+      pDate.setHours(0,0,0,0);
+      
+      const diffTime = today - pDate;
+      const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      let remainingDays = totalShelfLife - daysElapsed;
+      let freshnessScore = 0;
+      
+      if (remainingDays <= 0) {
+        remainingDays = 0;
+        freshnessScore = 0;
+      } else if (daysElapsed < 0) {
+        remainingDays = totalShelfLife;
+        freshnessScore = Math.min(100, Math.max(0, Math.round((totalShelfLife / baseShelfLife) * 100)));
+      } else {
+        freshnessScore = Math.min(100, Math.max(0, Math.round((remainingDays / baseShelfLife) * 100)));
+      }
+
+      // Update UI elements
+      document.getElementById("res-bread-name").textContent = breadName;
+      document.getElementById("res-freshness").textContent = freshnessScore + "%";
+      document.getElementById("res-days").textContent = remainingDays + " Days";
+
+      const freshnessBar = document.getElementById("res-freshness-bar");
+      const freshnessBarText = document.getElementById("res-freshness-bar-text");
+      freshnessBar.style.width = freshnessScore + "%";
+      freshnessBarText.textContent = freshnessScore + "%";
+
+      let risk = "Low";
+      let riskColor = "#22c55e"; // Green
+      let riskIcon = "check-square";
+      
+      if (freshnessScore <= 25) {
+        risk = "High";
+        riskColor = "#ef4444"; // Red
+        riskIcon = "alert-triangle";
+        freshnessBar.style.backgroundColor = "#ef4444";
+      } else if (freshnessScore <= 75) {
+        risk = "Moderate";
+        riskColor = "#eab308"; // Yellow
+        riskIcon = "alert-circle";
+        freshnessBar.style.backgroundColor = "#eab308";
+      } else {
+        freshnessBar.style.backgroundColor = "#22c55e";
+      }
+      
+      const resRisk = document.getElementById("res-risk");
+      resRisk.textContent = risk;
+      resRisk.style.color = riskColor;
+      
+      document.getElementById("res-freshness").style.color = riskColor;
+      freshnessBarText.style.color = riskColor;
+
+      const riskIconEl = document.getElementById("res-risk-icon");
+      if (riskIconEl && typeof lucide !== 'undefined') {
+        riskIconEl.setAttribute("data-lucide", riskIcon);
+        riskIconEl.style.color = riskColor;
+        lucide.createIcons();
+      }
+
+      // Generate Analysis Messages
+      let tempMsg = temp > 30 ? `High temp (${temp}°C) accelerates spoilage.` : temp < 20 ? `Cool temp (${temp}°C) extends shelf life.` : `Optimal room temperature (${temp}°C).`;
+      let humidMsg = humid > 70 ? `High humidity (${humid}%) risks rapid mold growth.` : humid < 40 ? `Low humidity (${humid}%) risks rapid staling.` : `Ideal humidity (${humid}%) preserves texture.`;
+      let storageMsg = storage === "sealed" ? "Sealed packaging protects from air." : storage === "refrigerated" ? "Refrigeration slows mold but may cause staling." : "Open storage exposes product to contaminants.";
+
+      document.getElementById("res-msg-temp").textContent = tempMsg;
+      document.getElementById("res-msg-temp").style.color = temp > 30 ? "#ef4444" : "var(--text-secondary)";
+      
+      document.getElementById("res-msg-humid").textContent = humidMsg;
+      document.getElementById("res-msg-humid").style.color = (humid > 70 || humid < 40) ? "#f59e0b" : "var(--text-secondary)";
+      
+      document.getElementById("res-msg-storage").textContent = storageMsg;
+      document.getElementById("res-msg-storage").style.color = storage === "open" ? "#ef4444" : "var(--text-secondary)";
+    });
+  }
+}
+
+// Call on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupShelfLifePredictor);
+} else {
+  setupShelfLifePredictor();
 }

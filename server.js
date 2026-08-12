@@ -64,7 +64,7 @@ async function setupDatabaseConnection() {
     console.error("❌ CRITICAL ERROR: Could not connect to XAMPP MySQL Database.");
     console.error("📌 Please open XAMPP Control Panel and ensure 'MySQL' is Started.");
     console.error("Error details:", err.message);
-    
+
     // Force the system to stop instead of silently falling back to a cloud database
     // This ensures data is ALWAYS saved to the local phpMyAdmin.
     process.exit(1);
@@ -103,7 +103,7 @@ async function queryDb(sql, params = []) {
 async function initializeMysqlSchema() {
   console.log("Synchronizing XAMPP MySQL table schemas and seed records...");
 
-  
+
   // 1. bw_branches
   await mysqlPool.query(`
     CREATE TABLE IF NOT EXISTS bw_branches (
@@ -929,14 +929,14 @@ app.get('/api/backup', async (req, res) => {
 // 11. AI FORECASTING API (RANDOM FOREST VIA PYTHON)
 app.post('/api/forecast', (req, res) => {
   const { exec } = require('child_process');
-  
+
   const payload = JSON.stringify(req.body);
   const scriptPath = path.join(__dirname, 'src', 'ai_forecast.py');
-  
+
   // Use python.exe or python depending on env. 
   // In Windows env provided, we verified python is available
   const command = `python "${scriptPath}"`;
-  
+
   const child = exec(command, (error, stdout, stderr) => {
     if (error) {
       console.error(`exec error: ${error}`);
@@ -945,7 +945,7 @@ app.post('/api/forecast', (req, res) => {
     try {
       const result = JSON.parse(stdout);
       res.json(result);
-    } catch(e) {
+    } catch (e) {
       console.error(`JSON Parse Error: ${e} Output: ${stdout}`);
       res.status(500).json({ predicted_demand: 30, error: 'Invalid Output from AI Engine' });
     }

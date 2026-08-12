@@ -1,0 +1,44 @@
+BakeWise System - Application Logic and Flow
+============================================
+
+1. System Architecture overview
+--------------------------------
+The BakeWise system is built as a Single Page Application (SPA) utilizing vanilla HTML, CSS, and JavaScript. The logic is entirely client-side, using the browser's `localStorage` as a mock database to persist data across reloads. It operates with a unified global state manager (`BakeWiseStore`) which acts as the single source of truth for the application.
+
+2. State Management (BakeWiseStore)
+------------------------------------
+All data (Products, Sales, Inventory, Production, Waste, Branches, Users, Notifications) is stored inside the `BakeWiseStore` class.
+- When the app initializes, the store pulls data from `localStorage`. If no data exists, it populates itself with default fallback data (e.g., `DEFAULT_SALES`, `DEFAULT_INVENTORY`).
+- The store uses modern JS getters and setters (e.g., `get sales()`) to automatically filter the retrieved records based on the currently selected branch from the global topbar dropdown. 
+- The `save()` method serializes the state arrays and stores them back into `localStorage`.
+
+3. Navigation and View Routing Flow
+------------------------------------
+The user interface is split into "Panes" (e.g., `#pane-dashboard`, `#pane-sales`, `#pane-inventory`). 
+- Navigation is handled by the `navigateToPane(paneId)` function.
+- This function removes the `active` class from all panes and navigation items, applies it to the selected pane, and hides/shows elements accordingly.
+- Each time a pane is activated, specific refresh functions are called (e.g., `refreshDashboard()`, `refreshSalesHistory()`) to ensure the view displays the most up-to-date state from the store.
+
+4. Authentication and Role-Based Access Control (RBAC)
+-------------------------------------------------------
+The `login()` and `logout()` functions control access.
+- When a user logs in, their session data is stored in `store.currentUser`.
+- The system checks `currentUser.role` to determine UI elements to show or hide.
+- For example, only the "admin" role has the authority to change the active branch via the branch switcher. For other roles, the branch switcher is locked or hidden, and they are restricted to viewing data only for their assigned branch.
+
+5. Data Mutation Flow (Adding Data)
+------------------------------------
+When a user submits a form (e.g., "Add Inventory", "Log Waste"):
+1. The form's `submit` event is intercepted, preventing page reload (`e.preventDefault()`).
+2. The data is collected from the DOM inputs.
+3. The application pushes a new object into the respective array inside `BakeWiseStore` (e.g., `store.inventory.push({...})`).
+4. `store.save("bakewise_v2_inventory", store._inventory)` is called to persist the changes.
+5. The modal is closed and a success toast notification is shown via `showToast()`.
+6. The relevant view is refreshed (e.g., `refreshInventory()`) to immediately display the new data.
+
+6. Analytics and AI Mock Logic
+-------------------------------
+The dashboard features complex data processing:
+- **Sales vs Waste Chart**: Aggregates sales and waste data over the last 7 days using `Date` objects and array `reduce()`, then injects this into Chart.js.
+- **Predicted Needed Stock**: A function `getAIPredictedDemand()` analyzes the recent sales velocity of items, applies a buffer, and compares it to current stock to recommend how many more items need to be produced.
+- **Real-Time Alerts**: Iterates through inventory and waste to generate smart warnings (e.g., items expiring within 2 days, or high waste trends) and displays them dynamically in the dashboard.

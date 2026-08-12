@@ -7,7 +7,7 @@
   <title>Rose Bakeshop | Enterprise Bakery Management System</title>
   <!-- SEO Meta Tags -->
   <meta name="description"
-    content="BakeWise: AI-Powered Enterprise Bakery Management System for Waste Reduction, Inventory Analytics, Shelf-Life Prediction, and Production Enhancement.">
+    content="BakeWise: Advanced Enterprise Bakery Management System for Waste Reduction, Inventory Analytics, Shelf-Life Prediction, and Production Enhancement.">
   <link rel="icon" type="image/png" href="assets/rose_logo.png">
 
   <!-- Stylesheet -->
@@ -45,7 +45,7 @@
           <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="hero-logo-img">
         </div>
         <h1 class="hero-title">Rose Bakeshop x BakeWise</h1>
-        <p class="hero-subtitle-gold">AI-Driven Bakery Operations Platform</p>
+        <p class="hero-subtitle-gold">Advanced Bakery Operations Platform</p>
         
         <div class="hero-divider-wheat">
           <div class="line"></div>
@@ -55,7 +55,7 @@
         <p class="hero-description">
           Reduce bread waste. Optimize inventory.<br>
           Predict shelf-life. Drive smarter production<br>
-          with AI-powered analytics.
+          with advanced analytics.
         </p>
 
         <!-- Feature Cards -->
@@ -78,7 +78,7 @@
             <div class="feature-icon"><i data-lucide="clock"></i></div>
             <div class="feature-text">
               <h4>Shelf-life Prediction</h4>
-              <p>AI-powered insights</p>
+              <p>advanced insights</p>
             </div>
           </div>
           <div class="feature-item">
@@ -206,7 +206,7 @@
         </a>
         <a class="nav-item" data-pane="pane-ai-analytics" id="nav-ai-analytics">
           <i data-lucide="cpu" style="width: 18px; height: 18px;"></i>
-          <span>AI & Demand Forecasting</span>
+          <span>Demand Forecasting</span>
         </a>
         <a class="nav-item" data-pane="pane-shelf-life" id="nav-shelf-life">
           <i data-lucide="sun-snow" style="width: 18px; height: 18px;"></i>
@@ -311,7 +311,7 @@
              ==================================================================== -->
         <section class="view-pane active" id="pane-dashboard">
           <div class="summary-cards-grid">
-            <div class="summary-card sales">
+            <div class="summary-card sales" onclick="navigateToPane('pane-sales')">
               <div class="card-icon-container">
                 <i data-lucide="trending-up" style="width: 24px; height: 24px;"></i>
               </div>
@@ -325,7 +325,7 @@
               </div>
             </div>
 
-            <div class="summary-card waste">
+            <div class="summary-card waste" onclick="navigateToPane('pane-waste')">
               <div class="card-icon-container">
                 <i data-lucide="alert-triangle" style="width: 24px; height: 24px;"></i>
               </div>
@@ -339,7 +339,7 @@
               </div>
             </div>
 
-            <div class="summary-card expiry">
+            <div class="summary-card expiry" onclick="navigateToPane('pane-inventory')">
               <div class="card-icon-container">
                 <i data-lucide="clock" style="width: 24px; height: 24px;"></i>
               </div>
@@ -351,7 +351,7 @@
               </div>
             </div>
 
-            <div class="summary-card inventory">
+            <div class="summary-card inventory" onclick="navigateToPane('pane-inventory')">
               <div class="card-icon-container">
                 <i data-lucide="package" style="width: 24px; height: 24px;"></i>
               </div>
@@ -380,7 +380,7 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
                   <i data-lucide="zap" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
-                  <span>AI Real-time Action Alerts</span>
+                  <span>Real-time Action Alerts</span>
                 </h2>
               </div>
               <div id="dashboard-ai-alerts-container">
@@ -398,7 +398,7 @@
             </div>
           </div>
 
-          <div class="dashboard-layout-grid" id="dashboard-branches-chart-container" style="margin-top: 20px; grid-template-columns: 1fr;">
+          <div class="dashboard-layout-grid" id="dashboard-branches-chart-container" style="margin-top: 20px; grid-template-columns: 1fr 1fr;">
             <div class="panel-card" style="margin-bottom: 0;">
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
@@ -417,6 +417,18 @@
                 <button id="chart-branches-next" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
+              </div>
+            </div>
+
+            <div class="panel-card" style="margin-bottom: 0;">
+              <div class="panel-card-header">
+                <h2 class="panel-card-title">
+                  <i data-lucide="package-search" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+                  <span>Predicted Needed Stock</span>
+                </h2>
+              </div>
+              <div class="chart-container" style="height: 350px;">
+                <canvas id="chart-dashboard-needed-stock"></canvas>
               </div>
             </div>
           </div>
@@ -819,32 +831,57 @@
             </div>
           </div>
 
-          <div id="inventory-modal" class="panel-card modal-dialog" style="display: none;">
-            <div class="panel-card-header">
-              <h2 class="panel-card-title">Add Inventory Item</h2>
+          <div id="inventory-modal" class="panel-card modal-dialog" style="display: none; padding: 24px;">
+            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+              <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="package-plus" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
+                <span>Add Inventory Item</span>
+              </h2>
               <button class="btn-secondary" id="btn-inventory-modal-close"
-                style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
+                style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
             <form id="inventory-add-form">
-              <div class="form-group" style="margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label for="inv-select-branch" class="form-label">Branch</label>
+                <div class="input-container">
+                  <i data-lucide="store" class="input-icon" style="width: 18px; height: 18px;"></i>
+                  <select id="inv-select-branch" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
                 <label for="inv-select-product" class="form-label">Product Name</label>
-                <select id="inv-select-product" class="form-input" style="padding-left: 14px;" required></select>
+                <div class="input-container">
+                  <i data-lucide="box" class="input-icon" style="width: 18px; height: 18px;"></i>
+                  <select id="inv-select-product" class="form-input" required></select>
+                </div>
               </div>
-              <div class="form-group" style="margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 16px;">
                 <label for="inv-stock-input" class="form-label">Stock Quantity (pcs)</label>
-                <input type="number" id="inv-stock-input" class="form-input" style="padding-left: 14px;" required min="1">
+                <div class="input-container">
+                  <i data-lucide="hash" class="input-icon" style="width: 18px; height: 18px;"></i>
+                  <input type="number" id="inv-stock-input" class="form-input" required min="1" placeholder="e.g. 50">
+                </div>
               </div>
-              <div class="form-group" style="margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 16px;">
                 <label for="inv-prod-date" class="form-label">Production Date</label>
-                <input type="date" id="inv-prod-date" class="form-input" style="padding-left: 14px;" required>
+                <div class="input-container">
+                  <i data-lucide="calendar" class="input-icon" style="width: 18px; height: 18px;"></i>
+                  <input type="date" id="inv-prod-date" class="form-input" required>
+                </div>
               </div>
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label for="inv-exp-date" class="form-label">Expiration Date</label>
-                <input type="date" id="inv-exp-date" class="form-input" style="padding-left: 14px;" required>
+              <div class="form-group" style="margin-bottom: 24px;">
+                <label for="inv-exp-date" class="form-label">Expiration Date (Auto-calculated)</label>
+                <div class="input-container">
+                  <i data-lucide="calendar-off" class="input-icon" style="width: 18px; height: 18px;"></i>
+                  <input type="date" id="inv-exp-date" class="form-input" required>
+                </div>
               </div>
-              <div class="form-actions">
+              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                 <button type="button" class="btn-secondary" id="btn-inventory-modal-cancel">Cancel</button>
-                <button type="submit" class="btn-primary" style="width: auto; padding: 10px 20px;">Save Stock</button>
+                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                  <i data-lucide="save" style="width: 18px; height: 18px;"></i>
+                  <span>Save Stock</span>
+                </button>
               </div>
             </form>
           </div>
@@ -1009,7 +1046,7 @@
               <canvas id="chart-ai-demand-forecast"></canvas>
             </div>
             <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 12px;">
-              * AI Demand Forecasting applies seasonal variables and rolling 7-day moving averages of sales histories to
+              * Demand Forecasting applies seasonal variables and rolling 7-day moving averages of sales histories to
               forecast optimal bread quantities.
             </p>
           </div>
@@ -1019,7 +1056,7 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
                   <i data-lucide="trending-up" style="width: 20px; height: 20px; color: var(--color-success);"></i>
-                  <span>AI Production Optimization Recommendations</span>
+                  <span>Bakewise Production Optimization Recommendations</span>
                 </h2>
               </div>
               <div class="ai-recommendation-list" id="ai-recs-container"></div>
@@ -1146,7 +1183,7 @@
               </div>
 
               <div class="panel-card">
-                <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1rem;">AI Analysis Summary</h3>
+                <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1rem;">Analysis Summary</h3>
                 <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem; color: var(--text-secondary);">
                   <li style="display: flex; align-items: center; gap: 12px;">
                     <i data-lucide="thermometer" style="color: #ef4444; width: 18px; height: 18px;"></i>
@@ -1489,10 +1526,10 @@
   <!-- Global Confirmation Modal -->
   <div class="modal-overlay" id="confirm-modal-overlay"></div>
   <div class="panel-card modal-dialog" id="confirm-modal" style="display: none; max-width: 400px; text-align: center; z-index: 2000;">
-    <div style="margin-bottom: 20px;">
+    <div id="confirm-modal-icon-container" style="margin-bottom: 20px;">
       <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: var(--color-error); margin: 0 auto; display: block;"></i>
     </div>
-    <h3 style="margin-bottom: 10px; font-weight: 600; font-size: 1.25rem;">Confirm Action</h3>
+    <h3 id="confirm-modal-title" style="margin-bottom: 10px; font-weight: 600; font-size: 1.25rem;">Confirm Action</h3>
     <p id="confirm-modal-message" style="margin-bottom: 24px; color: var(--text-secondary); line-height: 1.5;"></p>
     <div class="form-actions" style="justify-content: center; gap: 12px;">
       <button type="button" class="btn-secondary" id="btn-confirm-cancel" style="width: auto; padding: 10px 24px;">Cancel</button>

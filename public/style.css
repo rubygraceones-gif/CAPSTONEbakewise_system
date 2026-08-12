@@ -1075,12 +1075,14 @@ body:not(.dark-mode) select option {
   gap: 20px;
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .summary-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px -5px rgba(139, 92, 26, 0.08);
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 15px 35px -5px rgba(139, 92, 26, 0.15);
+  border-color: var(--primary-color);
 }
 
 .card-icon-container {
@@ -1169,7 +1171,15 @@ body:not(.dark-mode) select option {
   padding: 24px;
   box-shadow: var(--card-shadow);
   margin-bottom: 24px;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-card:not(.modal-dialog):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px -8px rgba(139, 92, 26, 0.12);
+  border-color: rgba(139, 92, 26, 0.3);
 }
 
 .panel-card-header {
@@ -1194,8 +1204,9 @@ body:not(.dark-mode) select option {
 
 .chart-container {
   position: relative;
-  height: 300px;
+  min-height: 300px;
   width: 100%;
+  flex-grow: 1;
 }
 
 /* Alert Boxes / AI insights */
@@ -2867,4 +2878,16 @@ body.dark-mode .leaflet-control-zoom-in,
 body.dark-mode .leaflet-control-zoom-out,
 body.dark-mode .leaflet-control-attribution {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+/* Shelf Life Pane Layout */
+.shelf-life-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .shelf-life-grid {
+    grid-template-columns: 1fr;
+  }
 }
