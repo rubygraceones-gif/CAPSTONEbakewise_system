@@ -3,6 +3,33 @@
    Advanced Bakery Management System Client Code
    ========================================================================== */
 
+// --- JWT FETCH INTERCEPTOR ---
+const originalFetch = window.fetch;
+window.fetch = async function () {
+  let [resource, config] = arguments;
+  if (typeof resource === 'string' && resource.startsWith('/api')) {
+    const sessionStr = localStorage.getItem('bakewise_v2_session');
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session.token) {
+          config = config || {};
+          config.headers = config.headers || {};
+          config.headers['Authorization'] = `Bearer ${session.token}`;
+        }
+      } catch(e) {}
+    }
+  }
+  const response = await originalFetch(resource, config);
+  if (response.status === 401 && typeof resource === 'string' && resource.startsWith('/api') && resource !== '/api/auth/login') {
+    localStorage.removeItem('bakewise_v2_session');
+    if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
+      window.location.reload();
+    }
+  }
+  return response;
+};
+
 // --- PAGINATION STATE VARIABLES ---
 let usersCurrentPage = 1;
 let salesHistCurrentPage = 1;
@@ -352,29 +379,37 @@ class BakeWiseStore {
   async login(email, password) {
     const cleanEmail = (email || '').trim().toLowerCase();
 
-    if (this.isBackendOnline) {
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password })
-        });
-        if (res.ok) {
-          const user = await res.json();
-          this.currentUser = {
-            email: user.email,
-            role: user.role,
-            name: user.name,
-            branch_id: user.branch_id,
-            branch_name: user.branch_name,
-            roleLabel: this.getRoleLabel(user.role)
-          };
-          localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
-          return this.currentUser;
-        }
-      } catch (e) {
-        console.error("Auth login failed", e);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password })
+      });
+      if (res.ok) {
+        const user = await res.json();
+        this.currentUser = {
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          branch_id: user.branch_id,
+          branch_name: user.branch_name,
+          roleLabel: this.getRoleLabel(user.role),
+          token: user.token
+        };
+        localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+        this.isBackendOnline = true;
+        return this.currentUser;
+      } else if (res.status === 429) {
+        // Rate limited - tell the UI and return null
+        if (typeof showToast !== 'undefined') showToast("Too many login attempts. Please try again after 15 minutes.", "error");
+        return null;
+      } else {
+        // Other server errors (e.g. 401 invalid credentials)
+        if (typeof showToast !== 'undefined') showToast("Invalid email or password.", "error");
+        return null; 
       }
+    } catch (e) {
+      console.error("Auth login network failed, attempting offline fallback", e);
     }
 
     const matchedUser = this.users.find(u => 
@@ -997,14 +1032,12 @@ async function checkSessionState() {
         switcherSelect.innerHTML = '<option value="all">All Network Branches</option>' + 
           store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
         switcherSelect.disabled = false;
-      } else if (store.currentUser.role === 'manager') {
-        branchSwitcher.style.display = 'flex';
+      } else {
+        branchSwitcher.style.display = 'none';
         const userBranch = store.branches.find(b => b.id === store.currentUser.branch_id);
         const branchName = userBranch ? userBranch.name : `Branch ${store.currentUser.branch_id}`;
         switcherSelect.innerHTML = `<option value="${store.currentUser.branch_id}">${branchName}</option>`;
         switcherSelect.disabled = true;
-      } else {
-        branchSwitcher.style.display = 'none';
       }
     }
 

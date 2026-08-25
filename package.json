@@ -8,11 +8,20 @@
     "dev": "node server.js"
   },
   "dependencies": {
+    "apicache": "^1.6.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
     "jsdom": "^29.1.1",
+    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.23.1",
-    "pg": "^8.11.5"
+    "pg": "^8.11.5",
+    "xss-clean": "^0.1.4"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6"
   }
 }

@@ -1,0 +1,73 @@
+==============================================================
+BAKEWISE SECURITY & DEVSECOPS - STEP-BY-STEP TESTING GUIDE
+==============================================================
+
+This guide will help you verify the newly implemented security features 
+(Code Quality, JWT Authentication, Caching, Server Security, and Rate Limiting).
+
+--------------------------------------------------------------
+TEST 1: JWT AUTHENTICATION (Login & Token Generation)
+--------------------------------------------------------------
+1. Open your browser and go to http://localhost:3000
+2. On the login screen, enter a valid credential:
+   - Email: manager@bakewise.com
+   - Password: password123
+3. Press "Secure System Sign In".
+4. Open the Developer Tools in your browser (Right-click -> Inspect, or press F12).
+5. Go to the "Application" tab (Chrome) or "Storage" tab (Firefox).
+6. Under "Local Storage", select "http://localhost:3000".
+7. Click on the key "bakewise_v2_session". 
+8. Verify that you see a "token" field with a long encrypted string. This means JWT Authentication is successfully working!
+
+--------------------------------------------------------------
+TEST 2: API SECURITY (Accessing Protected Routes)
+--------------------------------------------------------------
+1. While still logged in, click on different tabs (Branch Management, Inventory, Sales).
+2. The data should load normally because the system is automatically attaching your JWT token.
+3. Now, go back to Developer Tools -> Local Storage.
+4. Delete the "bakewise_v2_session" key entirely (or just delete the "token" part).
+5. Try to refresh the page or click on another tab.
+6. The system should detect that you are unauthorized (401 status) and kick you back to the login screen.
+
+--------------------------------------------------------------
+TEST 3: RATE LIMITING (Brute Force Protection)
+--------------------------------------------------------------
+1. Go to the Login screen.
+2. Enter an incorrect email or password.
+3. Rapidly click the "Secure System Sign In" button more than 10 times in quick succession.
+4. Open the "Network" tab in Developer Tools.
+5. You should eventually see a request fail with a "429 Too Many Requests" error status.
+6. If you check the response message, it will say: "Too many login attempts from this IP, please try again after 15 minutes."
+
+--------------------------------------------------------------
+TEST 4: SERVER SECURITY (Helmet Headers)
+--------------------------------------------------------------
+1. While the app is open, go to the "Network" tab in Developer Tools.
+2. Refresh the page (F5) and click on the "localhost" request at the top of the list.
+3. Look at the "Response Headers" section on the right.
+4. You should see security headers added by Helmet, such as:
+   - Content-Security-Policy (CSP)
+   - X-DNS-Prefetch-Control
+   - X-Frame-Options: SAMEORIGIN
+   - Strict-Transport-Security
+   - X-XSS-Protection
+
+--------------------------------------------------------------
+TEST 5: API CACHING (Performance Optimization)
+--------------------------------------------------------------
+1. Log in to the system.
+2. Open the "Network" tab in Developer Tools and clear the log (click the "circle with a slash" icon).
+3. Go to the "Branch Management" tab. Note the time it took for the `/api/branches` request to finish (e.g., 50ms).
+4. Click away to another tab, and then click back to "Branch Management".
+5. Look at the `/api/branches` request again. Because it is cached for 5 minutes, the response time should be significantly faster (e.g., 2ms) and it did not have to query the database again.
+
+--------------------------------------------------------------
+TEST 6: CODE QUALITY
+--------------------------------------------------------------
+1. In your code editor (VS Code), open `server.js` or `app.js`.
+2. Notice the new `.eslintrc.json` and `.prettierrc` files in your project folder.
+3. If you have the ESLint or Prettier extension installed in VS Code, it will automatically start highlighting bad code practices and formatting your code cleanly on save!
+
+==============================================================
+END OF TESTING GUIDE
+==============================================================

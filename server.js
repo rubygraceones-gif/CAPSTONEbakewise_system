@@ -3,13 +3,72 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const { Pool } = require('pg');
 const path = require('path');
+const helmet = require('helmet');
+const xss = require('xss-clean');
+const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const apicache = require('apicache');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Security and Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://unpkg.com", "https://*.tile.openstreetmap.org", "https://a.tile.openstreetmap.org", "https://b.tile.openstreetmap.org", "https://c.tile.openstreetmap.org"],
+      connectSrc: ["'self'"],
+    },
+  },
+}));
+app.use(xss());
 app.use(cors());
 app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
+const cache = apicache.middleware;
+
+// Rate Limiters
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 login requests per windowMs
+  message: { error: 'Too many login attempts from this IP, please try again after 15 minutes' }
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 500 requests per windowMs
+  message: { error: 'Too many requests from this IP, please try again later' }
+});
+
+app.use('/api/', apiLimiter);
+
+// JWT Middleware
+function authenticateToken(req, res, next) {
+  // Allow OPTIONS preflight requests
+  if (req.method === 'OPTIONS') return next();
+  
+  // Allow /api/auth/login and /api/status without token
+  if (req.path === '/auth/login' || req.path === '/status') return next();
+  
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token == null) return res.status(401).json({ error: 'No token provided' });
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token is invalid or expired' });
+    req.user = user;
+    next();
+  });
+}
+
+app.use('/api/', authenticateToken);
 
 // --- DATABASE DRIVER STATE ---
 let activeDbDriver = 'none'; // 'mysql' | 'pg' | 'memory'
@@ -575,7 +634,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // 2. AUTHENTICATION & LOGIN API
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
   let { email, password } = req.body;
   email = (email || '').trim().toLowerCase();
   password = (password || '').trim();
@@ -603,7 +662,18 @@ app.post('/api/auth/login', async (req, res) => {
         'manager': 'Branch Manager',
         'admin': 'System Administrator'
       };
+
+      const payload = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        branchId: user.branch_id
+      };
+      
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+
       res.json({
+        token,
         id: user.id,
         email: user.email,
         name: user.name,
@@ -620,7 +690,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // 3. BRANCH NETWORK API
-app.get('/api/branches', async (req, res) => {
+app.get('/api/branches', cache('5 minutes'), async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_branches ORDER BY id ASC");
     res.json(result.rows);
@@ -722,7 +792,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // 5. PRODUCTS API
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', cache('5 minutes'), async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_products ORDER BY id ASC");
     res.json(result.rows);
