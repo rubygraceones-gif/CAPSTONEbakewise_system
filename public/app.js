@@ -133,7 +133,9 @@ class BakeWiseStore {
     ]);
 
     this.isBackendOnline = false;
-    this.currentUser = JSON.parse(localStorage.getItem("bakewise_v2_session") || null);
+    // Always start at the login screen when opening the system
+    localStorage.removeItem("bakewise_v2_session");
+    this.currentUser = null;
     this.notifications = this.load("bakewise_v2_notifications", []);
   }
 
