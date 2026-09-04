@@ -1,0 +1,75 @@
+System Check Instructions Guide - Step-by-Step with Commands (PowerShell)
+
+This guide provides a structured approach to evaluating the system based on the four key criteria. The commands below use native PowerShell (Invoke-RestMethod and Invoke-WebRequest), which is perfect for Windows environments. 
+
+Note: Replace `http://localhost:8000` and tokens with your actual system URLs and data.
+
+---
+
+Step 1: Authentication & OAuth Flow (25 pts)
+Goal: Ensure user identity is verified securely and standard authentication protocols are implemented correctly.
+
+* 1.1 Test Local Authentication:
+  - Command to test login endpoint:
+    Invoke-RestMethod -Uri "http://localhost:8000/api/login" -Method Post -ContentType "application/json" -Body '{"username":"testuser", "password":"Password123!"}'
+  - Check the response for a secure token (e.g., JWT).
+
+* 1.2 Inspect Session Management (Cookies/Headers):
+  - Command to check cookies and session headers:
+    Invoke-WebRequest -Uri "http://localhost:8000/api/login" -Method Post -ContentType "application/json" -Body '{"username":"testuser", "password":"Password123!"}' | Select-Object -ExpandProperty Headers
+  - Look for 'HttpOnly' and 'Secure' in the Set-Cookie response header.
+
+---
+
+Step 2: Access Control & Authorization (30 pts)
+Goal: Ensure users can only access resources they are permitted to see or modify.
+
+* 2.1 Role-Based Access Control (RBAC):
+  - Command to attempt accessing an admin endpoint with a regular user token:
+    Invoke-RestMethod -Uri "http://localhost:8000/api/admin/dashboard" -Method Get -Headers @{Authorization="Bearer YOUR_REGULAR_USER_TOKEN"}
+  - Expect a '403 Forbidden' or '401 Unauthorized' error.
+
+* 2.2 Insecure Direct Object Reference (IDOR) Testing:
+  - Command to access another user's data (e.g., trying to access User 2's data with User 1's token):
+    Invoke-RestMethod -Uri "http://localhost:8000/api/users/2/profile" -Method Get -Headers @{Authorization="Bearer YOUR_TOKEN_FOR_USER_1"}
+  - Expect an error response, meaning data isolation works.
+
+---
+
+Step 3: Threat Mitigation & Rate Limiting (30 pts)
+Goal: Protect the system against common attacks and abuse.
+
+* 3.1 Rate Limiting & Brute Force Protection:
+  - Command to simulate 50 rapid login requests:
+    1..50 | ForEach-Object { Invoke-WebRequest -Uri "http://localhost:8000/api/login" -Method Post -ErrorAction SilentlyContinue | Select-Object StatusCode }
+  - Expect '429' (Too Many Requests) HTTP status code after a certain number of attempts.
+
+* 3.2 Basic SQL Injection Test:
+  - Command to test a basic SQLi payload on a login field:
+    Invoke-RestMethod -Uri "http://localhost:8000/api/login" -Method Post -ContentType "application/json" -Body '{"username":"admin", "password":"\" OR 1=1 --"}'
+  - Ensure the system returns a standard login error, not a database error.
+
+* 3.3 Security Headers:
+  - Command to inspect security headers:
+    (Invoke-WebRequest -Uri "http://localhost:8000").Headers
+  - Look for headers like: X-Frame-Options, X-XSS-Protection, Content-Security-Policy.
+
+---
+
+Step 4: Availability, Caching & CDN (50 pts)
+Goal: Ensure the system is highly available, performs well under load, and serves content efficiently.
+
+* 4.1 Content Delivery Network (CDN) & Caching:
+  - Command to check caching headers for static assets (like images or CSS):
+    (Invoke-WebRequest -Uri "http://localhost:8000/static/style.css").Headers
+  - Look for 'Cache-Control', 'Expires', or 'X-Cache' headers to confirm caching is active.
+
+* 4.2 Performance & Load Testing:
+  - Command to measure the time it takes to complete 100 sequential requests:
+    Measure-Command { 1..100 | ForEach-Object { Invoke-WebRequest -Uri "http://localhost:8000/" -ErrorAction SilentlyContinue } }
+  - Check the "TotalSeconds" in the output to see how well the server handles the load.
+
+* 4.3 Uptime / Health Check:
+  - Command to check a health endpoint:
+    Invoke-RestMethod -Uri "http://localhost:8000/health"
+  - It should return a success message or status like '{"status":"ok"}'.

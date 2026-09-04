@@ -1,0 +1,77 @@
+BakeWise System - Security & Architecture Check Guide (PowerShell)
+
+Based on the actual BakeWise codebase and the 5 criteria from your rubric, here are the step-by-step commands to verify the system. 
+Note: I checked the codebase and found the BakeWise server runs on port 3000, not 8000.
+
+---
+
+Step 1: Authentication & OAuth Flow (25 pts)
+Goal: Ensure user identity is verified securely and standard authentication protocols are implemented correctly.
+Implementation: BakeWise uses JSON Web Tokens (JWT) and bcryptjs for passwords.
+
+* 1.1 Test Local Authentication (Login):
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method Post -ContentType "application/json" -Body '{"email":"admin@bakewise.com", "password":"password123"}'
+  - (Note: change username/password to actual credentials if known). Check the response for the JWT token. Keep this token for Step 2.
+
+---
+
+Step 2: Access Control & Authorization (30 pts)
+Goal: Ensure users can only access resources they are permitted to see or modify.
+Implementation: BakeWise uses `authenticateToken` middleware for all `/api/*` routes.
+
+* 2.1 Test Unauthorized Access:
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    Invoke-RestMethod -Uri "http://localhost:3000/api/branches" -Method Get
+  - NOTE: You will see a red PowerShell error saying "Invoke-RestMethod : {"error":"No token provided"}". This is the CORRECT result, proving the system is secure and blocks access without a token!
+
+* 2.2 Test Authorized Access:
+  - ACTION: Copy this, open your PowerShell terminal, and paste it (it contains the actual token you generated):
+    Invoke-RestMethod -Uri "http://localhost:3000/api/branches" -Method Get -Headers @{Authorization="Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwiZW1haWwiOiJhZG1pbkBiYWtld2lzZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJicmFuY2hJZCI6bnVsbCwiaWF0IjoxNzg4NTE0MjI4LCJleHAiOjE3ODg1NDMwMjh9.ntM--YnEecYkeS3BwUFPuCKizwgeh_7pn8fReFeBkwg"}
+
+---
+
+Step 3: Threat Mitigation & Rate Limiting (30 pts)
+Goal: Protect the system against common attacks and abuse.
+Implementation: BakeWise uses 'helmet', 'xss-clean', and 'express-rate-limit'.
+
+* 3.1 Rate Limiting (Brute Force Protection):
+  - The login route has a strict limit of 10 requests per 15 minutes. 
+  - ACTION: Copy this, open your PowerShell terminal, and paste it to trigger the block:
+    1..15 | ForEach-Object { Invoke-WebRequest -Uri "http://localhost:3000/api/auth/login" -Method Post -ErrorAction SilentlyContinue | Select-Object StatusCode }
+  - You will see '429' (Too Many Requests) once the limit is hit.
+
+* 3.2 Security Headers (Helmet):
+  - Inspect the security headers added by Helmet (like Content-Security-Policy).
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    (Invoke-WebRequest -Uri "http://localhost:3000/api/status").Headers
+
+---
+
+Step 4: Availability, Caching & CDN (50 pts)
+Goal: Ensure the system is highly available, performs well under load, and serves content efficiently.
+Implementation: Status endpoint `/api/status` exists, and `apicache` is configured.
+
+* 4.1 Check Server Status / Uptime:
+  - ACTION: Copy this, open your PowerShell terminal, and paste it to hit the status endpoint:
+    Invoke-RestMethod -Uri "http://localhost:3000/api/status"
+  - It should return system info and "status: online" as well as the database connection status.
+
+---
+
+Step 5: Code Quality & DevSecOps (30 pts)
+Goal: Ensure clean, maintainable code and automated security/deployment pipelines.
+Implementation: BakeWise has ESLint, Prettier, and GitHub Actions configured.
+
+* 5.1 Code Quality Check:
+  - The project uses `eslint` and `prettier`. You can inspect the configuration files.
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    Get-Content .eslintrc.json
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    Get-Content .prettierrc
+
+* 5.2 Verify DevSecOps Pipeline:
+  - Check the presence of the GitHub Actions workflow file.
+  - ACTION: Copy this, open your PowerShell terminal, and paste it:
+    Get-Content .\.github\workflows\ci-cd.yml
+  - This file confirms that automated CI/CD is implemented for testing and deployment.
