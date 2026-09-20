@@ -1,0 +1,19 @@
+BakeWise Demand Forecasting - System Updates & AI Insights
+
+In response to the feedback to "add meaningful insights on each data presented per forecast, add scoring matrix of the random forest and f1 score", the BakeWise demand forecasting module has been significantly upgraded.
+
+1. Scoring Matrix & F1 Score Implementation:
+Since the Random Forest model is inherently a Regression model (predicting exact quantities of bread rather than categorical labels), an F1 score (which is typically a Classification metric) required a hybrid approach to implement correctly. 
+
+The system now bins the continuous historical sales data and the predicted demand into three distinct classifications using percentile thresholds (33rd and 67th percentiles):
+- "Low Demand"
+- "Medium Demand"
+- "High Demand"
+
+By evaluating the predictions against the actual historical labels within these bins, the system dynamically calculates the F1-Score (using a weighted average) and generates a complete Confusion Matrix in the backend. 
+Additionally, the system also calculates standard regression metrics, specifically the Root Mean Squared Error (RMSE), to provide a complete view of the model's accuracy. Both the F1-Score and the RMSE are now prominently displayed in a new "AI Scoring Matrix" dashboard panel right below the AI Demand Forecast chart.
+
+2. Meaningful Data Insights:
+To ensure the data presented is immediately useful for business decision support, the system now automatically generates and displays "Meaningful Insights" for the top predicted products. 
+
+These insights dynamically compare the Random Forest's final prediction against the recent 7-day rolling average, expressing the anticipated variance as a percentage (e.g., "Forecasted demand is 64 units, which is 15.2% higher than the recent 7-day average"). Furthermore, the insights classify the forecast into the aforementioned demand bins (Low/Medium/High) and provide a plain-text interpretation of the model's RMSE and F1-Score variance, ensuring bakery personnel can easily understand the reliability of the forecast without needing a background in data science.

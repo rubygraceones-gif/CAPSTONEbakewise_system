@@ -1,0 +1,15 @@
+[build]
+builder = "nixpacks"
+providers = ["node", "python"]
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["nodejs_20", "python311"]
+
+[build.nixpacksPlan.phases.install]
+cmds = [
+    "npm install",
+    "pip install -r requirements.txt"
+]
+
+[deploy]
+startCommand = "node server.js"

@@ -322,6 +322,10 @@
                   <i data-lucide="arrow-up-right" style="width: 14px; height: 14px;"></i>
                   <span>+4.2% from yesterday</span>
                 </span>
+                <div class="dashboard-ai-insight" id="dash-sales-insight">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                  <span>Forecast indicates a steady increase. Ensure adequate staffing during peak hours.</span>
+                </div>
               </div>
             </div>
 
@@ -336,6 +340,10 @@
                   <i data-lucide="arrow-down-right" style="width: 14px; height: 14px;"></i>
                   <span>-12.8% this week</span>
                 </span>
+                <div class="dashboard-ai-insight" id="dash-waste-insight">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                  <span>Waste cost is decreasing. Maintain current inventory practices to keep waste low.</span>
+                </div>
               </div>
             </div>
 
@@ -348,6 +356,10 @@
                 <span class="stats-value" id="dash-expiry-value">0 items</span>
                 <span class="stats-trend text-light" style="color: var(--text-secondary);"
                   id="dash-expiry-subtext">Needs repurposing suggestion</span>
+                <div class="dashboard-ai-insight" id="dash-expiry-insight">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                  <span>Prioritize repurposing or discounting these items immediately.</span>
+                </div>
               </div>
             </div>
 
@@ -359,20 +371,34 @@
                 <span class="stats-label">Stock Status</span>
                 <span class="stats-value" id="dash-stock-value">0 pcs</span>
                 <span class="stats-trend up" style="color: var(--color-success);" id="dash-stock-subtext">Optimal levels</span>
+                <div class="dashboard-ai-insight" id="dash-stock-insight">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                  <span>Stock levels are optimal. No immediate restocking required.</span>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="dashboard-layout-grid">
             <div class="panel-card" style="margin-bottom: 0;">
-              <div class="panel-card-header">
+              <div class="panel-card-header" style="flex-direction: column; align-items: flex-start; gap: 10px;">
                 <h2 class="panel-card-title">
                   <i data-lucide="bar-chart-3" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
-                  <span>Sales vs. Waste Trend (Last 7 Days)</span>
+                  <span id="dash-chart-title">Sales vs. Waste Trend</span>
                 </h2>
+                <div style="display: flex; gap: 10px; align-items: center; width: 100%; justify-content: flex-end;">
+                  <input type="date" id="dash-filter-start" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;" title="Start Date">
+                  <span style="color: var(--text-secondary); font-size: 0.9rem;">to</span>
+                  <input type="date" id="dash-filter-end" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;" title="End Date">
+                  <button id="btn-dash-filter-apply" class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
+                </div>
               </div>
               <div class="chart-container">
                 <canvas id="chart-dashboard-sales-waste"></canvas>
+              </div>
+              <div class="dashboard-ai-insight" id="insight-sales-waste-chart" style="margin: 0 20px 20px 20px;">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                <span>Analyzing 7-day sales and waste trends...</span>
               </div>
             </div>
 
@@ -382,18 +408,10 @@
                   <i data-lucide="zap" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
                   <span>Real-time Action Alerts</span>
                 </h2>
+                <button id="clear-all-alerts-btn" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 8px; display: none;">Clear All</button>
               </div>
-              <div id="dashboard-ai-alerts-container">
+              <div id="dashboard-ai-alerts-container" style="max-height: 420px; overflow-y: auto; padding-right: 5px;">
                 <!-- Actionable Alerts injected dynamically -->
-              </div>
-              <div id="ai-alerts-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border-color);">
-                <button id="ai-alerts-prev" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
-                </button>
-                <span id="ai-alerts-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="ai-alerts-next" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
-                </button>
               </div>
             </div>
           </div>
@@ -418,6 +436,10 @@
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
               </div>
+              <div class="dashboard-ai-insight" id="insight-branches-chart" style="margin: 0 20px 20px 20px;">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                <span>Comparing branch performance metrics...</span>
+              </div>
             </div>
 
             <div class="panel-card" style="margin-bottom: 0;">
@@ -429,6 +451,10 @@
               </div>
               <div class="chart-container" style="height: 350px;">
                 <canvas id="chart-dashboard-needed-stock"></canvas>
+              </div>
+              <div class="dashboard-ai-insight" id="insight-needed-stock-chart" style="margin: 0 20px 20px 20px;">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                <span>Evaluating predicted stock requirements...</span>
               </div>
             </div>
           </div>
@@ -445,8 +471,8 @@
               </div>
               <div class="card-stats">
                 <span class="stats-label">Active Branches</span>
-                <span class="stats-value" id="branch-kpi-count">4 Nodes</span>
-                <span class="stats-trend up" style="color: var(--color-success);">XAMPP MySQL Persistent</span>
+                <span class="stats-value" id="branch-kpi-count">4 Branches</span>
+                <span class="stats-trend up" style="color: var(--color-success);">System Synchronized</span>
               </div>
             </div>
 
@@ -484,19 +510,6 @@
             </div>
           </div>
 
-          <div class="panel-card" style="margin-bottom: 24px;">
-            <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
-              <h2 class="panel-card-title">
-                <i data-lucide="map" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
-                <span>Bakeshop Network Map Monitor</span>
-              </h2>
-              <span class="badge success" style="padding: 6px 12px; font-size: 0.8rem;">Click Pin to Inspect</span>
-            </div>
-            <div class="map-monitor-wrapper" style="position: relative; height: 440px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background-color: var(--bg-secondary);">
-              <div id="branch-map" style="width: 100%; height: 100%; position: relative;">
-              </div>
-            </div>
-          </div>
 
           <div class="form-card-split">
             <div class="panel-card">
@@ -540,9 +553,12 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
-                <h2 class="panel-card-title">Network Nodes Directory</h2>
-                <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="max-width: 400px; width: 100%; padding: 6px 12px; font-size: 0.82rem;">
+              <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
+                <h2 class="panel-card-title">Network Branches Directory</h2>
+                <div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 400px;">
+                  <label for="branch-search-input" style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">Search Branch:</label>
+                  <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="flex: 1; padding: 6px 12px; font-size: 0.82rem;">
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="data-table">
@@ -585,7 +601,7 @@
               <div class="card-stats">
                 <span class="stats-label">Registered Accounts</span>
                 <span class="stats-value" id="user-kpi-total">5 Accounts</span>
-                <span class="stats-trend up" style="color: var(--color-success);">XAMPP MySQL User Directory</span>
+                <span class="stats-trend up" style="color: var(--color-success);">System User Directory</span>
               </div>
             </div>
 
@@ -643,7 +659,7 @@
                   <label for="usr-email-input" class="form-label">Work Email Address</label>
                   <div class="input-container">
                     <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="email" id="usr-email-input" class="form-input" required placeholder="staff@bakewise.com">
+                    <input type="email" id="usr-email-input" class="form-input" required placeholder="staff@bakewise.com" pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -658,6 +674,7 @@
                   <div class="input-container">
                     <i data-lucide="shield" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <select id="usr-role-select" class="form-input" required>
+                      <option value="" disabled selected>Select a role...</option>
                       <option value="sales">Sales Staff (Front Counter)</option>
                       <option value="inventory">Inventory Crew (Shelf Manager)</option>
                       <option value="production">Baking Crew (Kitchen/Oven)</option>
@@ -758,8 +775,24 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header">
+              <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Recent Sales History</h2>
+              </div>
+              <div class="sales-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="sales-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                  <select id="sales-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                    <option value="all">All Branches</option>
+                  </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="sales-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                  <input type="text" id="sales-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="sales-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Date:</label>
+                  <input type="date" id="sales-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="data-table">
@@ -794,13 +827,32 @@
              ==================================================================== -->
         <section class="view-pane" id="pane-inventory">
           <div class="panel-card">
-            <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px;">
+            <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
               <h2 class="panel-card-title">Current Bakery Inventory & Freshness Log</h2>
               <button class="btn-secondary" id="btn-add-inventory-modal"
                 style="padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
                 <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
                 <span>Add Inventory Stock</span>
               </button>
+            </div>
+            
+            <div class="inventory-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                <select id="inventory-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                  <option value="all">All Branches</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                <input type="text" id="inventory-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Production Date:</label>
+                <input type="date" id="inventory-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+              </div>
             </div>
 
             <div class="table-responsive">
@@ -924,8 +976,33 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header">
+              <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Daily Baking Production Log</h2>
+              </div>
+              <div class="production-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="prod-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                  <select id="prod-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                    <option value="all">All Branches</option>
+                  </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="prod-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                  <input type="text" id="prod-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="prod-batch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Batch Code:</label>
+                  <input type="text" id="prod-batch-filter" class="form-input" placeholder="e.g. B-260..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="prod-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
+                  <select id="prod-status-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 140px;">
+                    <option value="all">All Statuses</option>
+                    <option value="Completed">Completed</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="data-table">
@@ -1000,8 +1077,27 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header">
+              <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Waste Incident Ledger</h2>
+              </div>
+              
+              <div class="waste-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="waste-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                  <select id="waste-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                    <option value="all">All Branches</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="waste-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                  <input type="text" id="waste-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="waste-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Date:</label>
+                  <input type="date" id="waste-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="data-table">
@@ -1045,6 +1141,11 @@
             <div class="chart-container" style="height: 320px;">
               <canvas id="chart-ai-demand-forecast"></canvas>
             </div>
+            
+            <div id="ai-forecast-metrics" style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: none;">
+              <!-- Scoring metrics and insights will be injected here -->
+            </div>
+
             <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 12px;">
               * Demand Forecasting applies seasonal variables and rolling 7-day moving averages of sales histories to
               forecast optimal bread quantities.
@@ -1253,8 +1354,15 @@
              PANE: REPORTS VIEW
              ==================================================================== -->
         <section class="view-pane" id="pane-reports">
-          <div class="report-actions" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
-            <button class="btn-print" id="btn-print-report">
+          <div class="report-actions" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
+            <div class="report-filters" style="display: flex; gap: 10px; align-items: center; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-color);">Date Range:</span>
+              <input type="date" id="rep-filter-start" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;">
+              <span style="color: var(--text-secondary); font-size: 0.9rem;">to</span>
+              <input type="date" id="rep-filter-end" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;">
+              <button id="btn-rep-filter-apply" class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
+            </div>
+            <button class="btn-print" id="btn-print-report" style="margin-left: auto;">
               <i data-lucide="download" style="width: 18px; height: 18px;"></i>
               <span>Download</span>
             </button>
@@ -1406,7 +1514,7 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-email" class="form-label">Work Email</label>
-        <input type="email" id="edit-usr-email" class="form-input" style="padding-left: 14px;" required>
+        <input type="email" id="edit-usr-email" class="form-input" style="padding-left: 14px;" required pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-password" class="form-label">New Password (Leave blank to keep unchanged)</label>
@@ -1415,9 +1523,10 @@
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-role" class="form-label">System Role</label>
         <select id="edit-usr-role" class="form-input" style="padding-left: 14px;" required>
+          <option value="" disabled selected>Select a role...</option>
           <option value="sales">Sales Staff</option>
-          <option value="inventory">Inventory Crew</option>
-          <option value="production">Baking Crew</option>
+          <option value="inventory">Inventory Specialist</option>
+          <option value="production">Baking Specialist</option>
           <option value="manager">Branch Manager</option>
           <option value="admin">System Administrator</option>
         </select>
@@ -1457,6 +1566,7 @@
             <option value="PASTRIES">PASTRIES</option>
             <option value="CAKES">CAKES</option>
             <option value="COOKIES">COOKIES</option>
+            <option value="DRINKS">DRINKS</option>
           </select>
         </div>
       </div>
@@ -1558,7 +1668,7 @@
   <div id="toast-container"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 
 </html>

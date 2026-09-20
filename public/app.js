@@ -8,7 +8,7 @@ const originalFetch = window.fetch;
 window.fetch = async function () {
   let [resource, config] = arguments;
   if (typeof resource === 'string' && resource.startsWith('/api')) {
-    const sessionStr = localStorage.getItem('bakewise_v2_session');
+    const sessionStr = sessionStorage.getItem('bakewise_v2_session');
     if (sessionStr) {
       try {
         const session = JSON.parse(sessionStr);
@@ -22,7 +22,7 @@ window.fetch = async function () {
   }
   const response = await originalFetch(resource, config);
   if (response.status === 401 && typeof resource === 'string' && resource.startsWith('/api') && resource !== '/api/auth/login') {
-    localStorage.removeItem('bakewise_v2_session');
+    sessionStorage.removeItem('bakewise_v2_session');
     if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
       window.location.reload();
     }
@@ -81,63 +81,22 @@ const DEFAULT_PRODUCTS = [
   { id: "p6", name: "Butter Croissant", category: "Pastries", price: 50, cost: 22, shelfLifeDays: 2, repurposeRecipe: "Double Baked Almond Croissants" }
 ];
 
-const DEFAULT_SALES = [
-  { id: "s1", productId: "p1", qty: 45, price: 45, date: getRelativeDateString(-6), cashier: "Sales Staff", branchId: 1 },
-  { id: "s2", productId: "p2", qty: 28, price: 30, date: getRelativeDateString(-6), cashier: "Sales Staff", branchId: 1 },
-  { id: "s3", productId: "p3", qty: 20, price: 65, date: getRelativeDateString(-6), cashier: "Sales Staff", branchId: 1 },
-  { id: "s4", productId: "p5", qty: 65, price: 10, date: getRelativeDateString(-6), cashier: "Sales Staff", branchId: 1 },
-  { id: "s5", productId: "p1", qty: 48, price: 45, date: getRelativeDateString(-5), cashier: "Sales Staff", branchId: 1 },
-  { id: "s6", productId: "p2", qty: 32, price: 30, date: getRelativeDateString(-5), cashier: "Sales Staff", branchId: 1 },
-  { id: "s7", productId: "p3", qty: 22, price: 65, date: getRelativeDateString(-5), cashier: "Sales Staff", branchId: 1 },
-  { id: "s8", productId: "p6", qty: 15, price: 50, date: getRelativeDateString(-5), cashier: "Sales Staff", branchId: 1 },
-  { id: "s9", productId: "p1", qty: 52, price: 45, date: getRelativeDateString(-4), cashier: "Sales Staff", branchId: 1 },
-  { id: "s10", productId: "p2", qty: 30, price: 30, date: getRelativeDateString(-4), cashier: "Sales Staff", branchId: 1 },
-  { id: "s11", productId: "p3", qty: 25, price: 65, date: getRelativeDateString(-4), cashier: "Sales Staff", branchId: 1 },
-  { id: "s12", productId: "p5", qty: 72, price: 10, date: getRelativeDateString(-4), cashier: "Sales Staff", branchId: 1 },
-  { id: "s13", productId: "p1", qty: 60, price: 45, date: getRelativeDateString(-3), cashier: "Sales Staff", branchId: 1 },
-  { id: "s14", productId: "p2", qty: 42, price: 30, date: getRelativeDateString(-3), cashier: "Sales Staff", branchId: 1 },
-  { id: "s15", productId: "p3", qty: 28, price: 65, date: getRelativeDateString(-3), cashier: "Sales Staff", branchId: 1 },
-  { id: "s16", productId: "p6", qty: 20, price: 50, date: getRelativeDateString(-3), cashier: "Sales Staff", branchId: 1 },
-  { id: "s17", productId: "p1", qty: 65, price: 45, date: getRelativeDateString(-2), cashier: "Sales Staff", branchId: 1 },
-  { id: "s18", productId: "p2", qty: 38, price: 30, date: getRelativeDateString(-2), cashier: "Sales Staff", branchId: 1 },
-  { id: "s19", productId: "p3", qty: 30, price: 65, date: getRelativeDateString(-2), cashier: "Sales Staff", branchId: 1 },
-  { id: "s20", productId: "p5", qty: 85, price: 10, date: getRelativeDateString(-2), cashier: "Sales Staff", branchId: 1 },
-  { id: "s21", productId: "p1", qty: 50, price: 45, date: getRelativeDateString(-1), cashier: "Sales Staff", branchId: 1 },
-  { id: "s22", productId: "p2", qty: 35, price: 30, date: getRelativeDateString(-1), cashier: "Sales Staff", branchId: 1 },
-  { id: "s23", productId: "p3", qty: 18, price: 65, date: getRelativeDateString(-1), cashier: "Sales Staff", branchId: 1 },
-  { id: "s24", productId: "p6", qty: 12, price: 50, date: getRelativeDateString(-1), cashier: "Sales Staff", branchId: 1 },
-  { id: "s25", productId: "p1", qty: 40, price: 45, date: getRelativeDateString(0), cashier: "Sales Staff", branchId: 1 },
-  { id: "s26", productId: "p2", qty: 25, price: 30, date: getRelativeDateString(0), cashier: "Sales Staff", branchId: 1 },
-  { id: "s27", productId: "p3", qty: 15, price: 65, date: getRelativeDateString(0), cashier: "Sales Staff", branchId: 1 }
-];
-
-const DEFAULT_INVENTORY = [
-  { id: "i1", productId: "p1", stockLevel: 30, productionDate: getRelativeDateString(-1), expiryDate: getRelativeDateString(1), branchId: 1 },
-  { id: "i2", productId: "p2", stockLevel: 15, productionDate: getRelativeDateString(-2), expiryDate: getRelativeDateString(1), branchId: 1 },
-  { id: "i3", productId: "p3", stockLevel: 12, productionDate: getRelativeDateString(-3), expiryDate: getRelativeDateString(1), branchId: 1 },
-  { id: "i4", productId: "p4", stockLevel: 4, productionDate: getRelativeDateString(-4), expiryDate: getRelativeDateString(1), branchId: 1 },
-  { id: "i5", productId: "p5", stockLevel: 50, productionDate: getRelativeDateString(-1), expiryDate: getRelativeDateString(1), branchId: 1 },
-  { id: "i6", productId: "p6", stockLevel: 8, productionDate: getRelativeDateString(0), expiryDate: getRelativeDateString(2), branchId: 1 }
-];
-
-const DEFAULT_PRODUCTION = [
-  { id: "pr1", productId: "p1", planned: 80, actual: 80, date: getRelativeDateString(-1), baker: "Baking Specialist", status: "Completed", code: "B-260717-01", branchId: 1 },
-  { id: "pr2", productId: "p2", planned: 40, actual: 40, date: getRelativeDateString(-1), baker: "Baking Specialist", status: "Completed", code: "B-260717-02", branchId: 1 },
-  { id: "pr3", productId: "p3", planned: 25, actual: 23, date: getRelativeDateString(-1), baker: "Baking Specialist", status: "Completed", code: "B-260717-03", branchId: 1 },
-  { id: "pr4", productId: "p5", planned: 100, actual: 100, date: getRelativeDateString(-1), baker: "Baking Specialist", status: "Completed", code: "B-260717-04", branchId: 1 },
-  { id: "pr5", productId: "p6", planned: 20, actual: 20, date: getRelativeDateString(0), baker: "Baking Specialist", status: "Completed", code: "B-260718-01", branchId: 1 }
-];
-
-const DEFAULT_WASTE = [
-  { id: "w1", productId: "p1", qty: 10, cost: 18, reason: "Expired", date: getRelativeDateString(-4), branchId: 1 },
-  { id: "w2", productId: "p2", qty: 5, cost: 12, reason: "Expired", date: getRelativeDateString(-3), branchId: 1 },
-  { id: "w3", productId: "p3", qty: 2, cost: 28, reason: "Damaged", date: getRelativeDateString(-2), branchId: 1 },
-  { id: "w4", productId: "p6", qty: 4, cost: 22, reason: "Quality Defect", date: getRelativeDateString(-1), branchId: 1 }
-];
+const DEFAULT_SALES = [];
+const DEFAULT_INVENTORY = [];
+const DEFAULT_PRODUCTION = [];
+const DEFAULT_WASTE = [];
 
 // --- APP STATE CONTROLLER ---
 class BakeWiseStore {
   constructor() {
+    // One-time data wipe as requested by user
+    if (!localStorage.getItem('bakewise_v2_data_cleared_1')) {
+      localStorage.removeItem("bakewise_v2_sales");
+      localStorage.removeItem("bakewise_v2_inventory");
+      localStorage.removeItem("bakewise_v2_production");
+      localStorage.removeItem("bakewise_v2_waste");
+      localStorage.setItem('bakewise_v2_data_cleared_1', 'true');
+    }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
     this._inventory = this.load("bakewise_v2_inventory", DEFAULT_INVENTORY);
@@ -160,9 +119,39 @@ class BakeWiseStore {
     ]);
 
     this.isBackendOnline = false;
-    // Always start at the login screen when opening the system
-    localStorage.removeItem("bakewise_v2_session");
-    this.currentUser = null;
+    // Persist session across refresh within the same tab
+    const sessionStr = sessionStorage.getItem("bakewise_v2_session");
+    if (sessionStr) {
+      try {
+        this.currentUser = JSON.parse(sessionStr);
+        // Sync currentUser with latest user data locally
+        if (this.currentUser) {
+          const freshUser = this.users.find(u => u.email.toLowerCase() === this.currentUser.email.toLowerCase());
+          if (freshUser) {
+            this.currentUser.role = freshUser.role;
+            this.currentUser.name = freshUser.name;
+            this.currentUser.branch_id = freshUser.branch_id;
+            const branch = this.branches.find(b => b.id === freshUser.branch_id);
+            this.currentUser.branch_name = branch ? branch.name : null;
+            
+            const roleLabels = {
+              "manager": "Branch Manager",
+              "sales": "Sales Staff",
+              "inventory": "Inventory Staff",
+              "production": "Baking Crew",
+              "admin": "System Administrator"
+            };
+            this.currentUser.roleLabel = roleLabels[freshUser.role] || "Staff Member";
+            
+            sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+          }
+        }
+      } catch(e) {
+        this.currentUser = null;
+      }
+    } else {
+      this.currentUser = null;
+    }
     this.notifications = this.load("bakewise_v2_notifications", []);
   }
 
@@ -219,6 +208,8 @@ class BakeWiseStore {
     this.save("bakewise_v2_waste", this._waste);
     this.save("bakewise_v2_branches", this.branches);
     this.save("bakewise_v2_users", this.users);
+    if (typeof populateSelectDropdowns === 'function') populateSelectDropdowns();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
   }
 
   async syncWithBackend() {
@@ -283,6 +274,7 @@ class BakeWiseStore {
             cashier: s.cashier,
             branchId: s.branch_id
           }));
+          this.save("bakewise_v2_sales", this._sales);
         }
 
         // Fetch inventory
@@ -297,6 +289,7 @@ class BakeWiseStore {
             expiryDate: inv.expiry_date ? inv.expiry_date.split('T')[0] : getRelativeDateString(1),
             branchId: inv.branch_id
           }));
+          this.save("bakewise_v2_inventory", this._inventory);
         }
 
         // Fetch production
@@ -314,6 +307,7 @@ class BakeWiseStore {
             code: p.code,
             branchId: p.branch_id
           }));
+          this.save("bakewise_v2_production", this._production);
         }
 
         // Fetch waste
@@ -329,6 +323,7 @@ class BakeWiseStore {
             date: w.date ? w.date.split('T')[0] : getRelativeDateString(0),
             branchId: w.branch_id
           }));
+          this.save("bakewise_v2_waste", this._waste);
         }
 
         this.commitAll();
@@ -396,17 +391,13 @@ class BakeWiseStore {
           roleLabel: this.getRoleLabel(user.role),
           token: user.token
         };
-        localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+        sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
         this.isBackendOnline = true;
         return this.currentUser;
       } else if (res.status === 429) {
-        // Rate limited - tell the UI and return null
-        if (typeof showToast !== 'undefined') showToast("Too many login attempts. Please try again after 15 minutes.", "error");
-        return null;
+        if (typeof showToast !== 'undefined') showToast("API Rate limited. Falling back to local authentication.", "info");
       } else {
-        // Other server errors (e.g. 401 invalid credentials)
-        if (typeof showToast !== 'undefined') showToast("Invalid email or password.", "error");
-        return null; 
+        console.warn("API authentication failed. Falling back to local authentication.");
       }
     } catch (e) {
       console.error("Auth login network failed, attempting offline fallback", e);
@@ -415,7 +406,8 @@ class BakeWiseStore {
     const matchedUser = this.users.find(u => 
       u.email.toLowerCase() === cleanEmail ||
       u.email.toLowerCase().replace('@rosebakeshop.com', '@bakewise.com') === cleanEmail ||
-      u.email.toLowerCase().replace('@bakewise.com', '@rosebakeshop.com') === cleanEmail
+      u.email.toLowerCase().replace('@bakewise.com', '@rosebakeshop.com') === cleanEmail ||
+      u.email.toLowerCase().replace('@gmail.com', '@bakewise.com') === cleanEmail
     );
 
     if (matchedUser && matchedUser.password === password) {
@@ -428,7 +420,7 @@ class BakeWiseStore {
         branch_name: branch ? branch.name : null,
         roleLabel: this.getRoleLabel(matchedUser.role)
       };
-      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
       return this.currentUser;
     }
 
@@ -450,7 +442,7 @@ class BakeWiseStore {
         branch_id: role === 'admin' ? null : 1,
         branch_name: role === 'admin' ? null : "Main Branch (Central)"
       };
-      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
       return this.currentUser;
     }
 
@@ -470,7 +462,7 @@ class BakeWiseStore {
 
   logout() {
     this.currentUser = null;
-    localStorage.removeItem("bakewise_v2_session");
+    sessionStorage.removeItem("bakewise_v2_session");
   }
 
   async addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe) {
@@ -849,6 +841,21 @@ document.addEventListener("DOMContentLoaded", () => {
   setupShelfLifeModule();
   setupNotifications();
 
+  // Chart Date Filters
+  const dashFilterBtn = document.getElementById("btn-dash-filter-apply");
+  if (dashFilterBtn) {
+    dashFilterBtn.addEventListener("click", () => {
+      renderDashboardSalesWasteChart();
+    });
+  }
+
+  const repFilterBtn = document.getElementById("btn-rep-filter-apply");
+  if (repFilterBtn) {
+    repFilterBtn.addEventListener("click", () => {
+      refreshReportsPane();
+    });
+  }
+
   // Handle branch switcher changes
   const switcher = document.getElementById("branch-switcher-select");
   if (switcher) {
@@ -1034,15 +1041,16 @@ async function checkSessionState() {
         switcherSelect.disabled = false;
       } else {
         branchSwitcher.style.display = 'none';
-        const userBranch = store.branches.find(b => b.id === store.currentUser.branch_id);
-        const branchName = userBranch ? userBranch.name : `Branch ${store.currentUser.branch_id}`;
-        switcherSelect.innerHTML = `<option value="${store.currentUser.branch_id}">${branchName}</option>`;
+        const uBranchId = store.currentUser.branch_id ? parseInt(store.currentUser.branch_id) : 1;
+        const userBranch = store.branches.find(b => b.id === uBranchId);
+        const branchName = userBranch ? userBranch.name : `Branch ${uBranchId}`;
+        switcherSelect.innerHTML = `<option value="${uBranchId}">${branchName}</option>`;
         switcherSelect.disabled = true;
       }
     }
 
-    const activePane = document.querySelector(".view-pane.active");
-    if (activePane) navigateToPane(activePane.id);
+    const lastPane = localStorage.getItem("bakewise_v2_last_pane");
+    if (lastPane) navigateToPane(lastPane);
     else navigateToPane("pane-dashboard");
   } else {
     loginView.style.display = "grid";
@@ -1231,7 +1239,13 @@ function setupFormSubmissions() {
       if (!(await showConfirmModal("Are you sure you want to register this user account?"))) return;
 
       const name = document.getElementById("usr-name-input").value;
-      const email = document.getElementById("usr-email-input").value;
+      const email = document.getElementById("usr-email-input").value.trim();
+
+      if (!email.endsWith("@bakewise.com")) {
+        showToast("Only @bakewise.com email addresses are allowed.", "error");
+        return;
+      }
+
       const password = document.getElementById("usr-password-input").value;
       const role = document.getElementById("usr-role-select").value;
       const branchId = document.getElementById("usr-branch-select").value;
@@ -1301,7 +1315,13 @@ function setupFormSubmissions() {
 
       const id = document.getElementById("edit-user-id").value;
       const name = document.getElementById("edit-usr-name").value;
-      const email = document.getElementById("edit-usr-email").value;
+      const email = document.getElementById("edit-usr-email").value.trim();
+
+      if (!email.endsWith("@bakewise.com")) {
+        showToast("Only @bakewise.com email addresses are allowed.", "error");
+        return;
+      }
+
       const password = document.getElementById("edit-usr-password").value;
       const role = document.getElementById("edit-usr-role").value;
       const branchId = document.getElementById("edit-usr-branch").value;
@@ -1595,25 +1615,68 @@ function refreshDashboard() {
   if (latestDate > new Date()) latestDate = new Date(); // cap at today
   const latestDateStr = formatLocalDate(latestDate);
 
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
   const salesToday = store.sales
-    .filter(s => s.date === latestDateStr)
+    .filter(s => s.date === latestDateStr && (branchId === 'all' || s.branchId === branchId))
     .reduce((sum, s) => sum + (s.qty * s.price), 0);
   document.getElementById("dash-sales-value").textContent = `₱${salesToday.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   const wasteToday = store.waste
-    .filter(w => w.date === latestDateStr)
+    .filter(w => w.date === latestDateStr && (branchId === 'all' || w.branchId === branchId))
     .reduce((sum, w) => sum + (w.qty * w.cost), 0);
   document.getElementById("dash-waste-value").textContent = `₱${wasteToday.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   let expiryCount = 0;
   store.inventory.forEach(item => {
+    if (branchId !== 'all' && item.branchId !== branchId) return;
     const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
     if (fIndex <= 30 && item.stockLevel > 0) expiryCount++;
   });
   document.getElementById("dash-expiry-value").textContent = `${expiryCount} items`;
 
-  const totalStock = store.inventory.reduce((sum, i) => sum + i.stockLevel, 0);
+  const totalStock = store.inventory
+    .filter(i => branchId === 'all' || i.branchId === branchId)
+    .reduce((sum, i) => sum + i.stockLevel, 0);
   document.getElementById("dash-stock-value").textContent = `${totalStock.toLocaleString()} pcs`;
+
+  // Update AI Insights & Trends based on data presence
+  if (salesToday === 0 && store.sales.length === 0) {
+    document.getElementById("dash-sales-trend").style.visibility = "hidden";
+    document.getElementById("dash-sales-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent sales data to analyze.</span>';
+  } else {
+    document.getElementById("dash-sales-trend").style.visibility = "visible";
+    document.getElementById("dash-sales-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Forecast indicates a steady increase. Ensure adequate staffing during peak hours.</span>';
+  }
+
+  if (wasteToday === 0 && store.waste.length === 0) {
+    document.getElementById("dash-waste-trend").style.visibility = "hidden";
+    document.getElementById("dash-waste-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent waste data to analyze.</span>';
+  } else {
+    document.getElementById("dash-waste-trend").style.visibility = "visible";
+    document.getElementById("dash-waste-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Waste cost is decreasing. Maintain current inventory practices to keep waste low.</span>';
+  }
+
+  if (expiryCount === 0) {
+    document.getElementById("dash-expiry-subtext").style.visibility = "hidden";
+    document.getElementById("dash-expiry-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No items currently nearing expiry.</span>';
+  } else {
+    document.getElementById("dash-expiry-subtext").style.visibility = "visible";
+    document.getElementById("dash-expiry-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Prioritize repurposing or discounting these items immediately.</span>';
+  }
+
+  if (totalStock === 0) {
+    document.getElementById("dash-stock-subtext").textContent = "Empty";
+    document.getElementById("dash-stock-subtext").style.color = "var(--color-danger)";
+    document.getElementById("dash-stock-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Inventory is empty. Immediate restocking required.</span>';
+  } else {
+    document.getElementById("dash-stock-subtext").textContent = "Optimal levels";
+    document.getElementById("dash-stock-subtext").style.color = "var(--color-success)";
+    document.getElementById("dash-stock-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are optimal. No immediate restocking required.</span>';
+  }
+  
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
   renderDashboardSalesWasteChart();
   renderDashboardNeededStockChart();
@@ -1629,26 +1692,69 @@ function renderDashboardSalesWasteChart() {
   const salesData = [];
   const wasteData = [];
 
-  let latestDate = new Date();
-  const allDates = [...store.sales.map(s => s.date), ...store.waste.map(w => w.date)].filter(d => d);
-  if (allDates.length > 0) {
-    const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
-    latestDate = new Date(maxTime);
-  }
-  if (latestDate > new Date()) latestDate = new Date(); // cap at today
+  const startInput = document.getElementById("dash-filter-start")?.value;
+  const endInput = document.getElementById("dash-filter-end")?.value;
 
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(latestDate);
-    d.setDate(d.getDate() - i);
-    const dStr = formatLocalDate(d);
+  let startDate, endDate;
+  if (startInput && endInput) {
+    startDate = parseLocalDate(startInput);
+    endDate = parseLocalDate(endInput);
+  } else {
+    // Default to last 7 days from latest data date
+    endDate = new Date();
+    const allDates = [...store.sales.map(s => s.date), ...store.waste.map(w => w.date)].filter(d => d);
+    if (allDates.length > 0) {
+      const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
+      endDate = new Date(maxTime);
+    }
+    if (endDate > new Date()) endDate = new Date(); // cap at today
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
     
-    labels.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
+    // Set inputs to match default if empty
+    if (document.getElementById("dash-filter-start")) document.getElementById("dash-filter-start").value = formatLocalDate(startDate);
+    if (document.getElementById("dash-filter-end")) document.getElementById("dash-filter-end").value = formatLocalDate(endDate);
+  }
 
-    const daySales = store.sales.filter(s => s.date === dStr).reduce((sum, s) => sum + (s.qty * s.price), 0);
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
+  // Generate date range
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const dStr = formatLocalDate(current);
+    labels.push(current.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
+
+    const daySales = store.sales
+      .filter(s => s.date === dStr && (branchId === 'all' || s.branchId === branchId))
+      .reduce((sum, s) => sum + (s.qty * s.price), 0);
     salesData.push(daySales);
 
-    const dayWaste = store.waste.filter(w => w.date === dStr).reduce((sum, w) => sum + (w.qty * w.cost), 0);
+    const dayWaste = store.waste
+      .filter(w => w.date === dStr && (branchId === 'all' || w.branchId === branchId))
+      .reduce((sum, w) => sum + (w.qty * w.cost), 0);
     wasteData.push(dayWaste);
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Update chart title to show correct days count
+  const daysDiff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  const chartTitleEl = document.getElementById("dash-chart-title");
+  if (chartTitleEl) chartTitleEl.textContent = `Sales vs. Waste Trend (${daysDiff} Days)`;
+
+  // Dynamic AI Insight for Sales vs Waste
+  const totalSales = salesData.reduce((sum, val) => sum + val, 0);
+  const totalWaste = wasteData.reduce((sum, val) => sum + val, 0);
+  const salesWasteInsightEl = document.getElementById("insight-sales-waste-chart");
+  if (salesWasteInsightEl) {
+    if (totalSales === 0 && totalWaste === 0) {
+      salesWasteInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No sales or waste data for the selected period.</span>';
+    } else {
+      const salesExceed = totalSales > totalWaste;
+      salesWasteInsightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>${salesExceed ? 'Sales are outperforming waste costs.' : 'Warning: Waste costs are high compared to sales.'} Total sales reached ₱${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}.</span>`;
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   const isDark = document.body.classList.contains("dark-mode");
@@ -1693,6 +1799,8 @@ function renderDashboardSalesWasteChart() {
       }
     }
   });
+
+
 }
 
 let dashNeededStockChartInstance = null;
@@ -1782,6 +1890,20 @@ function renderDashboardNeededStockChart() {
       }
     }
   });
+
+  // Dynamic AI Insight for Needed Stock
+  const totalNeeded = neededStockData.reduce((sum, val) => sum + val, 0);
+  const stockInsightEl = document.getElementById("insight-needed-stock-chart");
+  if (stockInsightEl) {
+    if (totalNeeded === 0) {
+      stockInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>All stock levels are sufficient. No urgent production required.</span>';
+    } else {
+      const maxIndex = neededStockData.indexOf(Math.max(...neededStockData));
+      const topNeededProduct = labels[maxIndex] || "products";
+      stockInsightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>A total of ${totalNeeded} units are needed. Prioritize producing ${topNeededProduct}.</span>`;
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
 
 function renderDashboardBranchesChart() {
@@ -1883,6 +2005,59 @@ function renderDashboardBranchesChart() {
       }
     }
   });
+
+  // Dynamic AI Insight for Branch Performance
+  const branchInsightEl = document.getElementById("insight-branches-chart");
+  if (branchInsightEl) {
+    const allBranchPerformance = store.branches.map(b => {
+      const bSales = store.sales.filter(s => s.branchId === b.id).reduce((sum, s) => sum + (s.qty * s.price), 0);
+      const bWaste = store.waste.filter(w => w.branchId === b.id).reduce((sum, w) => sum + (w.qty * w.cost), 0);
+      return { name: b.name, sales: bSales, waste: bWaste };
+    });
+    
+    const totalSalesGlobal = allBranchPerformance.reduce((a, b) => a + b.sales, 0);
+    const totalWasteGlobal = allBranchPerformance.reduce((a, b) => a + b.waste, 0);
+    
+    if (totalSalesGlobal === 0 && totalWasteGlobal === 0) {
+      branchInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No branch data available for comparison.</span>';
+    } else {
+      const sortedBySales = [...allBranchPerformance].sort((a, b) => b.sales - a.sales);
+      const sortedByWaste = [...allBranchPerformance].sort((a, b) => b.waste - a.waste);
+      
+      const top3 = sortedBySales.slice(0, 3).filter(b => b.sales > 0);
+      let rankingText = top3.map((b, i) => {
+        const rank = i === 0 ? '1st' : i === 1 ? '2nd' : '3rd';
+        return `<strong>${rank}: ${b.name}</strong> (₱${b.sales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+      }).join(", ");
+      
+      if (!rankingText) rankingText = "No sales generated yet.";
+      
+      let insightHtml = `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+      insightHtml += `<div style="display: flex; align-items: flex-start; gap: 8px;">
+        <i data-lucide="sparkles" style="width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0;"></i>
+        <span style="line-height: 1.4;"><strong>Top Branches by Sales:</strong> ${rankingText}</span>
+      </div>`;
+      
+      let decisionText = "";
+      if (top3.length > 0) {
+        decisionText += `Maintain high inventory levels and consider running promotions at top performing branches to maximize revenue. `;
+      }
+      if (sortedByWaste[0] && sortedByWaste[0].waste > 0) {
+        decisionText += `Monitor <strong>${sortedByWaste[0].name}</strong> closely as it reported the highest waste cost (₱${sortedByWaste[0].waste.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}). Investigate their inventory management to minimize losses.`;
+      }
+      
+      if (decisionText) {
+        insightHtml += `<div style="display: flex; align-items: flex-start; gap: 8px;">
+          <i data-lucide="target" style="width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0;"></i>
+          <span style="font-size: 0.9em; line-height: 1.4;"><strong>Decision Support:</strong> ${decisionText}</span>
+        </div>`;
+      }
+      insightHtml += `</div>`;
+      
+      branchInsightEl.innerHTML = insightHtml;
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
 
 function renderRealtimeAlerts() {
@@ -1891,13 +2066,16 @@ function renderRealtimeAlerts() {
   container.innerHTML = "";
   const alerts = [];
 
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
   store.inventory.forEach(item => {
+    if (branchId !== 'all' && item.branchId !== branchId) return;
     if (item.stockLevel > 0) {
       const p = store.products.find(x => x.id === item.productId);
       if (!p) return;
       const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
       const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
-
       if (fIndex === 0) {
         alerts.push({
           type: "danger",
@@ -1918,7 +2096,7 @@ function renderRealtimeAlerts() {
     .filter(w => {
       const wDate = parseLocalDate(w.date);
       const limit = parseLocalDate(getRelativeDateString(-3));
-      return wDate >= limit;
+      return wDate >= limit && (branchId === 'all' || w.branchId === branchId);
     })
     .reduce((sum, w) => sum + (w.qty * w.cost), 0);
 
@@ -1995,7 +2173,20 @@ function refreshSalesPane() {
   const tbody = document.getElementById("sales-history-tbody");
   if (!tbody) return;
 
-  const sortedSales = [...store.sales].sort((a, b) => {
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
+  const searchInput = document.getElementById('sales-search-input')?.value.toLowerCase() || '';
+  const dateFilter = document.getElementById('sales-date-filter')?.value || '';
+  const sortedSales = [...store.sales]
+    .filter(s => branchId === 'all' || s.branchId === branchId)
+    .filter(s => {
+      const p = store.products.find(x => x.id === s.productId);
+      const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
+      const dateMatch = dateFilter ? s.date.startsWith(dateFilter) : true;
+      return nameMatch && dateMatch;
+    })
+    .sort((a, b) => {
     const dA = parseLocalDate(a.date);
     const dB = parseLocalDate(b.date);
     return dB.getTime() - dA.getTime();
@@ -2053,11 +2244,15 @@ function refreshSalesPane() {
 function refreshInventoryPane() {
   const tbody = document.getElementById("inventory-tbody");
   if (!tbody) return;
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
 
-  const totalPages = Math.ceil(store.inventory.length / ITEMS_PER_PAGE) || 1;
+  const filteredInventory = store.inventory.filter(i => branchId === 'all' || i.branchId === branchId);
+
+  const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE) || 1;
   if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
   const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
-  const pagedInventory = store.inventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const pagedInventory = filteredInventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   tbody.innerHTML = pagedInventory.map(item => {
     const p = store.products.find(x => x.id === item.productId);
@@ -2135,7 +2330,22 @@ function refreshProductionPane() {
   const tbody = document.getElementById("production-history-tbody");
   if (!tbody) return;
 
-  const sortedProd = [...store.production].sort((a, b) => {
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
+  const searchInput = document.getElementById('prod-search-input')?.value.toLowerCase() || '';
+  const batchFilter = document.getElementById('prod-batch-filter')?.value.toLowerCase() || '';
+  const statusFilter = document.getElementById('prod-status-filter')?.value || 'all';
+  const sortedProd = [...store.production]
+    .filter(p => branchId === 'all' || p.branchId === branchId)
+    .filter(p => {
+      const prodObj = store.products.find(x => x.id === p.productId);
+      const nameMatch = prodObj ? prodObj.name.toLowerCase().includes(searchInput) : true;
+      const batchMatch = batchFilter ? p.batchId.toLowerCase().includes(batchFilter) : true;
+      const statusMatch = statusFilter === 'all' ? true : p.status.toLowerCase() === statusFilter.toLowerCase();
+      return nameMatch && batchMatch && statusMatch;
+    })
+    .sort((a, b) => {
     const dA = parseLocalDate(a.date);
     const dB = parseLocalDate(b.date);
     return dB.getTime() - dA.getTime();
@@ -2196,7 +2406,20 @@ function refreshWastePane() {
   const tbody = document.getElementById("waste-history-tbody");
   if (!tbody) return;
 
-  const sortedWaste = [...store.waste].sort((a, b) => {
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
+  const searchInput = document.getElementById('waste-search-input')?.value.toLowerCase() || '';
+  const dateFilter = document.getElementById('waste-date-filter')?.value || '';
+  const sortedWaste = [...store.waste]
+    .filter(w => branchId === 'all' || w.branchId === branchId)
+    .filter(w => {
+      const p = store.products.find(x => x.id === w.productId);
+      const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
+      const dateMatch = dateFilter ? w.date.startsWith(dateFilter) : true;
+      return nameMatch && dateMatch;
+    })
+    .sort((a, b) => {
     const dA = parseLocalDate(a.date);
     const dB = parseLocalDate(b.date);
     return dB.getTime() - dA.getTime();
@@ -2261,7 +2484,7 @@ async function refreshAIAnalyticsPane() {
 
 async function getAIPredictedDemand(productId) {
   const salesHistory = store.sales.filter(s => s.productId === productId);
-  if (salesHistory.length === 0) return 30;
+  if (salesHistory.length === 0) return { demand: 30 };
 
   try {
     const response = await fetch('/api/forecast', {
@@ -2271,7 +2494,11 @@ async function getAIPredictedDemand(productId) {
     });
     if (response.ok) {
       const data = await response.json();
-      return data.predicted_demand !== undefined ? data.predicted_demand : 30;
+      return {
+        demand: data.predicted_demand !== undefined ? data.predicted_demand : 30,
+        metrics: data.metrics,
+        insights: data.insights
+      };
     }
   } catch (error) {
     console.error("AI Forecast error:", error);
@@ -2280,7 +2507,7 @@ async function getAIPredictedDemand(productId) {
   // Fallback
   const qtySum = salesHistory.slice(-3).reduce((sum, s) => sum + s.qty, 0);
   const avg = Math.round(qtySum / Math.min(3, salesHistory.length));
-  return Math.max(5, avg);
+  return { demand: Math.max(5, avg) };
 }
 
 async function renderAIDemandForecastChart() {
@@ -2294,7 +2521,8 @@ async function renderAIDemandForecastChart() {
     return Math.round(pSales.reduce((sum, s) => sum + s.qty, 0) / pSales.length);
   });
 
-  const predictedDemand = await Promise.all(store.products.map(p => getAIPredictedDemand(p.id)));
+  const aiResults = await Promise.all(store.products.map(p => getAIPredictedDemand(p.id)));
+  const predictedDemand = aiResults.map(r => r.demand);
 
   const isDark = document.body.classList.contains("dark-mode");
   const textColor = isDark ? "#a8a29e" : "#78716c";
@@ -2331,6 +2559,45 @@ async function renderAIDemandForecastChart() {
       }
     }
   });
+
+  const metricsEl = document.getElementById("ai-forecast-metrics");
+  if (metricsEl) {
+    const topResultIdx = predictedDemand.indexOf(Math.max(...predictedDemand));
+    const topResult = aiResults[topResultIdx];
+    const topProductName = store.products[topResultIdx]?.name;
+
+    if (topResult && topResult.metrics) {
+      metricsEl.style.display = "block";
+      const { rmse, f1_score } = topResult.metrics;
+      const insightsList = topResult.insights.map(ins => `<li>${ins}</li>`).join("");
+
+      metricsEl.innerHTML = `
+        <h4 style="margin:0 0 8px 0; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="brain-circuit" style="width: 16px; height: 16px;"></i>
+          AI Scoring Matrix & Insights (${topProductName})
+        </h4>
+        <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+          <div style="background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">Root Mean Squared Error (RMSE)</div>
+            <div style="font-size: 1.25rem; font-weight: bold; color: #0f172a;">${rmse.toFixed(2)}</div>
+          </div>
+          <div style="background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">Classification F1-Score</div>
+            <div style="font-size: 1.25rem; font-weight: bold; color: #0f172a;">${f1_score.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="background: #ebf8ff; border-left: 4px solid #3b82f6; padding: 8px 12px; font-size: 0.85rem; color: #1e3a8a;">
+          <strong>Meaningful Insights:</strong>
+          <ul style="margin: 4px 0 0 16px; padding: 0;">
+            ${insightsList}
+          </ul>
+        </div>
+      `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    } else {
+      metricsEl.style.display = "none";
+    }
+  }
 }
 
 async function renderBakeRecommendations() {
@@ -2343,7 +2610,8 @@ async function renderBakeRecommendations() {
       .filter(i => i.productId === p.id)
       .reduce((sum, i) => sum + i.stockLevel, 0);
 
-    const prediction = await getAIPredictedDemand(p.id);
+    const predictionResult = await getAIPredictedDemand(p.id);
+    const prediction = predictionResult.demand;
     const safetyStock = 5; // Allowable safety quantity
     const recommendedBake = Math.max(0, prediction - currentStock + safetyStock);
 
@@ -2524,6 +2792,30 @@ function refreshProductsPane() {
 
 // 8. REPORTS PERFORMANCE DASHBOARD REFRESHER
 function refreshReportsPane() {
+  const startInputEl = document.getElementById("rep-filter-start");
+  const endInputEl = document.getElementById("rep-filter-end");
+  
+  if (startInputEl && !startInputEl.value && endInputEl && !endInputEl.value) {
+    let endDate = new Date();
+    const allDates = [...store.sales.map(s => s.date), ...store.waste.map(w => w.date)].filter(d => d);
+    if (allDates.length > 0) {
+      const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
+      endDate = new Date(maxTime);
+    }
+    if (endDate > new Date()) endDate = new Date();
+    let startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
+    
+    startInputEl.value = formatLocalDate(startDate);
+    endInputEl.value = formatLocalDate(endDate);
+  }
+
+  const startDateStr = startInputEl?.value || "1970-01-01";
+  const endDateStr = endInputEl?.value || "2099-12-31";
+
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
   const reportSalesTbody = document.getElementById("report-sales-tbody");
   if (reportSalesTbody) {
     const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
@@ -2532,7 +2824,7 @@ function refreshReportsPane() {
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     reportSalesTbody.innerHTML = pagedProducts.map(p => {
-      const pSales = store.sales.filter(s => s.productId === p.id);
+      const pSales = store.sales.filter(s => s.productId === p.id && s.date >= startDateStr && s.date <= endDateStr && (branchId === 'all' || s.branchId === branchId));
       const unitsSold = pSales.reduce((sum, s) => sum + s.qty, 0);
       const totalIncome = unitsSold * p.price;
       return `
@@ -2581,7 +2873,7 @@ function refreshReportsPane() {
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     reportWasteTbody.innerHTML = pagedProducts.map(p => {
-      const pWaste = store.waste.filter(w => w.productId === p.id);
+      const pWaste = store.waste.filter(w => w.productId === p.id && w.date >= startDateStr && w.date <= endDateStr && (branchId === 'all' || w.branchId === branchId));
       const totalWaste = pWaste.reduce((sum, w) => sum + w.qty, 0);
       const costLost = totalWaste * p.cost;
       const reasons = pWaste.map(w => w.reason);
@@ -2632,7 +2924,7 @@ function refreshReportsPane() {
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     reportEffTbody.innerHTML = pagedProducts.map(p => {
-      const pRuns = store.production.filter(pr => pr.productId === p.id);
+      const pRuns = store.production.filter(pr => pr.productId === p.id && (branchId === 'all' || pr.branchId === branchId));
       const plannedSum = pRuns.reduce((sum, r) => sum + r.planned, 0);
       const actualSum = pRuns.reduce((sum, r) => sum + r.actual, 0);
       const deviation = actualSum - plannedSum;
@@ -3478,3 +3770,31 @@ if (document.readyState === 'loading') {
 } else {
   setupShelfLifePredictor();
 }
+
+function setupFilters() {
+  ['sales-search-input', 'sales-date-filter', 'sales-branch-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { salesHistCurrentPage = 1; refreshSalesPane(); });
+  });
+  ['inventory-search-input', 'inventory-date-filter', 'inventory-branch-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { invHistCurrentPage = 1; refreshInventoryPane(); });
+  });
+  ['prod-search-input', 'prod-batch-filter', 'prod-status-filter', 'prod-branch-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { prodHistCurrentPage = 1; refreshProductionPane(); });
+  });
+  ['waste-search-input', 'waste-date-filter', 'waste-branch-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { wasteHistCurrentPage = 1; refreshWastePane(); });
+  });
+  ['branch-search-input'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { branchCurrentPage = 1; refreshAdminBranchesPane(); });
+  });
+  ['user-search-input', 'user-role-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { userCurrentPage = 1; refreshAdminUsersPane(); });
+  });
+}
+document.addEventListener('DOMContentLoaded', () => setTimeout(setupFilters, 500));

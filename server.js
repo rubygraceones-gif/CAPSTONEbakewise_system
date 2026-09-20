@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
 const { Pool } = require('pg');
 const path = require('path');
@@ -52,15 +53,15 @@ app.use('/api/', apiLimiter);
 function authenticateToken(req, res, next) {
   // Allow OPTIONS preflight requests
   if (req.method === 'OPTIONS') return next();
-  
+
   // Allow /api/auth/login and /api/status without token
   if (req.path === '/auth/login' || req.path === '/status') return next();
-  
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (token == null) return res.status(401).json({ error: 'No token provided' });
-  
+
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Token is invalid or expired' });
     req.user = user;
@@ -410,14 +411,15 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  const defaultHash = bcrypt.hashSync('password123', 10);
   await mysqlPool.query(`
     INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES
-    (1, 'manager@bakewise.com', 'password123', 'Branch Manager', 'manager', 1),
-    (2, 'sales@bakewise.com', 'password123', 'Sales Staff', 'sales', 1),
-    (3, 'inventory@bakewise.com', 'password123', 'Inventory Specialist', 'inventory', 1),
-    (4, 'production@bakewise.com', 'password123', 'Baking Specialist', 'production', 1),
-    (5, 'admin@bakewise.com', 'password123', 'System Administrator', 'admin', NULL)
-    ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), branch_id = VALUES(branch_id);
+    (1, 'manager@bakewise.com', '${defaultHash}', 'Branch Manager', 'manager', 1),
+    (2, 'sales@bakewise.com', '${defaultHash}', 'Sales Staff', 'sales', 1),
+    (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
+    (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
+    (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
+    ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), branch_id = VALUES(branch_id), password = VALUES(password);
   `);
 
   // 3. bw_products
@@ -459,16 +461,7 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT IGNORE INTO bw_sales (product_id, qty, price, date, cashier, branch_id) VALUES
-    ('p1', 45, 45.00, '2026-07-12', 'Sales Staff', 1),
-    ('p2', 28, 30.00, '2026-07-12', 'Sales Staff', 1),
-    ('p3', 20, 65.00, '2026-07-12', 'Sales Staff', 1),
-    ('p1', 52, 45.00, '2026-07-13', 'Sales Staff', 1),
-    ('p2', 30, 30.00, '2026-07-13', 'Sales Staff', 1),
-    ('p1', 60, 45.00, '2026-07-14', 'Sales Staff', 1),
-    ('p3', 28, 65.00, '2026-07-14', 'Sales Staff', 1);
-  `);
+  // Seed data removed for bw_sales
 
   // 5. bw_inventory
   await mysqlPool.query(`
@@ -483,15 +476,7 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT IGNORE INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES
-    ('p1', 350, '2026-07-24', '2026-07-26', 1),
-    ('p2', 15, '2026-07-15', '2026-07-18', 1),
-    ('p3', 12, '2026-07-14', '2026-07-18', 1),
-    ('p4', 4, '2026-07-13', '2026-07-18', 1),
-    ('p5', 50, '2026-07-16', '2026-07-18', 1),
-    ('p6', 8, '2026-07-17', '2026-07-19', 1);
-  `);
+  // Seed data removed for bw_inventory
 
   // 6. bw_production
   await mysqlPool.query(`
@@ -509,13 +494,7 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT IGNORE INTO bw_production (product_id, planned, actual, date, baker, status, code, branch_id) VALUES
-    ('p1', 80, 80, '2026-07-16', 'Baking Specialist', 'Completed', 'B-260717-01', 1),
-    ('p2', 40, 40, '2026-07-16', 'Baking Specialist', 'Completed', 'B-260717-02', 1),
-    ('p3', 25, 23, '2026-07-16', 'Baking Specialist', 'Completed', 'B-260717-03', 1),
-    ('p6', 20, 20, '2026-07-17', 'Baking Specialist', 'Completed', 'B-260718-01', 1);
-  `);
+  // Seed data removed for bw_production
 
   // 7. bw_waste
   await mysqlPool.query(`
@@ -531,12 +510,7 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT IGNORE INTO bw_waste (product_id, qty, cost, reason, date, branch_id) VALUES
-    ('p1', 10, 18.00, 'Expired', '2026-07-13', 1),
-    ('p2', 5, 12.00, 'Expired', '2026-07-14', 1),
-    ('p6', 4, 22.00, 'Quality Defect', '2026-07-16', 1);
-  `);
+  // Seed data removed for bw_waste
 
   console.log("XAMPP MySQL database schema & seed initialization complete!");
 }
@@ -648,13 +622,18 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       ? email.replace('@bakewise.com', '@rosebakeshop.com')
       : (email.includes('@rosebakeshop.com') ? email.replace('@rosebakeshop.com', '@bakewise.com') : email);
 
-    let query = "SELECT * FROM bw_users WHERE (LOWER(email) = $1 OR LOWER(email) = $2) AND password = $3";
-    let params = [email, aliasEmail, password];
+    let query = "SELECT * FROM bw_users WHERE (LOWER(email) = $1 OR LOWER(email) = $2)";
+    let params = [email, aliasEmail];
 
     const result = await queryDb(query, params);
 
     if (result.rows && result.rows.length > 0) {
       const user = result.rows[0];
+
+      if (!bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
       const roleMap = {
         'sales': 'Sales Staff',
         'inventory': 'Inventory Specialist',
@@ -669,7 +648,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         role: user.role,
         branchId: user.branch_id
       };
-      
+
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
 
       res.json({
@@ -748,11 +727,12 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
   const { name, email, password, role, branch_id } = req.body;
+  const hashedPassword = bcrypt.hashSync(password || 'password123', 10);
   try {
     const bId = branch_id ? parseInt(branch_id) : null;
     const result = await queryDb(
       "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [name, email, password, role, bId]
+      [name, email, hashedPassword, role, bId]
     );
     res.status(201).json(result.rows[0] || { name, email, role, branch_id: bId });
   } catch (err) {
@@ -768,8 +748,9 @@ app.put('/api/users/:id', async (req, res) => {
     let query = "UPDATE bw_users SET name = $1, email = $2, role = $3, branch_id = $4";
     let params = [name, email, role, bId];
     if (password && password.trim() !== "") {
+      const hashedPassword = bcrypt.hashSync(password, 10);
       query += ", password = $5 WHERE id = $6";
-      params.push(password, parseInt(id));
+      params.push(hashedPassword, parseInt(id));
     } else {
       query += " WHERE id = $5";
       params.push(parseInt(id));
