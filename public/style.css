@@ -6,6 +6,14 @@
 /* Google Fonts Import */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
+/* Anti-Flicker Instant Session Rules */
+html.user-logged-in #login-view {
+  display: none !important;
+}
+html.user-logged-in #app-view {
+  display: flex !important;
+}
+
 /* Variables (Default: Light Mode) */
 :root {
   --font-main: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

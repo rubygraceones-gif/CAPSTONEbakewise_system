@@ -8,7 +8,7 @@ const originalFetch = window.fetch;
 window.fetch = async function () {
   let [resource, config] = arguments;
   if (typeof resource === 'string' && resource.startsWith('/api')) {
-    const sessionStr = sessionStorage.getItem('bakewise_v2_session');
+    const sessionStr = sessionStorage.getItem('bakewise_v2_session') || localStorage.getItem('bakewise_v2_session');
     if (sessionStr) {
       try {
         const session = JSON.parse(sessionStr);
@@ -22,9 +22,14 @@ window.fetch = async function () {
   }
   const response = await originalFetch(resource, config);
   if (response.status === 401 && typeof resource === 'string' && resource.startsWith('/api') && resource !== '/api/auth/login') {
-    sessionStorage.removeItem('bakewise_v2_session');
-    if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
-      window.location.reload();
+    const hasToken = config && config.headers && config.headers['Authorization'];
+    if (hasToken && (!window.store || window.store.isBackendOnline)) {
+      sessionStorage.removeItem('bakewise_v2_session');
+      localStorage.removeItem('bakewise_v2_session');
+      document.documentElement.classList.remove('user-logged-in');
+      if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
+        window.location.reload();
+      }
     }
   }
   return response;
@@ -119,8 +124,8 @@ class BakeWiseStore {
     ]);
 
     this.isBackendOnline = false;
-    // Persist session across refresh within the same tab
-    const sessionStr = sessionStorage.getItem("bakewise_v2_session");
+    // Persist session across refresh within the same tab or reloads
+    const sessionStr = sessionStorage.getItem("bakewise_v2_session") || localStorage.getItem("bakewise_v2_session");
     if (sessionStr) {
       try {
         this.currentUser = JSON.parse(sessionStr);
@@ -144,6 +149,7 @@ class BakeWiseStore {
             this.currentUser.roleLabel = roleLabels[freshUser.role] || "Staff Member";
             
             sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+            localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
           }
         }
       } catch(e) {
@@ -392,6 +398,8 @@ class BakeWiseStore {
           token: user.token
         };
         sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+        localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+        document.documentElement.classList.add('user-logged-in');
         this.isBackendOnline = true;
         return this.currentUser;
       } else if (res.status === 429) {
@@ -421,6 +429,8 @@ class BakeWiseStore {
         roleLabel: this.getRoleLabel(matchedUser.role)
       };
       sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      document.documentElement.classList.add('user-logged-in');
       return this.currentUser;
     }
 
@@ -443,6 +453,8 @@ class BakeWiseStore {
         branch_name: role === 'admin' ? null : "Main Branch (Central)"
       };
       sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      document.documentElement.classList.add('user-logged-in');
       return this.currentUser;
     }
 
@@ -463,6 +475,8 @@ class BakeWiseStore {
   logout() {
     this.currentUser = null;
     sessionStorage.removeItem("bakewise_v2_session");
+    localStorage.removeItem("bakewise_v2_session");
+    document.documentElement.classList.remove('user-logged-in');
   }
 
   async addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe) {
@@ -1019,6 +1033,7 @@ async function checkSessionState() {
   const appView = document.getElementById("app-view");
 
   if (store.currentUser) {
+    document.documentElement.classList.add('user-logged-in');
     loginView.style.display = "none";
     appView.style.display = "flex";
 
@@ -1053,6 +1068,7 @@ async function checkSessionState() {
     if (lastPane) navigateToPane(lastPane);
     else navigateToPane("pane-dashboard");
   } else {
+    document.documentElement.classList.remove('user-logged-in');
     loginView.style.display = "grid";
     appView.style.display = "none";
   }
