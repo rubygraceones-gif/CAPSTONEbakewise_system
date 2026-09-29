@@ -85,34 +85,65 @@ const MYSQL_CONFIG = {
   database: process.env.MYSQL_DATABASE || 'bakewise_db'
 };
 
-// PostgreSQL Connection String (Supabase / Cloud Postgres)
-const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "postgresql://postgres.ewgebrbrgftbsljjgkwr:BakeWise2026!Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
+// Default Supabase PostgreSQL Connection String
+const DEFAULT_SUPABASE_URL = "postgresql://postgres.ewgebrbrgftbsljjgkwr:BakeWise2026!Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
+
+// Determine if running in Cloud / Railway environment
+const isCloudEnv = !!(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_ENVIRONMENT_NAME ||
+  process.env.RAILWAY_SERVICE_ID ||
+  process.env.RAILWAY_PROJECT_ID ||
+  process.env.NODE_ENV === 'production' ||
+  process.env.PORT
+);
 
 // Initialize Database Connection (Supports XAMPP MySQL locally & Supabase PostgreSQL on Railway)
 async function setupDatabaseConnection() {
   console.log("--------------------------------------------------");
   console.log("Initializing BakeWise Database Engine...");
+  console.log(`Environment mode: ${isCloudEnv ? 'Cloud / Railway Production' : 'Local Development'}`);
 
-  // 1. Attempt PostgreSQL / Supabase database connection
-  try {
-    console.log("Attempting PostgreSQL / Supabase database connection...");
-    pgPool = new Pool({
-      connectionString: PG_CONNECTION_STRING,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000
-    });
-    await pgPool.query("SELECT 1");
-    activeDbDriver = 'pg';
-    console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
-    console.log("--------------------------------------------------");
-    await initializePgSchema();
-    return;
-  } catch (pgErr) {
-    console.error("❌ Could not connect to PostgreSQL / Supabase:", pgErr.message);
+  // Connection candidates to try for PostgreSQL
+  const pgCandidates = [];
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) {
+    pgCandidates.push(process.env.DATABASE_URL.trim());
+  }
+  if (process.env.SUPABASE_DB_URL && process.env.SUPABASE_DB_URL.trim()) {
+    pgCandidates.push(process.env.SUPABASE_DB_URL.trim());
+  }
+  if (!pgCandidates.includes(DEFAULT_SUPABASE_URL)) {
+    pgCandidates.push(DEFAULT_SUPABASE_URL);
   }
 
-  // 2. Try Connecting to Local XAMPP MySQL Server (Only for Local Development)
-  if (!process.env.RAILWAY_ENVIRONMENT && process.env.NODE_ENV !== 'production') {
+  // 1. Attempt PostgreSQL / Supabase connection candidates
+  for (const connStr of pgCandidates) {
+    try {
+      const sanitized = connStr.replace(/:[^:@]+@/, ':***@');
+      console.log(`Attempting PostgreSQL / Supabase connection to: ${sanitized}`);
+      
+      pgPool = new Pool({
+        connectionString: connStr,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000
+      });
+      await pgPool.query("SELECT 1");
+      activeDbDriver = 'pg';
+      console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
+      console.log("--------------------------------------------------");
+      await initializePgSchema();
+      return;
+    } catch (pgErr) {
+      console.error("❌ PostgreSQL connection attempt failed:", pgErr.message);
+      if (pgPool) {
+        try { await pgPool.end(); } catch (e) {}
+        pgPool = null;
+      }
+    }
+  }
+
+  // 2. Try Connecting to Local XAMPP MySQL Server ONLY if running locally
+  if (!isCloudEnv) {
     try {
       console.log("Checking XAMPP MySQL database connection on localhost:3306...");
       const rootConn = await mysql.createConnection({
@@ -144,26 +175,8 @@ async function setupDatabaseConnection() {
     }
   }
 
-  // 3. Fallback to PostgreSQL Pool (Neon / Supabase default connection string)
-  try {
-    console.log("Attempting connection to Cloud PostgreSQL (Supabase / Neon)...");
-    pgPool = new Pool({
-      connectionString: PG_CONNECTION_STRING,
-      ssl: { rejectUnauthorized: false }
-    });
-
-    await pgPool.query("SELECT 1");
-    activeDbDriver = 'pg';
-    console.log("🟢 CONNECTED TO POSTGRESQL DATABASE (SUPABASE / CLOUD) SUCCESSFULLY!");
-    console.log("--------------------------------------------------");
-    await initializePgSchema();
-    return;
-  } catch (pgErr) {
-    console.error("❌ CRITICAL ERROR: Unable to connect to XAMPP MySQL or Cloud PostgreSQL / Supabase!");
-    console.error("📌 For local setup: Open XAMPP Control Panel and start MySQL.");
-    console.error("📌 For Railway deployment: Set 'DATABASE_URL' environment variable in Railway to your Supabase connection string.");
-    process.exit(1);
-  }
+  console.error("❌ CRITICAL ERROR: Unable to connect to PostgreSQL / Supabase database engine!");
+  process.exit(1);
 }
 
 // Global Database Query Helper
