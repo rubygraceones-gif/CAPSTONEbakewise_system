@@ -2247,7 +2247,19 @@ function refreshInventoryPane() {
   const branchIdStr = store.getSelectedBranchId();
   const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
 
-  const filteredInventory = store.inventory.filter(i => branchId === 'all' || i.branchId === branchId);
+  const searchInput = document.getElementById('inventory-search-input')?.value.toLowerCase() || '';
+  const dateFilter = document.getElementById('inventory-date-filter')?.value || '';
+  const localBranchFilter = document.getElementById('inventory-branch-filter')?.value || 'all';
+  const effectiveBranchId = localBranchFilter !== 'all' ? parseInt(localBranchFilter) : branchId;
+
+  const filteredInventory = store.inventory
+    .filter(i => effectiveBranchId === 'all' || i.branchId === effectiveBranchId)
+    .filter(i => {
+      const p = store.products.find(x => x.id === i.productId);
+      const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
+      const dateMatch = dateFilter ? i.productionDate.startsWith(dateFilter) : true;
+      return nameMatch && dateMatch;
+    });
 
   const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE) || 1;
   if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;

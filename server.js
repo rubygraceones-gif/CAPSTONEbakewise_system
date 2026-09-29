@@ -85,16 +85,36 @@ const MYSQL_CONFIG = {
   database: process.env.MYSQL_DATABASE || 'bakewise_db'
 };
 
-// PostgreSQL Connection String (Fallback)
-const PG_CONNECTION_STRING = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_k0h9pXrJxRcQ@ep-lingering-flower-a4gancu9-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
+// PostgreSQL Connection String (Supabase / Cloud Postgres)
+const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "postgresql://neondb_owner:npg_k0h9pXrJxRcQ@ep-lingering-flower-a4gancu9-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
 
-// Initialize Database Connection
+// Initialize Database Connection (Supports XAMPP MySQL locally & Supabase PostgreSQL on Railway)
 async function setupDatabaseConnection() {
   console.log("--------------------------------------------------");
-  console.log("Checking XAMPP MySQL database connection on localhost:3306...");
+  console.log("Initializing BakeWise Database Engine...");
 
-  // 1. Try Connecting to Local XAMPP MySQL Server
+  // 1. If DATABASE_URL or SUPABASE_DB_URL is explicitly set (e.g. on Railway/Supabase), try PostgreSQL first
+  if (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) {
+    console.log("📌 Cloud Database URL detected. Attempting PostgreSQL / Supabase connection...");
+    try {
+      pgPool = new Pool({
+        connectionString: PG_CONNECTION_STRING,
+        ssl: { rejectUnauthorized: false }
+      });
+      await pgPool.query("SELECT 1");
+      activeDbDriver = 'pg';
+      console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
+      console.log("--------------------------------------------------");
+      await initializePgSchema();
+      return;
+    } catch (pgErr) {
+      console.error("⚠️ Could not connect via primary DATABASE_URL:", pgErr.message);
+    }
+  }
+
+  // 2. Try Connecting to Local XAMPP MySQL Server (Local Development)
   try {
+    console.log("Checking XAMPP MySQL database connection on localhost:3306...");
     const rootConn = await mysql.createConnection({
       host: MYSQL_CONFIG.host,
       port: MYSQL_CONFIG.port,
@@ -112,7 +132,6 @@ async function setupDatabaseConnection() {
       queueLimit: 0
     });
 
-    // Test MySQL query
     await mysqlPool.query("SELECT 1");
     activeDbDriver = 'mysql';
     console.log("🟢 CONNECTED TO XAMPP MYSQL DATABASE ('bakewise_db') SUCCESSFULLY!");
@@ -121,12 +140,27 @@ async function setupDatabaseConnection() {
     await initializeMysqlSchema();
     return;
   } catch (err) {
-    console.error("❌ CRITICAL ERROR: Could not connect to XAMPP MySQL Database.");
-    console.error("📌 Please open XAMPP Control Panel and ensure 'MySQL' is Started.");
-    console.error("Error details:", err.message);
+    console.log("ℹ️ Local XAMPP MySQL connection unavailable:", err.message);
+  }
 
-    // Force the system to stop instead of silently falling back to a cloud database
-    // This ensures data is ALWAYS saved to the local phpMyAdmin.
+  // 3. Fallback to PostgreSQL Pool (Neon / Supabase default connection string)
+  try {
+    console.log("Attempting connection to Cloud PostgreSQL (Supabase / Neon)...");
+    pgPool = new Pool({
+      connectionString: PG_CONNECTION_STRING,
+      ssl: { rejectUnauthorized: false }
+    });
+
+    await pgPool.query("SELECT 1");
+    activeDbDriver = 'pg';
+    console.log("🟢 CONNECTED TO POSTGRESQL DATABASE (SUPABASE / CLOUD) SUCCESSFULLY!");
+    console.log("--------------------------------------------------");
+    await initializePgSchema();
+    return;
+  } catch (pgErr) {
+    console.error("❌ CRITICAL ERROR: Unable to connect to XAMPP MySQL or Cloud PostgreSQL / Supabase!");
+    console.error("📌 For local setup: Open XAMPP Control Panel and start MySQL.");
+    console.error("📌 For Railway deployment: Set 'DATABASE_URL' environment variable in Railway to your Supabase connection string.");
     process.exit(1);
   }
 }
@@ -515,80 +549,157 @@ async function initializeMysqlSchema() {
   console.log("XAMPP MySQL database schema & seed initialization complete!");
 }
 
-// --- INITIALIZE POSTGRESQL SCHEMA ---
+// --- INITIALIZE POSTGRESQL SCHEMA & SEED DATA ---
 async function initializePgSchema() {
-  await pgPool.query(`
-    CREATE TABLE IF NOT EXISTS bw_branches (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(100) UNIQUE NOT NULL,
-      latitude DOUBLE PRECISION NOT NULL,
-      longitude DOUBLE PRECISION NOT NULL,
-      status VARCHAR(20) DEFAULT 'Active',
-      address TEXT,
-      store_hours VARCHAR(100),
-      contact_no VARCHAR(100)
-    );
+  console.log("Synchronizing Supabase / PostgreSQL table schemas and seed records...");
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS bw_branches (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        latitude DOUBLE PRECISION DEFAULT 300,
+        longitude DOUBLE PRECISION DEFAULT 200,
+        status VARCHAR(50) DEFAULT 'Active',
+        address TEXT,
+        store_hours VARCHAR(100),
+        contact_no VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS bw_users (
-      id SERIAL PRIMARY KEY,
-      email VARCHAR(100) UNIQUE NOT NULL,
-      password VARCHAR(100) NOT NULL,
-      name VARCHAR(100) NOT NULL,
-      role VARCHAR(50) NOT NULL,
-      branch_id INTEGER REFERENCES bw_branches(id) ON DELETE SET NULL
-    );
+      ALTER TABLE bw_branches ADD COLUMN IF NOT EXISTS address TEXT;
+      ALTER TABLE bw_branches ADD COLUMN IF NOT EXISTS store_hours VARCHAR(100);
+      ALTER TABLE bw_branches ADD COLUMN IF NOT EXISTS contact_no VARCHAR(100);
 
-    CREATE TABLE IF NOT EXISTS bw_products (
-      id VARCHAR(50) PRIMARY KEY,
-      name VARCHAR(100) NOT NULL,
-      category VARCHAR(50) NOT NULL,
-      price NUMERIC(10, 2) NOT NULL,
-      cost NUMERIC(10, 2) NOT NULL,
-      shelf_life_days INTEGER NOT NULL,
-      repurpose_recipe TEXT
-    );
+      CREATE TABLE IF NOT EXISTS bw_users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        branch_id INTEGER REFERENCES bw_branches(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS bw_sales (
-      id SERIAL PRIMARY KEY,
-      product_id VARCHAR(50) NOT NULL,
-      qty INTEGER NOT NULL,
-      price NUMERIC(10, 2) NOT NULL,
-      date DATE NOT NULL,
-      cashier VARCHAR(100) NOT NULL,
-      branch_id INTEGER REFERENCES bw_branches(id) ON DELETE CASCADE
-    );
+      CREATE TABLE IF NOT EXISTS bw_products (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        price NUMERIC(10, 2) NOT NULL,
+        cost NUMERIC(10, 2) NOT NULL,
+        shelf_life_days INTEGER DEFAULT 2,
+        repurpose_recipe TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS bw_inventory (
-      id SERIAL PRIMARY KEY,
-      product_id VARCHAR(50) NOT NULL,
-      stock_level INTEGER NOT NULL,
-      production_date DATE NOT NULL,
-      expiry_date DATE NOT NULL,
-      branch_id INTEGER REFERENCES bw_branches(id) ON DELETE CASCADE
-    );
+      CREATE TABLE IF NOT EXISTS bw_sales (
+        id SERIAL PRIMARY KEY,
+        product_id VARCHAR(50) NOT NULL,
+        qty INTEGER NOT NULL,
+        price NUMERIC(10, 2) NOT NULL,
+        date DATE NOT NULL,
+        cashier VARCHAR(255) DEFAULT 'Staff',
+        branch_id INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS bw_production (
-      id SERIAL PRIMARY KEY,
-      product_id VARCHAR(50) NOT NULL,
-      planned INTEGER NOT NULL,
-      actual INTEGER NOT NULL,
-      date DATE NOT NULL,
-      baker VARCHAR(100) NOT NULL,
-      status VARCHAR(20) DEFAULT 'Completed',
-      code VARCHAR(50),
-      branch_id INTEGER REFERENCES bw_branches(id) ON DELETE CASCADE
-    );
+      CREATE TABLE IF NOT EXISTS bw_inventory (
+        id SERIAL PRIMARY KEY,
+        product_id VARCHAR(50) NOT NULL,
+        stock_level INTEGER NOT NULL DEFAULT 0,
+        production_date DATE NOT NULL,
+        expiry_date DATE NOT NULL,
+        branch_id INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS bw_waste (
-      id SERIAL PRIMARY KEY,
-      product_id VARCHAR(50) NOT NULL,
-      qty INTEGER NOT NULL,
-      cost NUMERIC(10, 2) NOT NULL,
-      reason VARCHAR(100) NOT NULL,
-      date DATE NOT NULL,
-      branch_id INTEGER REFERENCES bw_branches(id) ON DELETE CASCADE
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS bw_production (
+        id SERIAL PRIMARY KEY,
+        product_id VARCHAR(50) NOT NULL,
+        planned INTEGER NOT NULL,
+        actual INTEGER NOT NULL,
+        date DATE NOT NULL,
+        baker VARCHAR(255) DEFAULT 'Baker',
+        status VARCHAR(50) DEFAULT 'Completed',
+        code VARCHAR(100),
+        branch_id INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bw_waste (
+        id SERIAL PRIMARY KEY,
+        product_id VARCHAR(50) NOT NULL,
+        qty INTEGER NOT NULL,
+        cost NUMERIC(10, 2) NOT NULL,
+        reason VARCHAR(255) NOT NULL,
+        date DATE NOT NULL,
+        branch_id INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    console.warn("⚠️ Postgres table creation notice:", err.message);
+  }
+
+  // Seed default branches into PostgreSQL
+  try {
+    await pgPool.query(`
+      INSERT INTO bw_branches (id, name, address, store_hours, contact_no, latitude, longitude, status) VALUES
+      (1, 'Agdao 1', 'Aquino St., Brgy. T. Monteverd...', '24 HOURS', '(082) 286-2546', 110, 210, 'Active'),
+      (2, 'Agdao 2', 'Door 2, Uy King Bldg, Lapu- La...', '24 HOURS', '(082) 300-7675', 120, 220, 'Active'),
+      (3, 'Bajada', 'JP Laurel Avenue, Bajada, Brgy...', '5 AM to 10 PM', '(082) 222-5071', 100, 200, 'Active'),
+      (4, 'Buhangin', 'Buhangin Public Market, Buhang...', '24 HOURS', '0977-088-1941', 100, 200, 'Active'),
+      (5, 'Head Office', 'Ruby St, Agdao, Davao City, Da...', '8AM to 5PM', '', 100, 200, 'Active')
+      ON CONFLICT (id) DO UPDATE SET 
+        name = EXCLUDED.name, 
+        address = EXCLUDED.address,
+        store_hours = EXCLUDED.store_hours,
+        contact_no = EXCLUDED.contact_no;
+    `);
+  } catch (err) {
+    console.warn("⚠️ Postgres branch seed notice:", err.message);
+  }
+
+  // Seed default user accounts into PostgreSQL
+  try {
+    const defaultHash = bcrypt.hashSync('password123', 10);
+    await pgPool.query(`
+      INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES
+      (1, 'manager@bakewise.com', '${defaultHash}', 'Branch Manager', 'manager', 1),
+      (2, 'sales@bakewise.com', '${defaultHash}', 'Sales Staff', 'sales', 1),
+      (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
+      (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
+      (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
+      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, branch_id = EXCLUDED.branch_id, password = EXCLUDED.password;
+    `);
+  } catch (err) {
+    console.warn("⚠️ Postgres user seed notice:", err.message);
+  }
+
+  // Seed default products into PostgreSQL
+  try {
+    await pgPool.query(`
+      INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES
+      ('p1', 'Pandesal (10pcs/pack)', 'Bread', 45.00, 18.00, 2, 'Garlic Croutons or Fine Breadcrumbs'),
+      ('p2', 'Special Ensaymada', 'Pastries', 30.00, 12.00, 3, 'Baked Ensaymada Pudding'),
+      ('p3', 'Classic Sliced Bread', 'Bread', 65.00, 28.00, 4, 'Cinnamon Bread Pudding or French Toast Sliders'),
+      ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
+      ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
+      ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, price = EXCLUDED.price, cost = EXCLUDED.cost;
+    `);
+  } catch (err) {
+    console.warn("⚠️ Postgres product seed notice:", err.message);
+  }
+
+  // Reset SERIAL sequence values
+  try {
+    await pgPool.query(`SELECT setval('bw_branches_id_seq', COALESCE((SELECT MAX(id) FROM bw_branches), 1))`);
+    await pgPool.query(`SELECT setval('bw_users_id_seq', COALESCE((SELECT MAX(id) FROM bw_users), 1))`);
+  } catch (err) {
+    console.warn("⚠️ Postgres sequence sync notice:", err.message);
+  }
+
+  console.log("Supabase / PostgreSQL database schema & seed initialization complete!");
 }
 
 setupDatabaseConnection();
@@ -602,7 +713,7 @@ app.get('/api/status', (req, res) => {
     system: 'BakeWise Bakery Management Enterprise',
     database_driver: activeDbDriver,
     dbConnection: activeDbDriver !== 'none' ? 'healthy' : 'disconnected',
-    connectionStringUsed: activeDbDriver === 'mysql' ? 'XAMPP MySQL' : 'Neon Postgres',
+    connectionStringUsed: activeDbDriver === 'mysql' ? 'XAMPP MySQL' : 'Supabase PostgreSQL',
     timestamp: new Date().toISOString()
   });
 });
@@ -669,7 +780,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 });
 
 // 3. BRANCH NETWORK API
-app.get('/api/branches', cache('5 minutes'), async (req, res) => {
+app.get('/api/branches', async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_branches ORDER BY id ASC");
     res.json(result.rows);
@@ -773,7 +884,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // 5. PRODUCTS API
-app.get('/api/products', cache('5 minutes'), async (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_products ORDER BY id ASC");
     res.json(result.rows);
