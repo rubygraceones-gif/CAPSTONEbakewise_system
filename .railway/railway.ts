@@ -8,6 +8,7 @@ export const partial = "CAPSTONEbakewise_system";
 export default defineRailway(() => {
   const CAPSTONEbakewise_system = service("CAPSTONEbakewise_system", {
     start: "node server.js",
+    region: "asia-southeast1",
     // builder from CaC: "nixpacks"
   });
   return project("amusing-commitment", {
