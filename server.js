@@ -14,6 +14,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable 'trust proxy' for reverse proxies (Railway, Heroku, Nginx, Cloudflare)
+app.set('trust proxy', 1);
+
 // Security and Middleware
 app.use(helmet({
   contentSecurityPolicy: {
