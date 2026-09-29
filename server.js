@@ -86,7 +86,7 @@ const MYSQL_CONFIG = {
 };
 
 // PostgreSQL Connection String (Supabase / Cloud Postgres)
-const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "postgresql://neondb_owner:npg_k0h9pXrJxRcQ@ep-lingering-flower-a4gancu9-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
+const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "postgresql://postgres.ewgebrbrgftbsljjgkwr:BakeWise2026!Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
 
 // Initialize Database Connection (Supports XAMPP MySQL locally & Supabase PostgreSQL on Railway)
 async function setupDatabaseConnection() {
