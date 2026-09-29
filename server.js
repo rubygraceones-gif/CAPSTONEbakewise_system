@@ -470,7 +470,7 @@ async function initializeMysqlSchema() {
     (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
     (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
     (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
-    ON DUPLICATE KEY UPDATE name = VALUES(name), role = VALUES(role), branch_id = VALUES(branch_id), password = VALUES(password);
+    ON DUPLICATE KEY UPDATE id = id;
   `);
 
   // 3. bw_products
@@ -686,7 +686,7 @@ async function initializePgSchema() {
       (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
       (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
       (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, branch_id = EXCLUDED.branch_id, password = EXCLUDED.password;
+      ON CONFLICT (email) DO NOTHING;
     `);
   } catch (err) {
     console.warn("⚠️ Postgres user seed notice:", err.message);
