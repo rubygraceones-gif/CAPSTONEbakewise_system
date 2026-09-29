@@ -93,54 +93,55 @@ async function setupDatabaseConnection() {
   console.log("--------------------------------------------------");
   console.log("Initializing BakeWise Database Engine...");
 
-  // 1. If DATABASE_URL or SUPABASE_DB_URL is explicitly set (e.g. on Railway/Supabase), try PostgreSQL first
-  if (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) {
-    console.log("📌 Cloud Database URL detected. Attempting PostgreSQL / Supabase connection...");
-    try {
-      pgPool = new Pool({
-        connectionString: PG_CONNECTION_STRING,
-        ssl: { rejectUnauthorized: false }
-      });
-      await pgPool.query("SELECT 1");
-      activeDbDriver = 'pg';
-      console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
-      console.log("--------------------------------------------------");
-      await initializePgSchema();
-      return;
-    } catch (pgErr) {
-      console.error("⚠️ Could not connect via primary DATABASE_URL:", pgErr.message);
-    }
+  // 1. Attempt PostgreSQL / Supabase database connection
+  try {
+    console.log("Attempting PostgreSQL / Supabase database connection...");
+    pgPool = new Pool({
+      connectionString: PG_CONNECTION_STRING,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000
+    });
+    await pgPool.query("SELECT 1");
+    activeDbDriver = 'pg';
+    console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
+    console.log("--------------------------------------------------");
+    await initializePgSchema();
+    return;
+  } catch (pgErr) {
+    console.error("❌ Could not connect to PostgreSQL / Supabase:", pgErr.message);
   }
 
-  // 2. Try Connecting to Local XAMPP MySQL Server (Local Development)
-  try {
-    console.log("Checking XAMPP MySQL database connection on localhost:3306...");
-    const rootConn = await mysql.createConnection({
-      host: MYSQL_CONFIG.host,
-      port: MYSQL_CONFIG.port,
-      user: MYSQL_CONFIG.user,
-      password: MYSQL_CONFIG.password
-    });
+  // 2. Try Connecting to Local XAMPP MySQL Server (Only for Local Development)
+  if (!process.env.RAILWAY_ENVIRONMENT && process.env.NODE_ENV !== 'production') {
+    try {
+      console.log("Checking XAMPP MySQL database connection on localhost:3306...");
+      const rootConn = await mysql.createConnection({
+        host: MYSQL_CONFIG.host,
+        port: MYSQL_CONFIG.port,
+        user: MYSQL_CONFIG.user,
+        password: MYSQL_CONFIG.password
+      });
 
-    await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${MYSQL_CONFIG.database}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
-    await rootConn.end();
+      await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${MYSQL_CONFIG.database}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+      await rootConn.end();
 
-    mysqlPool = mysql.createPool({
-      ...MYSQL_CONFIG,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0
-    });
+      mysqlPool = mysql.createPool({
+        ...MYSQL_CONFIG,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      });
 
-    await mysqlPool.query("SELECT 1");
-    activeDbDriver = 'mysql';
-    console.log("🟢 CONNECTED TO XAMPP MYSQL DATABASE ('bakewise_db') SUCCESSFULLY!");
-    console.log("XAMPP phpMyAdmin URL: http://localhost/phpmyadmin");
-    console.log("--------------------------------------------------");
-    await initializeMysqlSchema();
-    return;
-  } catch (err) {
-    console.log("ℹ️ Local XAMPP MySQL connection unavailable:", err.message);
+      await mysqlPool.query("SELECT 1");
+      activeDbDriver = 'mysql';
+      console.log("🟢 CONNECTED TO XAMPP MYSQL DATABASE ('bakewise_db') SUCCESSFULLY!");
+      console.log("XAMPP phpMyAdmin URL: http://localhost/phpmyadmin");
+      console.log("--------------------------------------------------");
+      await initializeMysqlSchema();
+      return;
+    } catch (err) {
+      console.log("ℹ️ Local XAMPP MySQL connection unavailable:", err.message);
+    }
   }
 
   // 3. Fallback to PostgreSQL Pool (Neon / Supabase default connection string)
