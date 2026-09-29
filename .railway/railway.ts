@@ -1,3 +1,4 @@
+/// <reference path="./railway.d.ts" />
 import { defineRailway, project, service } from "railway/iac";
 
 // This repository manages only its own resources in the environment. Other

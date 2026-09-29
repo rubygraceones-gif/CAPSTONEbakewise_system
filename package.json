@@ -23,7 +23,9 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "eslint": "^9.0.0",
-    "prettier": "^3.2.5"
+    "prettier": "^3.2.5",
+    "typescript": "^7.0.2"
   }
 }
