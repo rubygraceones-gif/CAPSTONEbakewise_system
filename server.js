@@ -442,11 +442,7 @@ async function initializeMysqlSchema() {
     (208, 'Valencia Villa', 'Villahermosa Bldg., Purok 1, G...', '5 AM to 8 PM', '0935-235-5605', 180, 280, 'Active'),
     (209, 'Victorias', 'Brgy. 4 (Fytc), San Francisco,...', '5 AM to 8 PM', '0907-856-6864', 190, 290, 'Active'),
     (210, 'Villarica', 'Miranda, Babak District, IGACO...', '5 AM to 8 PM', '0945-708-7429', 100, 200, 'Active')
-    ON DUPLICATE KEY UPDATE 
-      name = VALUES(name), 
-      address = VALUES(address),
-      store_hours = VALUES(store_hours),
-      contact_no = VALUES(contact_no);
+    ON DUPLICATE KEY UPDATE id = id;
   `);
 
   // 2. bw_users
@@ -495,7 +491,7 @@ async function initializeMysqlSchema() {
     ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
     ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
     ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants')
-    ON DUPLICATE KEY UPDATE name = VALUES(name), price = VALUES(price), cost = VALUES(cost);
+    ON DUPLICATE KEY UPDATE id = id;
   `);
 
   // 4. bw_sales
@@ -666,11 +662,7 @@ async function initializePgSchema() {
       (3, 'Bajada', 'JP Laurel Avenue, Bajada, Brgy...', '5 AM to 10 PM', '(082) 222-5071', 100, 200, 'Active'),
       (4, 'Buhangin', 'Buhangin Public Market, Buhang...', '24 HOURS', '0977-088-1941', 100, 200, 'Active'),
       (5, 'Head Office', 'Ruby St, Agdao, Davao City, Da...', '8AM to 5PM', '', 100, 200, 'Active')
-      ON CONFLICT (id) DO UPDATE SET 
-        name = EXCLUDED.name, 
-        address = EXCLUDED.address,
-        store_hours = EXCLUDED.store_hours,
-        contact_no = EXCLUDED.contact_no;
+      ON CONFLICT (id) DO NOTHING;
     `);
   } catch (err) {
     console.warn("⚠️ Postgres branch seed notice:", err.message);
@@ -702,7 +694,7 @@ async function initializePgSchema() {
       ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
       ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
       ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, price = EXCLUDED.price, cost = EXCLUDED.cost;
+      ON CONFLICT (id) DO NOTHING;
     `);
   } catch (err) {
     console.warn("⚠️ Postgres product seed notice:", err.message);
