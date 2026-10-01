@@ -3448,7 +3448,9 @@ async function getAIPredictedDemand(productId) {
 }
 
 async function renderAIDemandForecastChart() {
-  const ctx = document.getElementById("chart-ai-demand-forecast").getContext("2d");
+  const canvas = document.getElementById("chart-ai-demand-forecast");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
   if (aiDemandChartInstance) aiDemandChartInstance.destroy();
 
   const labels = store.products.map(p => p.name.split(' (')[0]);
