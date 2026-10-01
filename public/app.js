@@ -59,6 +59,37 @@ function parseLocalDate(dateStr) {
   return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
 }
 
+function parseDateTime(dateStr) {
+  if (!dateStr) return new Date();
+  if (typeof dateStr !== 'string') return new Date(dateStr);
+
+  if (dateStr.includes('T') || dateStr.includes(' ')) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const dayPart = parseInt(parts[2]);
+    if (!isNaN(dayPart)) {
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, dayPart, 5, 0, 0);
+    }
+  }
+
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+function formatDateTimeDisplay(val) {
+  if (!val) return 'N/A';
+  const d = (val instanceof Date) ? val : parseDateTime(val);
+  if (isNaN(d.getTime())) return String(val);
+
+  const dateFormatted = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const timeFormatted = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${dateFormatted}, ${timeFormatted}`;
+}
+
 function formatLocalDate(dateObj) {
   let d = dateObj;
   if (!d || !(d instanceof Date) || isNaN(d.getTime())) {
@@ -292,8 +323,8 @@ class BakeWiseStore {
             id: inv.id.toString(),
             productId: inv.product_id,
             stockLevel: parseInt(inv.stock_level),
-            productionDate: inv.production_date ? inv.production_date.split('T')[0] : getRelativeDateString(0),
-            expiryDate: inv.expiry_date ? inv.expiry_date.split('T')[0] : getRelativeDateString(1),
+            productionDate: inv.production_date ? inv.production_date : (getRelativeDateString(0) + 'T05:00:00'),
+            expiryDate: inv.expiry_date ? inv.expiry_date : (getRelativeDateString(1) + 'T05:00:00'),
             branchId: inv.branch_id
           }));
           this.save("bakewise_v2_inventory", this._inventory);
@@ -1423,21 +1454,27 @@ function setupInventoryModal() {
 
     const prodDateStr = document.getElementById("inv-prod-date").value;
     if (prodDateStr) {
-      const expDate = parseLocalDate(prodDateStr);
-      expDate.setDate(expDate.getDate() + shelfLife);
-      document.getElementById("inv-exp-date").value = formatLocalDate(expDate);
+      const pDate = new Date(prodDateStr);
+      if (!isNaN(pDate.getTime())) {
+        pDate.setDate(pDate.getDate() + shelfLife);
+        const expFormatted = new Date(pDate.getTime() - pDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        document.getElementById("inv-exp-date").value = expFormatted;
+      }
     }
   };
 
   const prodSelectEl = document.getElementById("inv-select-product");
   const prodDateEl = document.getElementById("inv-prod-date");
   if (prodSelectEl) prodSelectEl.addEventListener("change", updateExpDate);
+  if (prodDateEl) prodDateEl.addEventListener("input", updateExpDate);
   if (prodDateEl) prodDateEl.addEventListener("change", updateExpDate);
 
   const openModal = () => {
     modal.style.display = "block";
     overlay.style.display = "block";
-    document.getElementById("inv-prod-date").value = formatLocalDate(new Date());
+    const now = new Date();
+    const nowFormatted = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById("inv-prod-date").value = nowFormatted;
     
     const branchSelect = document.getElementById("inv-select-branch");
     if (branchSelect && store.currentUser) {
@@ -1637,12 +1674,12 @@ let dashBranchesChartInstance = null;
 let aiDemandChartInstance = null;
 
 function getFreshnessIndex(productionDateStr, expiryDateStr) {
-  const today = parseLocalDate(formatLocalDate(new Date()));
-  const start = parseLocalDate(productionDateStr);
-  const end = parseLocalDate(expiryDateStr);
+  const now = new Date();
+  const start = parseDateTime(productionDateStr);
+  const end = parseDateTime(expiryDateStr);
 
   const totalSpan = end.getTime() - start.getTime();
-  const elapsed = today.getTime() - start.getTime();
+  const elapsed = now.getTime() - start.getTime();
 
   if (totalSpan <= 0) return 0;
   const percentage = Math.round(((totalSpan - elapsed) / totalSpan) * 100);
@@ -3171,8 +3208,8 @@ function refreshInventoryPane() {
       barColor = "var(--color-warning)";
     }
 
-    const pDate = parseLocalDate(item.productionDate);
-    const eDate = parseLocalDate(item.expiryDate);
+    const prodFormatted = formatDateTimeDisplay(item.productionDate);
+    const expFormatted = formatDateTimeDisplay(item.expiryDate);
     const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
 
     return `
@@ -3181,8 +3218,8 @@ function refreshInventoryPane() {
         <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
         <td>${p.category}</td>
         <td>${item.stockLevel} pcs</td>
-        <td>${pDate.toLocaleDateString()}</td>
-        <td>${eDate.toLocaleDateString()}</td>
+        <td style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600;">${prodFormatted}</td>
+        <td style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600;">${expFormatted}</td>
         <td>
           <div class="freshness-indicator">
             <div class="freshness-bar-outer">

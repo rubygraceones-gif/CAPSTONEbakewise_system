@@ -987,8 +987,8 @@
                     <th>Branch</th>
                     <th>Category</th>
                     <th>Stock Level</th>
-                    <th>Production Date</th>
-                    <th>Expiry Date</th>
+                    <th>Production Date & Time</th>
+                    <th>Expiry Date & Time</th>
                     <th>Freshness degradation</th>
                     <th>Shelf Status</th>
                   </tr>
@@ -1039,17 +1039,17 @@
                 </div>
               </div>
               <div class="form-group" style="margin-bottom: 16px;">
-                <label for="inv-prod-date" class="form-label">Production Date</label>
+                <label for="inv-prod-date" class="form-label">Production Date & Time</label>
                 <div class="input-container">
                   <i data-lucide="calendar" class="input-icon" style="width: 18px; height: 18px;"></i>
-                  <input type="date" id="inv-prod-date" class="form-input" required>
+                  <input type="datetime-local" id="inv-prod-date" class="form-input" required>
                 </div>
               </div>
               <div class="form-group" style="margin-bottom: 24px;">
-                <label for="inv-exp-date" class="form-label">Expiration Date (Auto-calculated)</label>
+                <label for="inv-exp-date" class="form-label">Expiration Date & Time (Auto-calculated)</label>
                 <div class="input-container">
                   <i data-lucide="calendar-off" class="input-icon" style="width: 18px; height: 18px;"></i>
-                  <input type="date" id="inv-exp-date" class="form-input" required>
+                  <input type="datetime-local" id="inv-exp-date" class="form-input" required readonly style="background-color: var(--bg-secondary);">
                 </div>
               </div>
               <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
@@ -1830,7 +1830,7 @@
   <div id="toast-container"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 
 </html>
