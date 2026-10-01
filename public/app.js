@@ -495,13 +495,15 @@ class BakeWiseStore {
 
   getRoleLabel(role) {
     const roleLabels = {
+      "admin": "System Administrator",
       "manager": "Branch Manager",
       "sales": "Sales Staff",
-      "inventory": "Inventory Staff",
-      "production": "Baking Crew",
-      "admin": "Administrator"
+      "staff": "Sales Staff",
+      "inventory": "Inventory Specialist",
+      "production": "Baking Specialist",
+      "baker": "Baking Specialist"
     };
-    return roleLabels[role] || "Staff Member";
+    return roleLabels[role] || role || "Staff Member";
   }
 
   logout() {
@@ -1641,10 +1643,18 @@ function populateSelectDropdowns() {
     onChange: refreshPosHistory
   });
 
+  const userRoleItems = [
+    { id: 'admin', name: 'System Administrator' },
+    { id: 'manager', name: 'Branch Manager' },
+    { id: 'sales', name: 'Sales Staff' },
+    { id: 'inventory', name: 'Inventory Specialist' },
+    { id: 'production', name: 'Baking Specialist' }
+  ];
+
   initCombobox("user-role-filter", {
     icon: "shield",
     placeholder: "Search role...",
-    items: [{ id: 'all', name: 'All Roles' }, { id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }],
+    items: [{ id: 'all', name: 'All Roles' }, ...userRoleItems],
     onChange: refreshAdminUsersPane
   });
 
@@ -1659,13 +1669,13 @@ function populateSelectDropdowns() {
   initCombobox("usr-role-select", {
     icon: "shield",
     placeholder: "Search role...",
-    items: [{ id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }]
+    items: userRoleItems
   });
 
   initCombobox("edit-usr-role", {
     icon: "shield",
     placeholder: "Search role...",
-    items: [{ id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }]
+    items: userRoleItems
   });
 
   initCombobox("waste-reason-select", {
@@ -4505,7 +4515,7 @@ async function refreshAdminUsersPane() {
 
   const filteredUsers = store.users.filter(u => {
     const matchQuery = !query || u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query);
-    const matchRole = roleVal === "all" || u.role === roleVal;
+    const matchRole = roleVal === "all" || u.role === roleVal || (roleVal === "sales" && u.role === "staff") || (roleVal === "production" && u.role === "baker");
     return matchQuery && matchRole;
   });
 
