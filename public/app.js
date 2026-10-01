@@ -3413,6 +3413,8 @@ function refreshWastePane() {
 // 6. AI ANALYTICS CONTROLLER
 async function refreshAIAnalyticsPane() {
   await renderAIDemandForecastChart();
+  await renderDailyPredictionTable();
+  await render7DayProjectionTable();
   await renderBakeRecommendations();
   renderRepurposingAlerts();
 }
@@ -3495,44 +3497,106 @@ async function renderAIDemandForecastChart() {
     }
   });
 
+  // Hide AI Scoring Matrix section as requested
   const metricsEl = document.getElementById("ai-forecast-metrics");
   if (metricsEl) {
-    const topResultIdx = predictedDemand.indexOf(Math.max(...predictedDemand));
-    const topResult = aiResults[topResultIdx];
-    const topProductName = store.products[topResultIdx]?.name;
-
-    if (topResult && topResult.metrics) {
-      metricsEl.style.display = "block";
-      const { rmse, f1_score } = topResult.metrics;
-      const insightsList = topResult.insights.map(ins => `<li>${ins}</li>`).join("");
-
-      metricsEl.innerHTML = `
-        <h4 style="margin:0 0 8px 0; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
-          <i data-lucide="brain-circuit" style="width: 16px; height: 16px;"></i>
-          AI Scoring Matrix & Insights (${topProductName})
-        </h4>
-        <div style="display: flex; gap: 16px; margin-bottom: 12px;">
-          <div style="background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">Root Mean Squared Error (RMSE)</div>
-            <div style="font-size: 1.25rem; font-weight: bold; color: #0f172a;">${rmse.toFixed(2)}</div>
-          </div>
-          <div style="background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">Classification F1-Score</div>
-            <div style="font-size: 1.25rem; font-weight: bold; color: #0f172a;">${f1_score.toFixed(2)}</div>
-          </div>
-        </div>
-        <div style="background: #ebf8ff; border-left: 4px solid #3b82f6; padding: 8px 12px; font-size: 0.85rem; color: #1e3a8a;">
-          <strong>Meaningful Insights:</strong>
-          <ul style="margin: 4px 0 0 16px; padding: 0;">
-            ${insightsList}
-          </ul>
-        </div>
-      `;
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    } else {
-      metricsEl.style.display = "none";
-    }
+    metricsEl.style.display = "none";
   }
+}
+
+async function renderDailyPredictionTable() {
+  const tbody = document.getElementById("ai-daily-prediction-tbody");
+  if (!tbody) return;
+
+  const predictions = await Promise.all(store.products.map(async p => {
+    const pSales = store.sales.filter(s => s.productId === p.id);
+    const histAvg = pSales.length === 0 ? 0 : Math.round(pSales.reduce((sum, s) => sum + s.qty, 0) / pSales.length);
+    const forecastRes = await getAIPredictedDemand(p.id);
+    const forecast = forecastRes.demand;
+    const diff = forecast - histAvg;
+    const diffPct = histAvg > 0 ? Math.round((diff / histAvg) * 100) : 0;
+
+    let trendHtml = '';
+    if (diff > 0) {
+      trendHtml = `<span style="color: var(--color-success); font-weight: 700;">+${diff} pcs (+${diffPct}%) ▲</span>`;
+    } else if (diff < 0) {
+      trendHtml = `<span style="color: var(--color-error); font-weight: 700;">${diff} pcs (${diffPct}%) ▼</span>`;
+    } else {
+      trendHtml = `<span style="color: var(--text-secondary); font-weight: 600;">0 pcs (Stable)</span>`;
+    }
+
+    let statusBadge = '';
+    if (diff >= 5) {
+      statusBadge = `<span class="badge success" style="background: #dcfce7; color: #166534; font-weight: 700;">High Demand</span>`;
+    } else if (diff <= -5) {
+      statusBadge = `<span class="badge danger" style="background: #fee2e2; color: #991b1b; font-weight: 700;">Low Demand</span>`;
+    } else {
+      statusBadge = `<span class="badge info" style="background: #e0f2fe; color: #075985; font-weight: 700;">Stable Demand</span>`;
+    }
+
+    return `
+      <tr>
+        <td style="font-weight: 700;">${p.name}</td>
+        <td>${p.category}</td>
+        <td style="font-weight: 600;">${histAvg} pcs/day</td>
+        <td style="font-weight: 800; color: var(--primary-color);">${forecast} pcs</td>
+        <td>${trendHtml}</td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+  }));
+
+  tbody.innerHTML = predictions.join('');
+}
+
+async function render7DayProjectionTable() {
+  const trHead = document.getElementById("ai-7day-projection-thead-tr");
+  const tbody = document.getElementById("ai-7day-projection-tbody");
+  if (!tbody) return;
+
+  if (trHead) {
+    let ths = `<th>Product</th>`;
+    for (let d = 1; d <= 7; d++) {
+      const dayDate = new Date();
+      dayDate.setDate(dayDate.getDate() + d);
+      const dateFormatted = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+      ths += `<th>Day ${d}<br><span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary);">${dateFormatted}</span></th>`;
+    }
+    ths += `<th style="background: rgba(217, 119, 6, 0.1); color: var(--primary-color);">7-Day Total</th>`;
+    trHead.innerHTML = ths;
+  }
+
+  const rows = await Promise.all(store.products.map(async p => {
+    const forecastRes = await getAIPredictedDemand(p.id);
+    const day1Forecast = forecastRes.demand;
+
+    const dailyForecasts = [];
+    for (let d = 0; d < 7; d++) {
+      const dayDate = new Date();
+      dayDate.setDate(dayDate.getDate() + (d + 1));
+      const dayOfWeek = dayDate.getDay();
+      let mult = 1.0;
+      if (dayOfWeek === 0 || dayOfWeek === 6) mult = 1.25;
+      else if (dayOfWeek === 5) mult = 1.15;
+      else mult = 0.95;
+
+      const f = Math.max(5, Math.round(day1Forecast * mult));
+      dailyForecasts.push(f);
+    }
+
+    const total7 = dailyForecasts.reduce((sum, val) => sum + val, 0);
+
+    const cols = dailyForecasts.map(f => `<td style="font-weight: 600;">${f} pcs</td>`).join('');
+    return `
+      <tr>
+        <td style="font-weight: 700; color: var(--primary-color);">${p.name}</td>
+        ${cols}
+        <td style="font-weight: 800; color: var(--accent-color); background: rgba(217, 119, 6, 0.05);">${total7} pcs</td>
+      </tr>
+    `;
+  }));
+
+  tbody.innerHTML = rows.join('');
 }
 
 async function renderBakeRecommendations() {
@@ -3547,7 +3611,7 @@ async function renderBakeRecommendations() {
 
     const predictionResult = await getAIPredictedDemand(p.id);
     const prediction = predictionResult.demand;
-    const safetyStock = 5; // Allowable safety quantity
+    const safetyStock = 5;
     const recommendedBake = Math.max(0, prediction - currentStock + safetyStock);
 
     let reason = `The predicted demand is ${prediction} pieces. With a current stock of ${currentStock} pieces and a required safety buffer of ${safetyStock} pieces, a production run of ${recommendedBake} pieces is recommended.`;
@@ -3589,7 +3653,7 @@ function renderRepurposingAlerts() {
         existing.qty += item.stockLevel;
         existing.freshness = Math.min(existing.freshness, fIndex);
       } else {
-        itemsToRepurposeMap.set(p.id, { name: p.name, qty: item.stockLevel, recipe: p.repurposeRecipe, freshness: fIndex });
+        itemsToRepurposeMap.set(p.id, { productId: p.id, name: p.name, qty: item.stockLevel, recipe: p.repurposeRecipe, freshness: fIndex });
       }
     }
   });
@@ -3602,19 +3666,19 @@ function renderRepurposingAlerts() {
         <p>No products are currently approaching shelf-life expiration limits. Repurposing is not required.</p>
       </div>
     `;
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
-  container.innerHTML = itemsToRepurpose.map((item, idx) => `
-    <div class="repurpose-card">
+  container.innerHTML = itemsToRepurpose.map(item => `
+    <div class="repurpose-card" id="repurpose-card-${item.productId}">
       <div class="repurpose-badge-top">
         <span class="repurpose-item-name">${item.name}</span>
         <span class="badge warning">${item.freshness}% Fresh</span>
       </div>
       <p style="font-size: 0.85rem;">Available excess stock: <strong>${item.qty} pcs</strong></p>
       <div class="repurpose-recipe">Suggested Recipe: "${item.recipe}"</div>
-      <button class="btn-primary btn-repurpose-action" data-idx="${idx}" style="margin-top: 10px; width: 100%; font-size: 0.8rem; padding: 6px 12px; background: linear-gradient(135deg, #0284c7, #0369a1);">
+      <button class="btn-primary btn-repurpose-action" data-pid="${item.productId}" data-qty="${item.qty}" data-name="${item.name}" data-recipe="${item.recipe}" style="margin-top: 10px; width: 100%; font-size: 0.8rem; padding: 6px 12px; background: linear-gradient(135deg, #0284c7, #0369a1);">
         <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed
       </button>
     </div>
@@ -3622,18 +3686,45 @@ function renderRepurposingAlerts() {
 
   document.querySelectorAll(".btn-repurpose-action").forEach(btn => {
     btn.addEventListener("click", () => {
-      const idx = parseInt(btn.getAttribute("data-idx"));
-      const target = itemsToRepurpose[idx];
-      if (target) {
-        showToast(`Saved ${target.qty} pcs of ${target.name} by converting into "${target.recipe}". Waste prevented!`, "success");
-        btn.disabled = true;
-        btn.textContent = "✓ Repurposed Recipe Prepared";
-        btn.style.background = "#22c55e";
-      }
+      const pid = btn.getAttribute("data-pid");
+      const name = btn.getAttribute("data-name");
+      const qty = parseInt(btn.getAttribute("data-qty") || 0);
+      const recipe = btn.getAttribute("data-recipe");
+
+      handleMarkAsRepurposed(pid, name, qty, recipe);
     });
   });
 
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function handleMarkAsRepurposed(productId, productName, qty, recipe) {
+  // Deduct/clear near-expiry inventory items for this product
+  let remainingToDeduct = qty;
+  store._inventory.forEach(item => {
+    if (item.productId === productId && remainingToDeduct > 0) {
+      const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
+      if (fIndex <= 30 && item.stockLevel > 0) {
+        const deduct = Math.min(item.stockLevel, remainingToDeduct);
+        item.stockLevel -= deduct;
+        remainingToDeduct -= deduct;
+      }
+    }
+  });
+
+  // Save updated state
+  store.save("bakewise_v2_inventory", store._inventory);
+  store.commitAll();
+
+  // Log system activity & toast notification
+  store.logActivity(`Repurposed ${qty} pcs of ${productName} into "${recipe}". Waste prevented & stock updated!`, "inventory");
+  showToast(`Successfully repurposed ${qty} pcs of ${productName} into "${recipe}"! Waste prevented & stock synchronized.`, "success");
+
+  // Synchronize system UI components immediately
+  refreshDashboard();
+  refreshInventoryPane();
+  renderRepurposingAlerts();
+  if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
 }
 
 function refreshShelfLifePane() {
