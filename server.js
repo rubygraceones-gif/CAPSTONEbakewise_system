@@ -1183,7 +1183,7 @@ app.post('/api/pos/checkout', async (req, res) => {
         parseFloat(total || 0),
         parseFloat(payment_amount || 0),
         parseFloat(change_amount || 0),
-        payment_method || 'Cash',
+        'Cash',
         txDate
       ]
     );
@@ -1196,7 +1196,7 @@ app.post('/api/pos/checkout', async (req, res) => {
       total,
       payment_amount,
       change_amount,
-      payment_method,
+      payment_method: 'Cash',
       status: 'Completed',
       date: txDate
     };

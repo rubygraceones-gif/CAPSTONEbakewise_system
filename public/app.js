@@ -2617,8 +2617,9 @@ async function handlePosCheckout() {
       });
     }
 
-    // Refresh store dataset from server
+    // Refresh store dataset from server & update Sales History table immediately
     await store.syncWithBackend();
+    refreshPosHistory();
 
     // Prepare receipt object
     currentReceiptTxData = {
@@ -2632,15 +2633,8 @@ async function handlePosCheckout() {
       total: total,
       payment_amount: payload.payment_amount,
       change_amount: payload.change_amount,
-      payment_method: currentPosPaymentMethod
+      payment_method: 'Cash'
     };
-
-    // Reset cart state
-    posCart = [];
-    document.getElementById("pos-discount-input").value = "0.00";
-    document.getElementById("pos-tendered-input").value = "";
-    updatePosCartUI();
-    renderPosProducts();
 
     // Show thermal receipt modal
     showPosReceiptModal(currentReceiptTxData);
@@ -2708,7 +2702,7 @@ function showPosReceiptModal(tx) {
     <div style="font-size: 0.82rem;">
       <div style="display: flex; justify-content: space-between;">
         <span>Payment Method:</span>
-        <span>${tx.payment_method}</span>
+        <span>${tx.payment_method || 'Cash'}</span>
       </div>
       <div style="display: flex; justify-content: space-between;">
         <span>Payment Amount:</span>
@@ -2735,6 +2729,7 @@ function closePosReceiptModal() {
   const modal = document.getElementById("pos-receipt-modal");
   if (overlay) overlay.style.display = 'none';
   if (modal) modal.style.display = 'none';
+  clearPosCart();
 }
 window.closePosReceiptModal = closePosReceiptModal;
 

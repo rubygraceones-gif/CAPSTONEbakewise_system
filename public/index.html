@@ -842,9 +842,7 @@
                   <div class="pos-payment-box">
                     <label class="form-label" style="margin-bottom: 6px; font-weight: 600;">Payment Method</label>
                     <div class="payment-method-selector">
-                      <button type="button" class="pay-method-btn active" data-method="Cash">Cash</button>
-                      <button type="button" class="pay-method-btn" data-method="GCash">GCash</button>
-                      <button type="button" class="pay-method-btn" data-method="Card">Card</button>
+                      <button type="button" class="pay-method-btn active" data-method="Cash" style="width: 100%; cursor: default; background: var(--accent-color); color: white; font-weight: 700;">Cash</button>
                     </div>
 
                     <div class="payment-amount-group" id="pos-cash-input-group" style="margin-top: 10px;">
@@ -910,8 +908,6 @@
                   <select id="pos-history-payment" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
                     <option value="all">All Methods</option>
                     <option value="Cash">Cash</option>
-                    <option value="GCash">GCash</option>
-                    <option value="Card">Card</option>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1793,7 +1789,7 @@
   </div>
 
   <!-- POS Receipt Preview Modal -->
-  <div class="modal-overlay" id="pos-receipt-overlay" style="display: none;"></div>
+  <div class="modal-overlay" id="pos-receipt-overlay" style="display: none;" onclick="closePosReceiptModal()"></div>
   <div class="panel-card modal-dialog" id="pos-receipt-modal" style="display: none; max-width: 440px; z-index: 2100; padding: 24px;">
     <div id="pos-receipt-printable" class="thermal-receipt-preview">
       <!-- Receipt content injected by JS -->
