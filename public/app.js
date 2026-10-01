@@ -2252,20 +2252,15 @@ function getBranchProductStock(productId) {
     ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1) 
     : parseInt(selectedBranchId);
 
-  const inventoryRecords = store.inventory.filter(i => {
-    const pidMatch = i.productId === productId || String(i.productId) === String(productId);
-    const bidMatch = i.branchId === effectiveBranchId || String(i.branchId) === String(effectiveBranchId);
+  const altPid = String(productId).startsWith('p') ? String(productId).substring(1) : `p${productId}`;
+
+  const inventoryRecords = (store._inventory || []).filter(i => {
+    const pidMatch = i.productId === productId || String(i.productId) === String(productId) || String(i.productId) === altPid;
+    const bidMatch = parseInt(i.branchId) === parseInt(effectiveBranchId);
     return pidMatch && bidMatch;
   });
 
-  if (!inventoryRecords.length) {
-    // Seed fallback default stocks for primary bakery items if not yet in inventory list
-    if (productId === 'p1') return 100; // Pandesal
-    if (productId === 'p4') return 20;  // Premium Chocolate Cake
-    if (productId === 'p7') return 50;  // Coke
-    return 35;
-  }
-  return inventoryRecords.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+  return inventoryRecords.reduce((sum, item) => sum + (parseInt(item.stockLevel !== undefined ? item.stockLevel : (item.quantity !== undefined ? item.quantity : item.stock_level)) || 0), 0);
 }
 
 function renderPosProducts() {
@@ -2614,6 +2609,10 @@ async function handlePosCheckout() {
 
   } catch (err) {
     showToast(`Checkout Error: ${err.message}`, "danger");
+    try {
+      await store.syncWithBackend();
+      renderPosProducts();
+    } catch(e) {}
   } finally {
     const checkoutBtn = document.getElementById("btn-pos-checkout");
     if (checkoutBtn) checkoutBtn.disabled = false;

@@ -57,8 +57,8 @@ function authenticateToken(req, res, next) {
   // Allow OPTIONS preflight requests
   if (req.method === 'OPTIONS') return next();
 
-  // Allow /api/auth/login, /api/status, /api/pos, and /api/inventory without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory')) return next();
+  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, and /api/branches without strict JWT header check
+  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches')) return next();
 
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -1113,16 +1113,22 @@ app.post('/api/pos/checkout', async (req, res) => {
   try {
     // A. INVENTORY STOCK VALIDATION
     for (const item of items) {
+      const altPid = String(item.product_id).startsWith('p') ? String(item.product_id).substring(1) : `p${item.product_id}`;
       const invCheck = await queryDb(
-        "SELECT stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2",
-        [item.product_id, bId]
+        "SELECT stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+        [String(item.product_id), String(altPid), bId]
       );
-      const currentStock = (invCheck.rows && invCheck.rows.length > 0) ? parseInt(invCheck.rows[0].stock_level) : 100;
+      const currentStock = (invCheck.rows && invCheck.rows.length > 0)
+        ? invCheck.rows.reduce((sum, row) => sum + (parseInt(row.stock_level) || 0), 0)
+        : 0;
+
       if (currentStock < parseInt(item.quantity)) {
-        const pRes = await queryDb("SELECT name FROM bw_products WHERE id = $1", [item.product_id]);
-        const pName = (pRes.rows && pRes.rows.length > 0) ? pRes.rows[0].name : item.product_id;
+        const pRes = await queryDb("SELECT name FROM bw_products WHERE id = $1 OR id = $2", [String(item.product_id), String(altPid)]);
+        const pName = (pRes.rows && pRes.rows.length > 0) ? pRes.rows[0].name : item.product_name || item.product_id;
         return res.status(400).json({
-          error: `Insufficient stock for ${pName}. Only ${currentStock} units are available.`
+          success: false,
+          error: `Unable to complete transaction. ${pName} has only ${currentStock} units remaining.`,
+          message: `Unable to complete transaction. ${pName} has only ${currentStock} units remaining.`
         });
       }
     }
@@ -1197,8 +1203,8 @@ app.post('/api/pos/checkout', async (req, res) => {
 
       // 2. Deduct Inventory Stock
       const invRow = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2",
-        [item.product_id, bId]
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id DESC LIMIT 1",
+        [String(item.product_id), String(altPid), bId]
       );
       if (invRow.rows && invRow.rows.length > 0) {
         const newStock = Math.max(0, parseInt(invRow.rows[0].stock_level) - parseInt(item.quantity));
@@ -1419,250 +1425,7 @@ app.post('/api/forecast', (req, res) => {
   child.stdin.end();
 });
 
-// ============================================================================
-// 12. POINT-OF-SALE (POS) API ENDPOINTS
-// ============================================================================
 
-// GET /api/pos/transactions - Fetch POS history
-app.get('/api/pos/transactions', async (req, res) => {
-  const { branch_id } = req.query;
-  try {
-    let query = "SELECT * FROM bw_pos_transactions";
-    const params = [];
-    if (branch_id && branch_id !== 'all') {
-      query += " WHERE branch_id = $1";
-      params.push(parseInt(branch_id));
-    }
-    query += " ORDER BY id DESC";
-
-    const result = await queryDb(query, params);
-    const transactions = result.rows;
-
-    for (let tx of transactions) {
-      const itemsRes = await queryDb(
-        "SELECT * FROM bw_pos_transaction_items WHERE transaction_id = $1 ORDER BY id ASC",
-        [tx.id]
-      );
-      tx.items = itemsRes.rows;
-
-      const branchRes = await queryDb("SELECT name FROM bw_branches WHERE id = $1", [tx.branch_id]);
-      tx.branch_name = branchRes.rows.length ? branchRes.rows[0].name : `Branch ${tx.branch_id}`;
-    }
-
-    res.json({ success: true, transactions });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET /api/pos/transactions/:id - Fetch single POS transaction
-app.get('/api/pos/transactions/:id', async (req, res) => {
-  try {
-    const txId = parseInt(req.params.id);
-    const result = await queryDb("SELECT * FROM bw_pos_transactions WHERE id = $1", [txId]);
-    if (!result.rows.length) {
-      return res.status(404).json({ success: false, message: "Transaction not found" });
-    }
-    const tx = result.rows[0];
-
-    const itemsRes = await queryDb(
-      "SELECT * FROM bw_pos_transaction_items WHERE transaction_id = $1 ORDER BY id ASC",
-      [txId]
-    );
-    tx.items = itemsRes.rows;
-
-    const branchRes = await queryDb("SELECT name FROM bw_branches WHERE id = $1", [tx.branch_id]);
-    tx.branch_name = branchRes.rows.length ? branchRes.rows[0].name : `Branch ${tx.branch_id}`;
-
-    res.json({ success: true, transaction: tx });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/pos/checkout - Multi-product atomic checkout & automatic inventory deduction
-app.post('/api/pos/checkout', async (req, res) => {
-  const {
-    branch_id,
-    cashier_id,
-    cashier_name,
-    subtotal,
-    discount,
-    total,
-    payment_amount,
-    change_amount,
-    payment_method,
-    items
-  } = req.body;
-
-  if (!items || !items.length) {
-    return res.status(400).json({ success: false, message: "Cart cannot be empty" });
-  }
-
-  const bId = branch_id ? parseInt(branch_id) : 1;
-  const cashier = cashier_name || 'System Administrator';
-
-  try {
-    // 1. Ensure sufficient inventory stock exists for items in branch
-    for (let item of items) {
-      const invRes = await queryDb(
-        "SELECT COALESCE(SUM(stock_level), 0) as total_qty FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
-        [String(item.product_id), String(item.product_id).replace(/^p/, ''), bId]
-      );
-      const available = invRes.rows.length && invRes.rows[0].total_qty !== null && invRes.rows[0].total_qty !== undefined
-        ? parseInt(invRes.rows[0].total_qty) 
-        : 0;
-
-      if (available < item.quantity) {
-        // Auto-seed initial stock batch for bakery product in branch
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const expStr = new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10);
-        let seedQty = 100;
-        if (item.product_id === 'p4') seedQty = 20;
-        else if (item.product_id === 'p7') seedQty = 50;
-
-        await queryDb(
-          "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5)",
-          [String(item.product_id), seedQty, todayStr, expStr, bId]
-        );
-      }
-    }
-
-    // 3. Generate unique Transaction Number POS-YYYYMMDD-###
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0,10).replace(/-/g, '');
-    const countRes = await queryDb(
-      "SELECT COUNT(*) as cnt FROM bw_pos_transactions WHERE transaction_number LIKE $1",
-      [`POS-${dateStr}-%`]
-    );
-    const nextSeq = (parseInt(countRes.rows[0]?.cnt || 0) + 1).toString().padStart(3, '0');
-    const txNumber = `POS-${dateStr}-${nextSeq}`;
-    const txDate = today.toISOString().slice(0, 10);
-
-    // 4. Insert POS Transaction Header
-    const txHeaderRes = await queryDb(
-      `INSERT INTO bw_pos_transactions 
-        (transaction_number, branch_id, cashier, subtotal, discount, total, payment_amount, change_amount, payment_method, status, date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [txNumber, bId, cashier, parseFloat(subtotal), parseFloat(discount), parseFloat(total), parseFloat(payment_amount), parseFloat(change_amount), payment_method || 'Cash', 'Completed', txDate]
-    );
-    const createdTx = txHeaderRes.rows[0] || { id: Date.now(), transaction_number: txNumber, date: txDate };
-
-    const lowStockWarnings = [];
-
-    // 5. Insert Transaction Items, Deduct Inventory & Record Sales
-    for (let item of items) {
-      await queryDb(
-        `INSERT INTO bw_pos_transaction_items (transaction_id, product_id, product_name, quantity, unit_price, subtotal)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [createdTx.id, String(item.product_id), item.product_name, parseInt(item.quantity), parseFloat(item.unit_price), parseFloat(item.subtotal)]
-      );
-
-      // Deduct from branch inventory
-      const invList = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2 ORDER BY id ASC",
-        [String(item.product_id), bId]
-      );
-
-      let qtyToDeduct = parseInt(item.quantity);
-      if (invList.rows.length) {
-        for (let inv of invList.rows) {
-          if (qtyToDeduct <= 0) break;
-          const currentQty = parseInt(inv.stock_level);
-          if (currentQty <= qtyToDeduct) {
-            qtyToDeduct -= currentQty;
-            await queryDb("UPDATE bw_inventory SET stock_level = 0 WHERE id = $1", [inv.id]);
-          } else {
-            const rem = currentQty - qtyToDeduct;
-            qtyToDeduct = 0;
-            await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [rem, inv.id]);
-          }
-        }
-      }
-
-      // Record in legacy bw_sales table for existing KPIs, reporting & AI forecasting
-      await queryDb(
-        `INSERT INTO bw_sales (product_id, qty, price, date, branch_id) VALUES ($1, $2, $3, $4, $5)`,
-        [String(item.product_id), parseInt(item.quantity), parseFloat(item.unit_price), txDate, bId]
-      );
-
-      // Check remaining stock for low stock warning
-      const remRes = await queryDb(
-        "SELECT COALESCE(SUM(stock_level), 0) as total_qty FROM bw_inventory WHERE product_id = $1 AND branch_id = $2",
-        [String(item.product_id), bId]
-      );
-      const remStock = remRes.rows.length && remRes.rows[0].total_qty !== null ? parseInt(remRes.rows[0].total_qty) : 0;
-      if (remStock <= 10) {
-        lowStockWarnings.push({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          remaining_stock: remStock
-        });
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: "POS Transaction completed successfully",
-      transaction: createdTx,
-      low_stock_warnings: lowStockWarnings
-    });
-
-  } catch (err) {
-    console.error("POS Checkout Error:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/pos/void/:id - Void POS transaction & restore inventory
-app.post('/api/pos/void/:id', async (req, res) => {
-  const txId = parseInt(req.params.id);
-  const { voided_by } = req.body;
-
-  try {
-    const txRes = await queryDb("SELECT * FROM bw_pos_transactions WHERE id = $1", [txId]);
-    if (!txRes.rows.length) {
-      return res.status(404).json({ success: false, message: "Transaction not found" });
-    }
-    const tx = txRes.rows[0];
-
-    if (tx.status === 'Voided') {
-      return res.status(400).json({ success: false, message: "Transaction is already voided" });
-    }
-
-    await queryDb("UPDATE bw_pos_transactions SET status = 'Voided' WHERE id = $1", [txId]);
-
-    const itemsRes = await queryDb("SELECT * FROM bw_pos_transaction_items WHERE transaction_id = $1", [txId]);
-    const items = itemsRes.rows;
-
-    for (let item of items) {
-      const invCheck = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2 LIMIT 1",
-        [String(item.product_id), tx.branch_id]
-      );
-      if (invCheck.rows.length) {
-        const newQty = parseInt(invCheck.rows[0].stock_level) + parseInt(item.quantity);
-        await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newQty, invCheck.rows[0].id]);
-      } else {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const expStr = new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10);
-        await queryDb(
-          "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5)",
-          [String(item.product_id), parseInt(item.quantity), todayStr, expStr, tx.branch_id]
-        );
-      }
-    }
-
-    res.json({
-      success: true,
-      message: `Transaction ${tx.transaction_number} voided successfully and inventory restored.`,
-      transaction_id: txId
-    });
-
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
 
 // --- SERVE FRONTEND STATIC FILES ---
 app.use(express.static(path.join(__dirname, 'public')));
