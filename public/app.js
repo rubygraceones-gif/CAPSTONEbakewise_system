@@ -2331,7 +2331,7 @@ function renderPosProducts() {
     }
 
     return `
-      <div class="pos-product-card" onclick="addToPosCart('${p.id}')">
+      <div class="pos-product-card" data-product-id="${p.id}" onclick="addToPosCart('${p.id}')">
         <div class="pos-product-info">
           <span class="pos-product-category">${p.category || 'BAKERY'}</span>
           <h4>${p.name}</h4>
@@ -2341,7 +2341,7 @@ function renderPosProducts() {
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" onclick="event.stopPropagation(); addToPosCart('${p.id}')" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" onclick="event.stopPropagation(); addToPosCart('${p.id}')" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
             <span>${remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart')}</span>
           </button>
         </div>
@@ -2972,6 +2972,20 @@ function setupPOSModule() {
   const searchInput = document.getElementById("pos-product-search");
   if (searchInput) {
     searchInput.addEventListener("input", renderPosProducts);
+  }
+
+  // Event delegation on product grid
+  const gridContainer = document.getElementById("pos-products-grid");
+  if (gridContainer) {
+    gridContainer.addEventListener("click", (e) => {
+      const card = e.target.closest(".pos-product-card, .pos-product-add-btn");
+      if (card) {
+        const productId = card.getAttribute("data-product-id");
+        if (productId) {
+          addToPosCart(productId);
+        }
+      }
+    });
   }
 
   // Payment method buttons
