@@ -3470,7 +3470,6 @@ async function renderDailyPredictionTable() {
         <td>${p.category}</td>
         <td style="font-weight: 600;">${histAvg} pcs/day</td>
         <td style="font-weight: 800; color: var(--primary-color);">${forecast} pcs</td>
-        <td>${trendHtml}</td>
         <td>${statusBadge}</td>
       </tr>
     `;
