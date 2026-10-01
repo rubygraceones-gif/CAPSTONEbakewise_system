@@ -3628,34 +3628,60 @@ function renderRepurposingAlerts() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function handleMarkAsRepurposed(productId, productName, qty, recipe) {
-  // Deduct/clear near-expiry inventory items for this product
+async function handleMarkAsRepurposed(productId, productName, qty, recipe, batchId) {
+  const userBranchId = store.currentUser && store.currentUser.branch_id ? parseInt(store.currentUser.branch_id) : 1;
+
+  // 1. Trigger POST /api/repurpose mutation to persist permanently in DB
+  try {
+    await fetch('/api/repurpose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_id: productId,
+        product_name: productName,
+        quantity: qty,
+        target_recipe: recipe,
+        branch_id: userBranchId,
+        batch_id: batchId || `batch_${Date.now()}`
+      })
+    });
+  } catch (err) {
+    console.warn("Backend API repurpose error (falling back to local state sync):", err.message);
+  }
+
+  // 2. Deduct/clear near-expiry inventory items and update batch status to "Repurposed"
   let remainingToDeduct = qty;
   store._inventory.forEach(item => {
-    if (item.productId === productId && remainingToDeduct > 0) {
+    if ((item.productId === productId || String(item.productId) === String(productId)) && remainingToDeduct > 0) {
       const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
       if (fIndex <= 30 && item.stockLevel > 0) {
         const deduct = Math.min(item.stockLevel, remainingToDeduct);
         item.stockLevel -= deduct;
         remainingToDeduct -= deduct;
+        item.status = "Repurposed";
       }
     }
   });
 
-  // Save updated state
+  // Save updated state permanently
   store.save("bakewise_v2_inventory", store._inventory);
   store.commitAll();
 
-  // Log system activity & toast notification
+  // Log system activity & display success toast alert
   store.logActivity(`Repurposed ${qty} pcs of ${productName} into "${recipe}". Waste prevented & stock updated!`, "inventory");
-  showToast(`Successfully repurposed ${qty} pcs of ${productName} into "${recipe}"! Waste prevented & stock synchronized.`, "success");
+  showToast(`${productName} (${qty} pcs) successfully marked as repurposed into "${recipe}"`, "success");
 
-  // Synchronize system UI components immediately
+  // 3. Cache invalidation & system-wide UI synchronization
+  if (store.isBackendOnline) {
+    try { await store.syncWithBackend(); } catch(e) {}
+  }
   refreshDashboard();
   refreshInventoryPane();
   renderRepurposingAlerts();
+  if (typeof refreshAIAnalyticsPane === 'function') refreshAIAnalyticsPane();
   if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
 }
+window.handleMarkAsRepurposed = handleMarkAsRepurposed;
 
 function populateShelfBreadTypeDropdown() {
   const selectEl = document.getElementById("shelf-bread-type");

@@ -58,7 +58,7 @@ function authenticateToken(req, res, next) {
   if (req.method === 'OPTIONS') return next();
 
   // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, and /api/branches without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches')) return next();
+  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose')) return next();
 
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -587,12 +587,41 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  await mysqlPool.query(`
+    CREATE TABLE IF NOT EXISTS bw_repurpose_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      batch_id VARCHAR(100),
+      product_id VARCHAR(50) NOT NULL,
+      product_name VARCHAR(255) NOT NULL,
+      quantity INT NOT NULL,
+      target_recipe VARCHAR(255) NOT NULL,
+      branch_id INT DEFAULT 1,
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   console.log("XAMPP MySQL database schema & seed initialization complete!");
 }
 
 // --- INITIALIZE POSTGRESQL SCHEMA & SEED DATA ---
 async function initializePgSchema() {
   console.log("Synchronizing Supabase / PostgreSQL table schemas and seed records...");
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS bw_repurpose_logs (
+        id SERIAL PRIMARY KEY,
+        batch_id VARCHAR(100),
+        product_id VARCHAR(50) NOT NULL,
+        product_name VARCHAR(255) NOT NULL,
+        quantity INTEGER NOT NULL,
+        target_recipe VARCHAR(255) NOT NULL,
+        branch_id INTEGER DEFAULT 1,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    console.warn("⚠️ Postgres repurpose table notice:", err.message);
+  }
   try {
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS bw_branches (
@@ -1295,6 +1324,92 @@ app.post('/api/pos/void/:id', async (req, res) => {
     }
 
     res.json({ success: true, message: `Transaction ${tx.transaction_number} has been voided and inventory restored.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. REPURPOSE BATCH ENDPOINTS
+app.post('/api/repurpose', async (req, res) => {
+  const { product_id, product_name, quantity, target_recipe, branch_id, batch_id } = req.body;
+
+  if (!product_id || !quantity) {
+    return res.status(400).json({ error: "Product ID and quantity are required." });
+  }
+
+  const bId = branch_id ? parseInt(branch_id) : 1;
+  const qtyNum = parseInt(quantity);
+  const pName = product_name || product_id;
+  const recipe = target_recipe || "Repurposed Recipe";
+  const bIdStr = String(batch_id || `batch_${Date.now()}`);
+
+  try {
+    const altPid = String(product_id).startsWith('p') ? String(product_id).substring(1) : `p${product_id}`;
+    
+    // Deduct stock from near-expiry or matching inventory items for this product
+    const invRes = await queryDb(
+      "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 AND stock_level > 0 ORDER BY expiry_date ASC, id ASC",
+      [String(product_id), String(altPid), bId]
+    );
+
+    let remainingToDeduct = qtyNum;
+    if (invRes.rows && invRes.rows.length > 0) {
+      for (const row of invRes.rows) {
+        if (remainingToDeduct <= 0) break;
+        const currentStock = parseInt(row.stock_level) || 0;
+        const deduct = Math.min(currentStock, remainingToDeduct);
+        const newStock = currentStock - deduct;
+        remainingToDeduct -= deduct;
+
+        await queryDb(
+          "UPDATE bw_inventory SET stock_level = $1 WHERE id = $2",
+          [newStock, row.id]
+        );
+      }
+    }
+
+    // Insert Repurpose Log
+    const logRes = await queryDb(
+      `INSERT INTO bw_repurpose_logs (batch_id, product_id, product_name, quantity, target_recipe, branch_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [bIdStr, String(product_id), pName, qtyNum, recipe, bId]
+    );
+
+    const createdLog = (logRes.rows && logRes.rows[0]) ? logRes.rows[0] : {
+      batch_id: bIdStr,
+      product_id: String(product_id),
+      product_name: pName,
+      quantity: qtyNum,
+      target_recipe: recipe,
+      branch_id: bId,
+      timestamp: new Date().toISOString()
+    };
+
+    apicache.clear();
+    res.json({
+      success: true,
+      message: `Successfully repurposed ${qtyNum} pcs of ${pName} into '${recipe}'`,
+      repurposed_log: createdLog
+    });
+  } catch (err) {
+    console.error("Error logging repurpose action:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/repurpose/logs', async (req, res) => {
+  const { branch_id } = req.query;
+  const bId = branch_id && branch_id !== 'all' ? parseInt(branch_id) : null;
+  try {
+    let sql = "SELECT * FROM bw_repurpose_logs";
+    let params = [];
+    if (bId) {
+      sql += " WHERE branch_id = $1";
+      params.push(bId);
+    }
+    sql += " ORDER BY timestamp DESC";
+    const result = await queryDb(sql, params);
+    res.json(result.rows || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
