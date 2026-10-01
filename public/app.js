@@ -85,9 +85,9 @@ function formatDateTimeDisplay(val) {
   const d = (val instanceof Date) ? val : parseDateTime(val);
   if (isNaN(d.getTime())) return String(val);
 
-  const dateFormatted = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-  const timeFormatted = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return `${dateFormatted}, ${timeFormatted}`;
+  const dateFormatted = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${dateFormatted} ${timeFormatted}`;
 }
 
 function formatLocalDate(dateObj) {
@@ -2288,6 +2288,7 @@ function renderPosProducts() {
     });
     const inCartQty = cartItem ? cartItem.qty : 0;
     const remainingStock = Math.max(0, stockAvailable - inCartQty);
+    const isOutOfStock = stockAvailable <= 0 || remainingStock <= 0;
 
     let stockBadgeClass = "in-stock";
     let stockLabel = `In Stock: ${stockAvailable}`;
@@ -2300,7 +2301,7 @@ function renderPosProducts() {
     }
 
     return `
-      <div class="pos-product-card" data-product-id="${p.id}" onclick="addToPosCart('${p.id}')">
+      <div class="pos-product-card ${stockAvailable <= 0 ? 'disabled-card' : ''}" data-product-id="${p.id}" ${stockAvailable > 0 ? `onclick="addToPosCart('${p.id}')"` : 'style="opacity: 0.55; cursor: not-allowed;"'}>
         <div class="pos-product-info">
           <span class="pos-product-category">${p.category || 'BAKERY'}</span>
           <h4>${p.name}</h4>
@@ -2310,8 +2311,8 @@ function renderPosProducts() {
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" onclick="event.stopPropagation(); addToPosCart('${p.id}')" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-            <span>${remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart')}</span>
+          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${stockAvailable > 0 ? `onclick="event.stopPropagation(); addToPosCart('${p.id}')"` : ''} ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+            <span>${stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'))}</span>
           </button>
         </div>
       </div>
@@ -2588,6 +2589,9 @@ async function handlePosCheckout() {
     // Refresh store dataset from server & update Sales History table immediately
     await store.syncWithBackend();
     refreshPosHistory();
+    refreshDashboard();
+    refreshAdminBranchesPane();
+    renderPosProducts();
 
     // Prepare receipt object
     currentReceiptTxData = {
@@ -2777,8 +2781,8 @@ async function refreshPosHistory() {
     }
 
     tbody.innerHTML = transactions.map(tx => {
-      const dateVal = tx.transaction_date || tx.date || Date.now();
-      const dateFormatted = new Date(dateVal).toLocaleDateString() + ' ' + new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const dateVal = tx.created_at || tx.transaction_date || tx.date;
+      const dateFormatted = formatDateTimeDisplay(dateVal);
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
       const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';
       const cashierName = tx.cashier_name || tx.cashier || 'Staff';
@@ -2837,28 +2841,30 @@ async function viewPosTransactionDetails(txId) {
 
     if (title) title.textContent = `Transaction Details — ${tx.transaction_number}`;
 
-    const dateVal = tx.transaction_date || tx.date || Date.now();
-    const dateFormatted = new Date(dateVal).toLocaleString();
-    const branchName = tx.branch_name || (store.branches.find(b => b.id === tx.branch_id)?.name) || 'Main Branch';
+    const dateVal = tx.created_at || tx.transaction_date || tx.date;
+    const dateFormatted = formatDateTimeDisplay(dateVal);
+    const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';
     const cashierName = tx.cashier_name || tx.cashier || 'System Administrator';
     const itemsList = tx.items || [];
 
     body.innerHTML = `
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-secondary); padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem;">
-        <div><strong>Date/Time:</strong> ${dateFormatted}</div>
+        <div><strong>Transaction ID:</strong> <span style="color: var(--primary-color); font-weight: 700;">${tx.transaction_number}</span></div>
+        <div><strong>Exact Timestamp:</strong> ${dateFormatted}</div>
         <div><strong>Branch:</strong> ${branchName}</div>
         <div><strong>Cashier:</strong> ${cashierName}</div>
-        <div><strong>Status:</strong> <span style="font-weight: 700; color: ${tx.status === 'Completed' ? 'var(--color-success)' : 'var(--color-error)'}">${tx.status || 'Completed'}</span></div>
+        <div><strong>Payment Method:</strong> ${tx.payment_method || 'Cash'}</div>
+        <div><strong>Status:</strong> <span class="status-badge ${tx.status === 'Completed' ? 'active' : 'inactive'}" style="font-weight: 700; color: ${tx.status === 'Completed' ? 'var(--color-success)' : 'var(--color-error)'}">${tx.status || 'Completed'}</span></div>
       </div>
 
-      <h4 style="margin-bottom: 8px; font-size: 0.95rem; font-weight: 700;">Items Purchased (${itemsList.length})</h4>
+      <h4 style="margin-bottom: 8px; font-size: 0.95rem; font-weight: 700;">Itemized Purchased Items (${itemsList.length})</h4>
       <table class="data-table" style="margin-bottom: 16px;">
         <thead>
           <tr>
-            <th>Product</th>
+            <th>Product Name</th>
+            <th>Quantity</th>
             <th>Unit Price</th>
-            <th>Qty</th>
-            <th>Subtotal</th>
+            <th>Item Subtotal</th>
           </tr>
         </thead>
         <tbody>
@@ -2870,8 +2876,8 @@ async function viewPosTransactionDetails(txId) {
             return `
               <tr>
                 <td style="font-weight: 600;">${pName}</td>
-                <td>₱${uPrice.toFixed(2)}</td>
                 <td>${qtyVal}</td>
+                <td>₱${uPrice.toFixed(2)}</td>
                 <td style="font-weight: 700;">₱${subVal.toFixed(2)}</td>
               </tr>
             `;
@@ -2887,10 +2893,16 @@ async function viewPosTransactionDetails(txId) {
           <span>Discount:</span> <strong>₱${parseFloat(tx.discount || 0).toFixed(2)}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 1.1rem; color: var(--accent-color); font-weight: 800; border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 4px;">
-          <span>Grand Total:</span> <span>₱${parseFloat(tx.total || 0).toFixed(2)}</span>
+          <span>Total Due:</span> <span>₱${parseFloat(tx.total || 0).toFixed(2)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);">
-          <span>Payment (${tx.payment_method || 'Cash'}):</span> <span>₱${parseFloat(tx.payment_amount || 0).toFixed(2)} (Change: ₱${parseFloat(tx.change_amount || 0).toFixed(2)})</span>
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.88rem;">
+          <span>Payment Method:</span> <strong>${tx.payment_method || 'Cash'}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.88rem;">
+          <span>Cash Tendered:</span> <strong>₱${parseFloat(tx.payment_amount || tx.total || 0).toFixed(2)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.88rem; font-weight: 700; color: var(--color-success);">
+          <span>Change:</span> <strong>₱${parseFloat(tx.change_amount || 0).toFixed(2)}</strong>
         </div>
       </div>
     `;
@@ -4140,6 +4152,24 @@ async function refreshAdminBranchesPane() {
       if (res.ok) store.branches = await res.json();
     } catch (e) { console.error("Error fetching branches:", e); }
   }
+
+  // Dynamic Network KPI Updates
+  const activeCount = store.branches.filter(b => b.status === 'Active').length;
+  const totalNetworkSales = store._sales.reduce((sum, s) => sum + (s.qty * s.price), 0);
+  const totalNetworkWaste = store._waste.reduce((sum, w) => sum + (w.qty * w.cost), 0);
+  const netMargin = totalNetworkSales - totalNetworkWaste;
+
+  const countEl = document.getElementById("branch-kpi-count");
+  if (countEl) countEl.textContent = `${activeCount} Active ${activeCount === 1 ? 'Node' : 'Nodes'}`;
+
+  const salesEl = document.getElementById("branch-kpi-sales");
+  if (salesEl) salesEl.textContent = `₱${totalNetworkSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+  const wasteEl = document.getElementById("branch-kpi-waste");
+  if (wasteEl) wasteEl.textContent = `₱${totalNetworkWaste.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+  const netEl = document.getElementById("branch-kpi-net");
+  if (netEl) netEl.textContent = `₱${netMargin.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   const searchInput = document.getElementById("branch-search-input");
   const query = searchInput ? searchInput.value.toLowerCase().trim() : "";

@@ -1199,6 +1199,7 @@ app.post('/api/pos/checkout', async (req, res) => {
     const txNumber = `POS-${dateFormatted}-${nextSeq}-${randomSuffix}`;
 
     // C. INSERT POS TRANSACTION HEADER
+    const nowIso = new Date().toISOString();
     const txInsert = await queryDb(
       `INSERT INTO bw_pos_transactions 
        (transaction_number, branch_id, cashier, subtotal, discount, total, payment_amount, change_amount, payment_method, status, date) 
@@ -1227,8 +1228,10 @@ app.post('/api/pos/checkout', async (req, res) => {
       change_amount,
       payment_method: 'Cash',
       status: 'Completed',
-      date: txDate
+      date: txDate,
+      created_at: nowIso
     };
+    if (!createdTx.created_at) createdTx.created_at = nowIso;
     const txId = createdTx.id || Date.now();
 
     // D. PROCESS ITEMS: INSERT POS ITEMS, DEDUCT INVENTORY, RECORD SALES
