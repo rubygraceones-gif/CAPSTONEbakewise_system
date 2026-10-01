@@ -2297,7 +2297,7 @@ function renderPosProducts() {
         <p style="font-weight: 600;">No bakery products found matching your search</p>
       </div>
     `;
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     return;
   }
 
@@ -2355,7 +2355,7 @@ function renderPosProducts() {
     `;
   }).join('');
 
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 }
 
 function addToPosCart(productId) {
@@ -2486,7 +2486,7 @@ function updatePosCartUI() {
           <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
         </div>
       `;
-      lucide.createIcons();
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     }
     if (subtotalElem) subtotalElem.textContent = "₱0.00";
     if (totalElem) totalElem.textContent = "₱0.00";
@@ -2516,7 +2516,7 @@ function updatePosCartUI() {
         </div>
       `;
     }).join('');
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   }
 
   const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
