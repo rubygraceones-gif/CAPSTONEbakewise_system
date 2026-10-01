@@ -3850,17 +3850,6 @@ async function refreshAdminUsersPane() {
     } catch (e) { console.error("Error fetching users:", e); }
   }
 
-  // Calculate User KPI Summary Cards
-  const kpiTotal = document.getElementById("user-kpi-total");
-  const kpiManagers = document.getElementById("user-kpi-managers");
-  const kpiStaff = document.getElementById("user-kpi-staff");
-  const kpiAdmins = document.getElementById("user-kpi-admins");
-
-  if (kpiTotal) kpiTotal.textContent = `${store.users.length} Accounts`;
-  if (kpiManagers) kpiManagers.textContent = `${store.users.filter(u => u.role === 'manager').length} Managers`;
-  if (kpiStaff) kpiStaff.textContent = `${store.users.filter(u => ['sales','inventory','production'].includes(u.role)).length} Staff`;
-  if (kpiAdmins) kpiAdmins.textContent = `${store.users.filter(u => u.role === 'admin').length} Admin`;
-
   const searchInput = document.getElementById("user-search-input");
   const roleFilter = document.getElementById("user-role-filter");
 
@@ -4004,20 +3993,6 @@ async function refreshAdminBranchesPane() {
       if (res.ok) store.branches = await res.json();
     } catch (e) { console.error("Error fetching branches:", e); }
   }
-
-  const kpiCount = document.getElementById("branch-kpi-count");
-  const kpiSales = document.getElementById("branch-kpi-sales");
-  const kpiWaste = document.getElementById("branch-kpi-waste");
-  const kpiNet = document.getElementById("branch-kpi-net");
-
-  const totalNetSales = store._sales.reduce((sum, s) => sum + (s.qty * s.price), 0);
-  const totalNetWaste = store._waste.reduce((sum, w) => sum + (w.qty * w.cost), 0);
-  const totalNetMargin = totalNetSales - totalNetWaste;
-
-  if (kpiCount) kpiCount.textContent = `${store.branches.length} Nodes`;
-  if (kpiSales) kpiSales.textContent = `₱${totalNetSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-  if (kpiWaste) kpiWaste.textContent = `₱${totalNetWaste.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-  if (kpiNet) kpiNet.textContent = `₱${totalNetMargin.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   const searchInput = document.getElementById("branch-search-input");
   const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
