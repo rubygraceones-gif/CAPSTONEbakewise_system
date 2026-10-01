@@ -1086,6 +1086,25 @@ select {
   box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
 }
 
+/* Static non-clickable KPI summary cards (Branch Management & User Management) */
+#pane-admin-branches .summary-card,
+#pane-admin-users .summary-card,
+.summary-card.static-kpi-card {
+  cursor: default !important;
+  transform: none !important;
+  border-color: var(--card-border) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+#pane-admin-branches .summary-card:hover,
+#pane-admin-users .summary-card:hover,
+.summary-card.static-kpi-card:hover {
+  transform: none !important;
+  border-color: var(--card-border) !important;
+  box-shadow: var(--card-shadow) !important;
+  background-color: var(--card-bg) !important;
+}
+
 .card-icon-container {
   width: 52px;
   height: 52px;
