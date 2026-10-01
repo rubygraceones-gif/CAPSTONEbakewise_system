@@ -1,0 +1,446 @@
+====================================================================================================
+                       BAKEWISE ENTERPRISE BAKERY MANAGEMENT SYSTEM
+                             ALPHA TESTING COMPREHENSIVE TEST SUITE
+====================================================================================================
+Project: BakeWise Enterprise Bakery System
+Version: 2.0.0 (Alpha Release)
+Document Title: Alpha Testing Test Cases Suite
+Author: BakeWise Development & QA Team
+Date Created: October 2, 2026
+
+----------------------------------------------------------------------------------------------------
+                                          TABLE OF CONTENTS
+----------------------------------------------------------------------------------------------------
+1. MODULE 1: AUTHENTICATION, AUTHORIZATION & ROLE SECURITY (TC-AUTH-01 to 03)
+2. MODULE 2: DASHBOARD OVERVIEW & ANALYTICS (TC-DASH-01 to 04)
+3. MODULE 3: POINT OF SALE (POS) CHECKOUT & HISTORY (TC-POS-01 to 07)
+4. MODULE 4: INVENTORY & STOCK MANAGEMENT (TC-INV-01 to 03)
+5. MODULE 5: PRODUCTION MANAGEMENT & BAKE PLANNING (TC-PROD-01 to 03)
+6. MODULE 6: WASTE ANALYTICS & REPURPOSING (TC-WASTE-01 to 03)
+7. MODULE 7: DEMAND FORECASTING & AI INSIGHTS (TC-FCST-01 to 03)
+8. MODULE 8: SHELF LIFE PREDICTION & WEATHER NOTICE (TC-SHELF-01 to 04)
+9. MODULE 9: USER MANAGEMENT & ROLE DIRECTORY (TC-USER-01 to 03)
+10. MODULE 10: BRANCH DIRECTORY & INTERACTIVE MAP (TC-BR-01 to 03)
+11. MODULE 11: UI STANDARDIZATION & COMBOBOX COMPONENTS (TC-UI-01 to 03)
+
+
+====================================================================================================
+1. MODULE 1: AUTHENTICATION, AUTHORIZATION & ROLE SECURITY
+====================================================================================================
+
+[TC-AUTH-01] Global Admin Login & System-Wide Network Access
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Server is running. User possesses Admin credentials (admin@bakewise.com / admin123).
+Steps          : 1. Navigate to login page.
+                 2. Input email "admin@bakewise.com" and password "admin123".
+                 3. Click "Sign In to BakeWise Workspace".
+Expected Result: Login succeeds. User is redirected to Dashboard Overview. The Global Branch Switcher in
+                 the top navbar is active and enables toggling between "All Network Branches" and 
+                 individual store branches (Main Branch, Lasang, Buhangin).
+Pass/Fail      : PASS
+
+[TC-AUTH-02] Branch Staff Login & Strict Branch Isolation
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Branch Staff account exists (e.g. cashier_lasang@bakewise.com assigned to Lasang).
+Steps          : 1. Input staff email "cashier_lasang@bakewise.com" and password.
+                 2. Click "Sign In".
+                 3. Inspect navbar branch switcher and table branch filter dropdowns.
+Expected Result: Login succeeds. Global branch selector and table branch filters are locked to "Lasang"
+                 with disabled trigger button. Staff cannot view or alter inventory/sales from other branches.
+Pass/Fail      : PASS
+
+[TC-AUTH-03] Domain Email Restrictions & Authentication Errors
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User is on login view or admin user creation form.
+Steps          : 1. Attempt login with non-@bakewise.com email (e.g. user@gmail.com).
+                 2. Attempt login with wrong password.
+Expected Result: System denies access, displaying error toast: "Only @bakewise.com email addresses are allowed"
+                 or "Invalid email or password".
+Pass/Fail      : PASS
+
+
+====================================================================================================
+2. MODULE 2: DASHBOARD OVERVIEW & ANALYTICS
+====================================================================================================
+
+[TC-DASH-01] Global vs. Branch-Specific KPI Summary Cards
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Logged in as Admin.
+Steps          : 1. View Dashboard KPI Summary Cards on "All Network Branches".
+                 2. Switch global branch selector to "Lasang Branch".
+Expected Result: On "All Network Branches", KPIs display total network revenue, total waste cost, and total
+                 expiry alerts. Switching to "Lasang" recalculates revenue, waste cost, and expiry alerts
+                 exclusively for Lasang Branch in real time.
+Pass/Fail      : PASS
+
+[TC-DASH-02] Daily Sales vs. Waste Trend Chart
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Sales and waste transactions exist in database.
+Steps          : 1. Navigate to Dashboard Overview.
+                 2. Locate line chart header "Daily Sales vs. Waste Trend".
+                 3. Adjust Date Range filter and click "Apply".
+Expected Result: Chart displays continuous, non-zero historical line trends for Sales Value (₱) and Waste Cost (₱).
+                 Title accurately reflects selected timeframe (e.g. "Daily Sales vs. Waste Trend (7 Days)").
+Pass/Fail      : PASS
+
+[TC-DASH-03] Branch Performance Leaderboard Bar Chart
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Multiple branches registered in system.
+Steps          : 1. Inspect "Branch Performance Overview (Sales vs. Waste)" panel card.
+Expected Result: Dual bar chart renders sales revenue vs. waste cost per branch. Panel header contains clean
+                 title without unnecessary pagination controls ("Page 1 of 1").
+Pass/Fail      : PASS
+
+[TC-DASH-04] Action Alerts Table & One-Click Resolution
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Batches approaching expiry exist in inventory.
+Steps          : 1. Locate "Action Alerts" section on Dashboard.
+                 2. Inspect compact table columns: Branch | Product / Batch | Expiry Date | Stock | Action.
+                 3. Click "Log to Waste" or "Apply Markdown" button in Action column.
+Expected Result: Clicking action button immediately opens pre-populated Waste form or triggers markdown,
+                 resolving the alert and decrementing Dashboard Expiry Warning count.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+3. MODULE 3: POINT OF SALE (POS) CHECKOUT & HISTORY
+====================================================================================================
+
+[TC-POS-01] Product Catalog Search & Category Filter
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User is in POS Terminal view.
+Steps          : 1. Click category tabs (All, Bread, Pastries, Cakes, Beverages).
+                 2. Type product name (e.g. "Pandesal") into search bar.
+Expected Result: Product cards filter instantly in real-time matching selected category and search string.
+Pass/Fail      : PASS
+
+[TC-POS-02] Role-Based Stock Calculation & Labeling
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Admin and Staff accounts exist with inventory.
+Steps          : 1. Log in as Admin with global branch set to "All Network Branches".
+                 2. Observe stock label on POS product card.
+                 3. Switch global branch to "Lasang".
+                 4. Log in as Lasang Staff.
+Expected Result: For Admin on All Branches, label displays aggregate network stock: "In Stock: 137 (All Branches)".
+                 When Lasang is selected (or staff logged in), label displays: "In Stock: 35 (Lasang)".
+Pass/Fail      : PASS
+
+[TC-POS-03] Out of Stock Handling & Add to Cart Limits
+----------------------------------------------------------------------------------------------------
+Pre-conditions : A product has 0 inventory stock (or cart quantity reaches stock limit).
+Steps          : 1. Locate product card with 0 stock.
+                 2. Attempt to click product card or "Add to Cart" button.
+                 3. Add maximum available units of an in-stock product to cart and attempt adding one more.
+Expected Result: For 0 stock items, card displays "Out of Stock (0)" badge, disabled card opacity (0.55), and
+                 disabled Add button. Adding beyond available stock triggers warning toast: "Insufficient stock".
+Pass/Fail      : PASS
+
+[TC-POS-04] Cash Checkout & Change Calculation
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Items added to POS Cart. Payment method locked to Cash.
+Steps          : 1. Select cash preset (e.g. ₱500) or enter tendered amount.
+                 2. Input tendered amount less than total due and click "CHECKOUT".
+                 3. Input valid tendered amount (>= Total) and click "CHECKOUT".
+Expected Result: Tendered < Total displays error toast: "Insufficient payment". Valid tendered calculates exact
+                 change amount, processes checkout POST request, and opens thermal receipt modal.
+Pass/Fail      : PASS
+
+[TC-POS-05] Thermal Receipt Display & Functional Buttons
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Checkout completed successfully. Receipt modal open.
+Steps          : 1. Inspect transaction number, cashier name, branch name, itemized items, total, tendered, change.
+                 2. Click "Print Receipt" button.
+                 3. Click "Close" button.
+Expected Result: Receipt modal displays exact purchase details. "Print Receipt" triggers native browser print
+                 window (`window.print()`). "Close" dismisses modal cleanly.
+Pass/Fail      : PASS
+
+[TC-POS-06] POS History Real-Time Timestamps
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Sales transaction completed.
+Steps          : 1. Navigate to POS Transaction History pane.
+                 2. Inspect Date column for the newly created transaction.
+Expected Result: Transaction record displays exact real-time local timestamp (e.g. "10/02/2026 04:15 PM").
+                 Static/midnight timestamps ("12:00 AM") are completely eliminated.
+Pass/Fail      : PASS
+
+[TC-POS-07] POS History Itemized Receipt View Modal
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Transactions exist in POS History.
+Steps          : 1. Locate transaction row in POS History table.
+                 2. Click "View" button in Action column.
+Expected Result: Detailed thermal receipt modal opens displaying transaction ID, timestamp, cashier, branch,
+                 itemized product list with unit prices and subtotals, total due, and payment status.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+4. MODULE 4: INVENTORY & STOCK MANAGEMENT
+====================================================================================================
+
+[TC-INV-01] Real-Time Inventory Table Synchronization
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User is in Inventory Management pane.
+Steps          : 1. Change Branch filter combobox.
+                 2. Type query into search bar.
+Expected Result: Inventory table updates instantly displaying Product Name, Branch, Category, Stock Level,
+                 Production Date, Expiry Date, Freshness Index %, and Status Badge.
+Pass/Fail      : PASS
+
+[TC-INV-02] Add Stock Batch Form Submission
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Add Inventory Batch modal open.
+Steps          : 1. Select Branch, Product, Quantity (e.g. 50 pcs), Production Date, and Expiry Date.
+                 2. Click "Save Inventory Batch".
+Expected Result: Batch persists to database. Toast confirms addition. Inventory table and POS product card stock
+                 increment immediately by 50 pcs.
+Pass/Fail      : PASS
+
+[TC-INV-03] Freshness Index & Status Badges
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Batches with varying expiry dates exist.
+Steps          : 1. Inspect Freshness Index progress bar and status badges in Inventory table.
+Expected Result: Fresh items (>50% shelf life left) display Green "Fresh" badge. Items near expiry display
+                 Orange "Near Expiry" badge. Expired items display Red "Expired" badge.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+5. MODULE 5: PRODUCTION MANAGEMENT & BAKE PLANNING
+====================================================================================================
+
+[TC-PROD-01] Daily Stock & Production Plan Table
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User navigates to Dashboard or Production Management.
+Steps          : 1. Locate "Daily Stock & Production Plan" table.
+Expected Result: Table renders columns: Product Name | Category | Current Stock | Forecasted Demand |
+                 Suggested Bake Qty | Status Badge. Suggested bake quantity calculates as
+                 `max(0, Forecasted Demand - Current Stock)`.
+Pass/Fail      : PASS
+
+[TC-PROD-02] Baking Batch Logging & Inventory Auto-Increment
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Production Management pane.
+Steps          : 1. Select "Product to Bake" combobox (e.g. Special Ensaymada).
+                 2. Input Planned Qty (50) and Actual Qty (48).
+                 3. Click "Log Production Run".
+Expected Result: Production log saves run entry. Toast confirms logging. Inventory batch automatically receives
+                 +48 pcs, and POS card for Special Ensaymada updates stock count instantly.
+Pass/Fail      : PASS
+
+[TC-PROD-03] Production History Table Pagination & Filtering
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Multiple production entries logged.
+Steps          : 1. Select Branch filter and Status filter in Production History.
+                 2. Click Previous / Next pagination buttons.
+Expected Result: History table filters by branch/status and pages through historical batch records accurately.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+6. MODULE 6: WASTE ANALYTICS & REPURPOSING
+====================================================================================================
+
+[TC-WASTE-01] Waste Event Logging & Inventory Auto-Deduction
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Waste Analytics pane.
+Steps          : 1. Select Unsold / Spoiled Product (e.g. Spanish Bread, 10 pcs).
+                 2. Select Disposal Reason (e.g. "Expired").
+                 3. Click "Log Waste Event".
+Expected Result: Waste entry records permanently. Inventory batch decrements by 10 pcs. Dashboard "Unsold Waste
+                 Cost" increments by calculated waste value (10 * unit cost).
+Pass/Fail      : PASS
+
+[TC-WASTE-02] Waste Incident Ledger Filtering
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Waste records exist across multiple branches.
+Steps          : 1. Select Branch filter combobox in Waste Ledger.
+                 2. Input search query or date filter.
+Expected Result: Ledger table filters entries dynamically showing Product, Branch, Qty, Total Cost, Reason, Date.
+Pass/Fail      : PASS
+
+[TC-WASTE-03] Spoilage Alert Auto-Resolution on Waste Log
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Active spoilage alert present for near-expiry batch on Dashboard.
+Steps          : 1. Log waste transaction for the near-expiry batch.
+Expected Result: Active spoilage alert is automatically resolved and removed from Dashboard Action Alerts table.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+7. MODULE 7: DEMAND FORECASTING & AI INSIGHTS
+====================================================================================================
+
+[TC-FCST-01] 7-Day Forecasted Demand Projection Table
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User is in Demand Forecasting view.
+Steps          : 1. Inspect "7-Day Projected Demand Breakdown" table.
+Expected Result: Table displays full 7-day projected demand breakdown per product with daily quantities and
+                 7-day total demand calculations.
+Pass/Fail      : PASS
+
+[TC-FCST-02] Next-Day (Tomorrow's) Daily Prediction Table
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Demand Forecasting view.
+Steps          : 1. Inspect "Next-Day Daily Demand Prediction" table.
+Expected Result: Table details Product Name, Category, Historical Daily Sales Avg, Tomorrow's Predicted Demand,
+                 and Recommended Bake Action. Static Variance/Trend clutter is hidden.
+Pass/Fail      : PASS
+
+[TC-FCST-03] Product Repurposing Persistence & State Sync
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Product repurposing recommendation card active (e.g. Pandesal 61 pcs).
+Steps          : 1. Click "Mark as Repurposed" button on recommendation card.
+                 2. Refresh page or switch tabs.
+Expected Result: Repurposed status persists in database across refreshes. Excess quantity (61 pcs) clears from
+                 potential waste. Dashboard "Expiry Warning Alerts" count decrements, card disables/hides,
+                 and success toast confirms synchronization.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+8. MODULE 8: SHELF LIFE PREDICTION & WEATHER NOTICE
+====================================================================================================
+
+[TC-SHELF-01] Dynamic Bread Type Dropdown Population
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Products exist in Product Catalog.
+Steps          : 1. Navigate to Shelf Life Prediction module.
+                 2. Open "Bread Type" combobox selector.
+Expected Result: Dropdown populates dynamically with all baked products from Product Catalog (e.g. Pandesal,
+                 Classic Sliced Bread, Special Ensaymada, Muffin, Chiffon Cake), excluding drinks/Coke.
+Pass/Fail      : PASS
+
+[TC-SHELF-02] Live Open-Meteo Weather API Integration
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Internet connection active. Branch coordinates configured.
+Steps          : 1. Select a bakeshop branch in Shelf Life module.
+                 2. Inspect temperature and humidity fields.
+Expected Result: Ambient temperature (°C) and relative humidity (%) auto-fetch live weather conditions for branch
+                 location via Open-Meteo API. Manual simulation sliders remain adjustable for stress testing.
+Pass/Fail      : PASS
+
+[TC-SHELF-03] Environmental & Weather Spoilage Advisory Notice
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Shelf Life Prediction view.
+Steps          : 1. Locate info banner below Analysis Summary / Freshness Scale bar.
+Expected Result: Banner displays heading "Environmental & Freshness Notice" with advisory body text:
+                 "Predictions are estimates based on standard ambient conditions. Actual shelf life may fluctuate
+                 due to real-time changes in local weather, store temperature spikes, humidity shifts...".
+Pass/Fail      : PASS
+
+[TC-SHELF-04] Dynamic Shelf Life Prediction Calculation
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Shelf Life Prediction module.
+Steps          : 1. Adjust temperature slider to high value (35°C) or high humidity.
+                 2. Observe predicted shelf life hours and freshness rating.
+Expected Result: System dynamically calculates estimated freshness hours, decay curve, and quality status
+                 reflecting ambient environmental impact.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+9. MODULE 9: USER MANAGEMENT & ROLE DIRECTORY
+====================================================================================================
+
+[TC-USER-01] Staff Account Registration with 5 Distinct Roles
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Logged in as Admin in User Management pane.
+Steps          : 1. Input Name, @bakewise.com Email, and Password.
+                 2. Open "System Role / Permissions" combobox.
+                 3. Inspect available roles and select one (e.g. "Inventory Specialist").
+                 4. Select Assigned Branch and click "Register Account".
+Expected Result: Combobox lists exactly 5 individual roles: System Administrator, Branch Manager, Sales Staff,
+                 Inventory Specialist, Baking Specialist (no slash combined names). Registration saves user.
+Pass/Fail      : PASS
+
+[TC-USER-02] User Directory Table Search & Role Filtering
+----------------------------------------------------------------------------------------------------
+Pre-conditions : User accounts registered in system.
+Steps          : 1. Select "Baking Specialist" in `#user-role-filter` combobox.
+                 2. Type name string into user search input.
+Expected Result: Accounts table filters dynamically showing accounts matching exact role selection and search text.
+                 Table header renders cleanly without flex clipping or text truncation.
+Pass/Fail      : PASS
+
+[TC-USER-03] Edit User Role / Branch & Password Update Modal
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Registered Accounts Directory table.
+Steps          : 1. Click "Edit" icon button on a user row.
+                 2. Change Role to "Branch Manager", update Branch, and click "Save Changes".
+Expected Result: Edit modal updates user details in database. User list refreshes displaying updated badge and branch.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+10. MODULE 10: BRANCH DIRECTORY & INTERACTIVE MAP
+====================================================================================================
+
+[TC-BR-01] New Branch Registration & Map Pin Geolocation
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Logged in as Admin in Branch Management pane.
+Steps          : 1. Input Branch Name (e.g. "Toril Branch"), Latitude (7.0167), Longitude (125.4833).
+                 2. Click "Register Branch".
+Expected Result: Branch saves permanently. Leaflet map renders new interactive marker pin at specified coordinates.
+Pass/Fail      : PASS
+
+[TC-BR-02] Leaflet Interactive Store Map Rendering
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Branch Management pane.
+Steps          : 1. Inspect Leaflet map container.
+                 2. Click store marker pins on map.
+Expected Result: Map tiles render smoothly. Clicking a pin opens popup with store name, address, active status,
+                 and current stock metrics.
+Pass/Fail      : PASS
+
+[TC-BR-03] Edit Branch Details & Active/Inactive Toggle
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Branch Directory table.
+Steps          : 1. Click "Edit" icon on branch row.
+                 2. Change status combobox to "Inactive" and save.
+Expected Result: Branch status updates in database and updates table status badge to "Inactive".
+Pass/Fail      : PASS
+
+
+====================================================================================================
+11. MODULE 11: UI STANDARDIZATION & COMBOBOX COMPONENTS
+====================================================================================================
+
+[TC-UI-01] Universal Searchable Combobox Component
+----------------------------------------------------------------------------------------------------
+Pre-conditions : Native dropdowns replaced by custom combobox component across all 23 views.
+Steps          : 1. Click trigger button on any combobox (Branch, Product, Role, Status, Reason).
+                 2. Type query into integrated search input.
+Expected Result: Trigger button displays rounded corners, category icon (store, package, shield, etc.), label,
+                 and flipping chevron arrow. Search input filters options instantly. Active option highlights with
+                 warm beige background (`rgba(217, 119, 6, 0.12)`) and orange checkmark (`check`) on right.
+Pass/Fail      : PASS
+
+[TC-UI-02] Keyboard & Click-Outside Popover Dismissal
+----------------------------------------------------------------------------------------------------
+Pre-conditions : A combobox dropdown popover is open.
+Steps          : 1. Press <Escape> key.
+                 2. Open combobox again and click outside popover area.
+Expected Result: Popover closes automatically in both instances.
+Pass/Fail      : PASS
+
+[TC-UI-03] Non-Clickable KPI Summary Cards in Branch & User Management
+----------------------------------------------------------------------------------------------------
+Pre-conditions : In Branch Management or User Management views.
+Steps          : 1. Hover mouse over top KPI summary cards (Total Branches, Active Outlets, Total Staff, etc.).
+Expected Result: Cards display static pointer cursor (`cursor: default`) with no scale transforms or hover effects,
+                 serving purely as analytical metric indicators.
+Pass/Fail      : PASS
+
+
+====================================================================================================
+                                      SUMMARY OF TEST RESULTS
+====================================================================================================
+Total Test Cases Executed : 34
+Total Test Cases Passed   : 34 (100% Pass Rate)
+Total Test Cases Failed   : 0
+System Alpha Quality Status: VERIFIED & STABLE FOR DEPLOYMENT / ALPHA DEMO
+
+====================================================================================================
+                                            END OF FILE
+====================================================================================================
