@@ -1761,13 +1761,47 @@ function refreshDashboard() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
   renderDashboardSalesWasteChart();
-  renderDashboardNeededStockChart();
+  renderDashboardStockPlanTable();
   renderDashboardBranchesChart();
   renderRealtimeAlerts();
 }
 
+function handleAlertLogWaste(inventoryId, productId, branchId, qty, cost, productName) {
+  let item = store._inventory.find(i => i.id === inventoryId);
+  if (!item) {
+    item = store._inventory.find(i => i.productId === productId && i.branchId === branchId && i.stockLevel > 0);
+  }
+  if (item) {
+    item.stockLevel = 0;
+  }
+  store._waste.push({
+    id: `w_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    productId: productId,
+    branchId: branchId,
+    qty: qty,
+    cost: cost || 10,
+    reason: "Expired",
+    date: formatLocalDate(new Date())
+  });
+
+  store.save("bakewise_v2_inventory", store._inventory);
+  store.save("bakewise_v2_waste", store._waste);
+  store.commitAll();
+
+  store.logActivity(`Recorded ${qty} pcs of expired ${productName} to waste logs.`, "waste");
+  showToast(`Logged ${qty} pcs of expired ${productName} to waste logs.`, "warning");
+
+  refreshDashboard();
+  refreshInventoryPane();
+  refreshWastePane();
+  if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+}
+window.handleAlertLogWaste = handleAlertLogWaste;
+
 function renderDashboardSalesWasteChart() {
-  const ctx = document.getElementById("chart-dashboard-sales-waste").getContext("2d");
+  const canvas = document.getElementById("chart-dashboard-sales-waste");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
   if (dashSalesChartInstance) dashSalesChartInstance.destroy();
 
   const labels = [];
@@ -1789,11 +1823,10 @@ function renderDashboardSalesWasteChart() {
       const maxTime = Math.max(...allDates.map(d => parseLocalDate(d).getTime()));
       endDate = new Date(maxTime);
     }
-    if (endDate > new Date()) endDate = new Date(); // cap at today
+    if (endDate > new Date()) endDate = new Date();
     startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - 6);
     
-    // Set inputs to match default if empty
     if (document.getElementById("dash-filter-start")) document.getElementById("dash-filter-start").value = formatLocalDate(startDate);
     if (document.getElementById("dash-filter-end")) document.getElementById("dash-filter-end").value = formatLocalDate(endDate);
   }
@@ -1801,7 +1834,6 @@ function renderDashboardSalesWasteChart() {
   const branchIdStr = store.getSelectedBranchId();
   const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
 
-  // Generate date range
   const current = new Date(startDate);
   while (current <= endDate) {
     const dStr = formatLocalDate(current);
@@ -1820,12 +1852,10 @@ function renderDashboardSalesWasteChart() {
     current.setDate(current.getDate() + 1);
   }
 
-  // Update chart title to show correct days count
   const daysDiff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
   const chartTitleEl = document.getElementById("dash-chart-title");
   if (chartTitleEl) chartTitleEl.textContent = `Sales vs. Waste Trend (${daysDiff} Days)`;
 
-  // Dynamic AI Insight for Sales vs Waste
   const totalSales = salesData.reduce((sum, val) => sum + val, 0);
   const totalWaste = wasteData.reduce((sum, val) => sum + val, 0);
   const salesWasteInsightEl = document.getElementById("insight-sales-waste-chart");
@@ -1833,7 +1863,7 @@ function renderDashboardSalesWasteChart() {
     if (totalSales === 0 && totalWaste === 0) {
       salesWasteInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No sales or waste data for the selected period.</span>';
     } else {
-      const salesExceed = totalSales > totalWaste;
+      const salesExceed = totalSales >= totalWaste;
       salesWasteInsightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>${salesExceed ? 'Sales are outperforming waste costs.' : 'Warning: Waste costs are high compared to sales.'} Total sales reached ₱${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}.</span>`;
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1881,163 +1911,86 @@ function renderDashboardSalesWasteChart() {
       }
     }
   });
-
-
 }
 
-let dashNeededStockChartInstance = null;
+async function renderDashboardStockPlanTable() {
+  const tbody = document.getElementById("dashboard-stock-plan-tbody");
+  if (!tbody) return;
 
-function renderDashboardNeededStockChart() {
-  const canvas = document.getElementById("chart-dashboard-needed-stock");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (dashNeededStockChartInstance) dashNeededStockChartInstance.destroy();
+  const branchIdStr = store.getSelectedBranchId();
+  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
 
-  const branchId = store.getSelectedBranchId();
-  
-  const labels = [];
-  const neededStockData = [];
-  const currentStockData = [];
-
-  store.products.forEach(p => {
-    labels.push(p.name);
-    
-    // Calculate current stock for the selected branch (or all)
-    let currentStock = 0;
+  const rows = await Promise.all(store.products.map(async p => {
     const inventoryItems = store.inventory.filter(i => 
-      i.productId === p.id && (branchId === 'all' || i.branchId === parseInt(branchId))
+      i.productId === p.id && (branchId === 'all' || i.branchId === branchId)
     );
-    currentStock = inventoryItems.reduce((sum, i) => sum + i.stockLevel, 0);
+    const currentStock = inventoryItems.reduce((sum, i) => sum + i.stockLevel, 0);
 
-    // Estimate predicted demand based on recent sales in the selected branch
-    const salesHistory = store.sales.filter(s => 
-      s.productId === p.id && (branchId === 'all' || s.branchId === parseInt(branchId))
-    );
-    
-    let predictedDemand = 30; // default
-    if (salesHistory.length > 0) {
-      const qtySum = salesHistory.slice(-3).reduce((sum, s) => sum + s.qty, 0);
-      predictedDemand = Math.round(qtySum / Math.min(3, salesHistory.length));
-      predictedDemand = Math.max(5, predictedDemand);
-    }
-    
-    // Add a 10% buffer to demand
-    const targetStock = Math.ceil(predictedDemand * 1.1);
-    const needed = Math.max(0, targetStock - currentStock);
-    
-    currentStockData.push(currentStock);
-    neededStockData.push(needed);
-  });
+    const forecastRes = await getAIPredictedDemand(p.id);
+    const predictedDemand = forecastRes ? forecastRes.demand : 30;
 
-  const isDarkMode = document.body.classList.contains("dark-theme");
-  const textColor = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const gridColor = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
+    const suggestedBake = Math.max(0, predictedDemand - currentStock);
 
-  dashNeededStockChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "Current Stock",
-          data: currentStockData,
-          backgroundColor: "#3b82f6", // Blue
-          borderRadius: 4
-        },
-        {
-          label: "Needed Stock",
-          data: neededStockData,
-          backgroundColor: "#f59e0b", // Amber/Yellow
-          borderRadius: 4
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: textColor, font: { family: 'Outfit' } } }
-      },
-      scales: {
-        x: { 
-          stacked: true,
-          grid: { color: gridColor }, 
-          ticks: { color: textColor, font: { family: 'Outfit' } } 
-        },
-        y: { 
-          stacked: true,
-          grid: { color: gridColor }, 
-          ticks: { color: textColor, font: { family: 'Outfit' } } 
-        }
-      }
-    }
-  });
-
-  // Dynamic AI Insight for Needed Stock
-  const totalNeeded = neededStockData.reduce((sum, val) => sum + val, 0);
-  const stockInsightEl = document.getElementById("insight-needed-stock-chart");
-  if (stockInsightEl) {
-    if (totalNeeded === 0) {
-      stockInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>All stock levels are sufficient. No urgent production required.</span>';
+    let statusBadge = '';
+    if (currentStock < predictedDemand) {
+      statusBadge = `<span class="badge warning" style="background: #fef3c7; color: #b45309; font-weight: 700;">Low Stock</span>`;
+    } else if (currentStock >= Math.round(predictedDemand * 1.5) && currentStock > predictedDemand + 10) {
+      statusBadge = `<span class="badge info" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">Overstocked</span>`;
     } else {
-      const maxIndex = neededStockData.indexOf(Math.max(...neededStockData));
-      const topNeededProduct = labels[maxIndex] || "products";
-      stockInsightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>A total of ${totalNeeded} units are needed. Prioritize producing ${topNeededProduct}.</span>`;
+      statusBadge = `<span class="badge success" style="background: #dcfce7; color: #15803d; font-weight: 700;">Sufficient</span>`;
+    }
+
+    return `
+      <tr>
+        <td style="font-weight: 700; color: var(--text-primary);">${p.name}</td>
+        <td><span class="badge info" style="font-size: 0.75rem;">${p.category}</span></td>
+        <td style="font-weight: 700;">${currentStock} pcs</td>
+        <td style="font-weight: 700; color: var(--primary-color);">${predictedDemand} pcs</td>
+        <td style="font-weight: 800; color: ${suggestedBake > 0 ? 'var(--accent-color)' : 'var(--text-secondary)'};">${suggestedBake} pcs</td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+  }));
+
+  tbody.innerHTML = rows.join('');
+
+  const insightEl = document.getElementById("insight-stock-plan");
+  if (insightEl) {
+    const lowStockCount = store.products.filter(p => {
+      const stock = store.inventory.filter(i => i.productId === p.id && (branchId === 'all' || i.branchId === branchId)).reduce((sum, i) => sum + i.stockLevel, 0);
+      return stock < 10;
+    }).length;
+    if (lowStockCount > 0) {
+      insightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Notice: ${lowStockCount} product(s) are currently at low stock. Prioritize suggested production runs.</span>`;
+    } else {
+      insightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are healthy across products. Production recommendations updated based on forecast.</span>`;
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 }
 
 function renderDashboardBranchesChart() {
-  const ctx = document.getElementById("chart-dashboard-branches").getContext("2d");
+  const canvas = document.getElementById("chart-dashboard-branches");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
   if (dashBranchesChartInstance) dashBranchesChartInstance.destroy();
 
-  const totalPages = Math.ceil(store.branches.length / CHART_BRANCHES_PER_PAGE);
-  if (dashBranchesChartPage > totalPages && totalPages > 0) dashBranchesChartPage = totalPages;
-
-  const startIdx = (dashBranchesChartPage - 1) * CHART_BRANCHES_PER_PAGE;
-  const paginatedBranches = store.branches.slice(startIdx, startIdx + CHART_BRANCHES_PER_PAGE);
-
-  const branchLabels = paginatedBranches.map(b => b.name);
-  const salesData = paginatedBranches.map(b => {
+  const branchLabels = store.branches.map(b => b.name);
+  const salesData = store.branches.map(b => {
     return store.sales
       .filter(s => s.branchId === b.id)
       .reduce((sum, s) => sum + (s.qty * s.price), 0);
   });
   
-  const wasteData = paginatedBranches.map(b => {
+  const wasteData = store.branches.map(b => {
     return store.waste
       .filter(w => w.branchId === b.id)
       .reduce((sum, w) => sum + (w.qty * w.cost), 0);
   });
 
-  const prevBtn = document.getElementById("chart-branches-prev");
-  const nextBtn = document.getElementById("chart-branches-next");
-  const infoSpan = document.getElementById("chart-branches-info");
-  
-  if (prevBtn) {
-    prevBtn.disabled = dashBranchesChartPage === 1;
-    prevBtn.onclick = () => {
-      if (dashBranchesChartPage > 1) {
-        dashBranchesChartPage--;
-        renderDashboardBranchesChart();
-      }
-    };
-  }
-  
-  if (nextBtn) {
-    nextBtn.disabled = dashBranchesChartPage >= totalPages;
-    nextBtn.onclick = () => {
-      if (dashBranchesChartPage < totalPages) {
-        dashBranchesChartPage++;
-        renderDashboardBranchesChart();
-      }
-    };
-  }
-  
-  if (infoSpan) {
-    infoSpan.textContent = `Page ${dashBranchesChartPage} of ${totalPages || 1}`;
-  }
+  const isDark = document.body.classList.contains("dark-mode");
+  const textColor = isDark ? "#a8a29e" : "#78716c";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
 
   dashBranchesChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -2047,18 +2000,18 @@ function renderDashboardBranchesChart() {
         {
           label: 'Total Sales (₱)',
           data: salesData,
-          backgroundColor: 'rgba(34, 197, 94, 0.7)',
+          backgroundColor: 'rgba(34, 197, 94, 0.75)',
           borderColor: 'rgb(34, 197, 94)',
           borderWidth: 1,
-          borderRadius: 4
+          borderRadius: 6
         },
         {
           label: 'Total Waste (₱)',
           data: wasteData,
-          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          backgroundColor: 'rgba(239, 68, 68, 0.75)',
           borderColor: 'rgb(239, 68, 68)',
           borderWidth: 1,
-          borderRadius: 4
+          borderRadius: 6
         }
       ]
     },
@@ -2066,9 +2019,13 @@ function renderDashboardBranchesChart() {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit' } } },
         y: { 
           beginAtZero: true,
+          grid: { color: gridColor },
           ticks: {
+            color: textColor,
+            font: { family: 'Outfit' },
             callback: function(value) {
               return '₱' + value.toLocaleString();
             }
@@ -2076,7 +2033,7 @@ function renderDashboardBranchesChart() {
         }
       },
       plugins: {
-        legend: { position: 'top' },
+        legend: { position: 'top', labels: { color: textColor, font: { family: 'Outfit' } } },
         tooltip: {
           callbacks: {
             label: function(context) {
@@ -2088,7 +2045,6 @@ function renderDashboardBranchesChart() {
     }
   });
 
-  // Dynamic AI Insight for Branch Performance
   const branchInsightEl = document.getElementById("insight-branches-chart");
   if (branchInsightEl) {
     const allBranchPerformance = store.branches.map(b => {
@@ -2143,13 +2099,14 @@ function renderDashboardBranchesChart() {
 }
 
 function renderRealtimeAlerts() {
-  const container = document.getElementById("dashboard-ai-alerts-container");
-  if (!container) return;
-  container.innerHTML = "";
-  const alerts = [];
+  const tbody = document.getElementById("dashboard-action-alerts-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
   const branchIdStr = store.getSelectedBranchId();
   const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+
+  const alertItems = [];
 
   store.inventory.forEach(item => {
     if (branchId !== 'all' && item.branchId !== branchId) return;
@@ -2157,97 +2114,68 @@ function renderRealtimeAlerts() {
       const p = store.products.find(x => x.id === item.productId);
       if (!p) return;
       const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
-      const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
+      const b = store.branches.find(x => x.id === item.branchId) || { name: "Main Branch" };
+
       if (fIndex === 0) {
-        alerts.push({
-          type: "danger",
-          title: "Critical Expiration Hazard",
-          description: `[${b.name}] Batch of ${item.stockLevel} units of ${p.name} has expired! Record to waste log immediately.`
+        alertItems.push({
+          item,
+          product: p,
+          branch: b,
+          fIndex,
+          type: 'expired'
         });
       } else if (fIndex <= 30) {
-        alerts.push({
-          type: "warning",
-          title: "Shelf-Life Expiry Imminent",
-          description: `[${b.name}] ${p.name} on shelf has only ${fIndex}% freshness left (${item.stockLevel} pcs). Suggested repurposing: "${p.repurposeRecipe}".`
+        alertItems.push({
+          item,
+          product: p,
+          branch: b,
+          fIndex,
+          type: 'near_expiry'
         });
       }
     }
   });
 
-  const last3DaysWaste = store.waste
-    .filter(w => {
-      const wDate = parseLocalDate(w.date);
-      const limit = parseLocalDate(getRelativeDateString(-3));
-      return wDate >= limit && (branchId === 'all' || w.branchId === branchId);
-    })
-    .reduce((sum, w) => sum + (w.qty * w.cost), 0);
-
-  if (last3DaysWaste > 800) {
-    alerts.push({
-      type: "info",
-      title: "Waste Reduction Strategy Required",
-      description: `High waste (₱${last3DaysWaste.toLocaleString()}) logged over last 3 days. Check optimization model before scheduling tomorrow's bake.`
-    });
-  }
-
-  if (alerts.length === 0) {
-    container.innerHTML = `
-      <div class="alert-box success">
-        <i data-lucide="check-circle" class="alert-icon"></i>
-        <div class="alert-content">
-          <span class="alert-title">Systems Nominal</span>
-          <span class="alert-description">No expiration hazards or high waste incidents detected. Production matches daily demand.</span>
-        </div>
-      </div>
+  if (alertItems.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          <i data-lucide="check-circle" style="width: 24px; height: 24px; color: var(--color-success); vertical-align: middle; margin-right: 6px;"></i>
+          <strong>Systems Nominal</strong> — No active expiration hazards or critical alerts.
+        </td>
+      </tr>
     `;
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
-  const totalPages = Math.ceil(alerts.length / AI_ALERTS_PER_PAGE) || 1;
-  if (aiAlertsCurrentPage > totalPages) aiAlertsCurrentPage = totalPages;
-  const startIndex = (aiAlertsCurrentPage - 1) * AI_ALERTS_PER_PAGE;
-  const pagedAlerts = alerts.slice(startIndex, startIndex + AI_ALERTS_PER_PAGE);
+  tbody.innerHTML = alertItems.map(a => {
+    const expFormatted = formatDateTimeDisplay(a.item.expiryDate);
+    const cost = a.product.cost || 10;
+    
+    let actionBtnHtml = '';
+    if (a.type === 'expired') {
+      actionBtnHtml = `<button class="btn-primary" onclick="handleAlertLogWaste('${a.item.id}', '${a.product.id}', ${a.item.branchId}, ${a.item.stockLevel}, ${cost}, '${a.product.name.replace(/'/g, "\\'")}')" style="padding: 4px 10px; font-size: 0.75rem; background: var(--color-error); border: none; border-radius: 4px; font-weight: 600;">
+        <i data-lucide="trash-2" style="width: 12px; height: 12px; margin-right: 4px;"></i> Log to Waste
+      </button>`;
+    } else {
+      actionBtnHtml = `<button class="btn-primary" onclick="handleMarkAsRepurposed('${a.product.id}', '${a.product.name.replace(/'/g, "\\'")}', ${a.item.stockLevel}, '${(a.product.repurposeRecipe || 'Repurpose').replace(/'/g, "\\'")}')" style="padding: 4px 10px; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #0369a1); border: none; border-radius: 4px; font-weight: 600;">
+        <i data-lucide="refresh-cw" style="width: 12px; height: 12px; margin-right: 4px;"></i> Repurpose
+      </button>`;
+    }
 
-  const prevBtn = document.getElementById("ai-alerts-prev");
-  const nextBtn = document.getElementById("ai-alerts-next");
-  const infoSpan = document.getElementById("ai-alerts-info");
-  
-  if (prevBtn) {
-    prevBtn.disabled = aiAlertsCurrentPage === 1;
-    prevBtn.onclick = () => {
-      if (aiAlertsCurrentPage > 1) {
-        aiAlertsCurrentPage--;
-        renderRealtimeAlerts();
-      }
-    };
-  }
-  
-  if (nextBtn) {
-    nextBtn.disabled = aiAlertsCurrentPage >= totalPages;
-    nextBtn.onclick = () => {
-      if (aiAlertsCurrentPage < totalPages) {
-        aiAlertsCurrentPage++;
-        renderRealtimeAlerts();
-      }
-    };
-  }
-  
-  if (infoSpan) {
-    infoSpan.textContent = `Page ${aiAlertsCurrentPage} of ${totalPages}`;
-  }
+    return `
+      <tr>
+        <td style="font-size: 0.85rem; font-weight: 600;">${a.branch.name}</td>
+        <td style="font-weight: 700;">${a.product.name}</td>
+        <td style="font-size: 0.82rem; color: var(--text-secondary);">${expFormatted}</td>
+        <td style="font-weight: 700;">${a.item.stockLevel} pcs</td>
+        <td>${actionBtnHtml}</td>
+      </tr>
+    `;
+  }).join('');
 
-  container.innerHTML = pagedAlerts.map(a => `
-    <div class="alert-box ${a.type}">
-      <i data-lucide="${a.type === 'danger' ? 'x-circle' : a.type === 'warning' ? 'alert-triangle' : 'info'}" class="alert-icon"></i>
-      <div class="alert-content">
-        <span class="alert-title">${a.title}</span>
-        <span class="alert-description">${a.description}</span>
-      </div>
-    </div>
-  `).join('');
-
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // 2. POINT-OF-SALE (POS) CONTROLLER & REFRESHER

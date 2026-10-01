@@ -420,10 +420,22 @@
                   <i data-lucide="zap" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
                   <span>Real-time Action Alerts</span>
                 </h2>
-                <button id="clear-all-alerts-btn" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 8px; display: none;">Clear All</button>
               </div>
-              <div id="dashboard-ai-alerts-container" style="max-height: 420px; overflow-y: auto; padding-right: 5px;">
-                <!-- Actionable Alerts injected dynamically -->
+              <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                <table class="data-table" id="dashboard-action-alerts-table">
+                  <thead>
+                    <tr>
+                      <th>Branch</th>
+                      <th>Product / Batch</th>
+                      <th>Expiry Date</th>
+                      <th>Stock</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-action-alerts-tbody">
+                    <!-- Actionable alerts table rows -->
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -439,16 +451,7 @@
               <div class="chart-container" style="height: 350px;">
                 <canvas id="chart-dashboard-branches"></canvas>
               </div>
-              <div id="chart-branches-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="chart-branches-prev" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
-                </button>
-                <span id="chart-branches-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="chart-branches-next" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
-                </button>
-              </div>
-              <div class="dashboard-ai-insight" id="insight-branches-chart" style="margin: 0 20px 20px 20px;">
+              <div class="dashboard-ai-insight" id="insight-branches-chart" style="margin: 12px 20px 20px 20px;">
                 <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
                 <span>Comparing branch performance metrics...</span>
               </div>
@@ -457,16 +460,30 @@
             <div class="panel-card" style="margin-bottom: 0;">
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
-                  <i data-lucide="package-search" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
-                  <span>Predicted Needed Stock</span>
+                  <i data-lucide="clipboard-check" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+                  <span>Daily Stock & Production Plan</span>
                 </h2>
               </div>
-              <div class="chart-container" style="height: 350px;">
-                <canvas id="chart-dashboard-needed-stock"></canvas>
+              <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                <table class="data-table" id="dashboard-stock-plan-table">
+                  <thead>
+                    <tr>
+                      <th>Product Name</th>
+                      <th>Category</th>
+                      <th>Current Stock</th>
+                      <th>Forecasted Demand</th>
+                      <th>Suggested Bake Qty</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-stock-plan-tbody">
+                    <!-- Dynamic stock & production plan rows -->
+                  </tbody>
+                </table>
               </div>
-              <div class="dashboard-ai-insight" id="insight-needed-stock-chart" style="margin: 0 20px 20px 20px;">
+              <div class="dashboard-ai-insight" id="insight-stock-plan" style="margin: 12px 20px 20px 20px;">
                 <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
-                <span>Evaluating predicted stock requirements...</span>
+                <span>Evaluating daily stock and production requirements...</span>
               </div>
             </div>
           </div>
