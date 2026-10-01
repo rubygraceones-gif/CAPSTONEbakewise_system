@@ -2837,17 +2837,21 @@ async function viewPosTransactionDetails(txId) {
 
     if (title) title.textContent = `Transaction Details — ${tx.transaction_number}`;
 
-    const dateFormatted = new Date(tx.transaction_date).toLocaleString();
+    const dateVal = tx.transaction_date || tx.date || Date.now();
+    const dateFormatted = new Date(dateVal).toLocaleString();
+    const branchName = tx.branch_name || (store.branches.find(b => b.id === tx.branch_id)?.name) || 'Main Branch';
+    const cashierName = tx.cashier_name || tx.cashier || 'System Administrator';
+    const itemsList = tx.items || [];
 
     body.innerHTML = `
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-secondary); padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem;">
         <div><strong>Date/Time:</strong> ${dateFormatted}</div>
-        <div><strong>Branch:</strong> ${tx.branch_name || 'Main Branch'}</div>
-        <div><strong>Cashier:</strong> ${tx.cashier_name || 'System Administrator'}</div>
-        <div><strong>Status:</strong> <span style="font-weight: 700; color: ${tx.status === 'Completed' ? 'var(--color-success)' : 'var(--color-error)'}">${tx.status}</span></div>
+        <div><strong>Branch:</strong> ${branchName}</div>
+        <div><strong>Cashier:</strong> ${cashierName}</div>
+        <div><strong>Status:</strong> <span style="font-weight: 700; color: ${tx.status === 'Completed' ? 'var(--color-success)' : 'var(--color-error)'}">${tx.status || 'Completed'}</span></div>
       </div>
 
-      <h4 style="margin-bottom: 8px; font-size: 0.95rem; font-weight: 700;">Items Purchased (${tx.items ? tx.items.length : 0})</h4>
+      <h4 style="margin-bottom: 8px; font-size: 0.95rem; font-weight: 700;">Items Purchased (${itemsList.length})</h4>
       <table class="data-table" style="margin-bottom: 16px;">
         <thead>
           <tr>
@@ -2858,29 +2862,35 @@ async function viewPosTransactionDetails(txId) {
           </tr>
         </thead>
         <tbody>
-          ${tx.items.map(i => `
-            <tr>
-              <td style="font-weight: 600;">${i.product_name}</td>
-              <td>₱${parseFloat(i.unit_price).toFixed(2)}</td>
-              <td>${i.quantity}</td>
-              <td style="font-weight: 700;">₱${parseFloat(i.subtotal).toFixed(2)}</td>
-            </tr>
-          `).join('')}
+          ${itemsList.map(i => {
+            const pName = i.product_name || i.name || i.product_id;
+            const uPrice = parseFloat(i.unit_price || i.price || 0);
+            const qtyVal = parseInt(i.quantity || i.qty || 1);
+            const subVal = parseFloat(i.subtotal || (uPrice * qtyVal));
+            return `
+              <tr>
+                <td style="font-weight: 600;">${pName}</td>
+                <td>₱${uPrice.toFixed(2)}</td>
+                <td>${qtyVal}</td>
+                <td style="font-weight: 700;">₱${subVal.toFixed(2)}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
 
       <div style="background: var(--bg-secondary); padding: 14px; border-radius: 8px; font-size: 0.9rem;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span>Subtotal:</span> <strong>₱${parseFloat(tx.subtotal).toFixed(2)}</strong>
+          <span>Subtotal:</span> <strong>₱${parseFloat(tx.subtotal || 0).toFixed(2)}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span>Discount:</span> <strong>₱${parseFloat(tx.discount).toFixed(2)}</strong>
+          <span>Discount:</span> <strong>₱${parseFloat(tx.discount || 0).toFixed(2)}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 1.1rem; color: var(--accent-color); font-weight: 800; border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 4px;">
-          <span>Grand Total:</span> <span>₱${parseFloat(tx.total).toFixed(2)}</span>
+          <span>Grand Total:</span> <span>₱${parseFloat(tx.total || 0).toFixed(2)}</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);">
-          <span>Payment (${tx.payment_method}):</span> <span>₱${parseFloat(tx.payment_amount).toFixed(2)} (Change: ₱${parseFloat(tx.change_amount).toFixed(2)})</span>
+          <span>Payment (${tx.payment_method || 'Cash'}):</span> <span>₱${parseFloat(tx.payment_amount || 0).toFixed(2)} (Change: ₱${parseFloat(tx.change_amount || 0).toFixed(2)})</span>
         </div>
       </div>
     `;
