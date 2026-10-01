@@ -2305,7 +2305,7 @@ function renderDashboardSalesWasteChart() {
 
   const daysDiff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
   const chartTitleEl = document.getElementById("dash-chart-title");
-  if (chartTitleEl) chartTitleEl.textContent = `Sales vs. Waste Trend (${daysDiff} Days)`;
+  if (chartTitleEl) chartTitleEl.textContent = `Daily Sales vs. Waste Trend (${daysDiff} Days)`;
 
   const totalSales = salesData.reduce((sum, val) => sum + val, 0);
   const totalWaste = wasteData.reduce((sum, val) => sum + val, 0);
