@@ -968,7 +968,7 @@ function setupNavigation() {
       e.preventDefault();
       if (card.classList.contains("sales")) navigateToPane("pane-sales");
       else if (card.classList.contains("waste")) navigateToPane("pane-waste");
-      else if (card.classList.contains("expiry")) navigateToPane("pane-shelf-life");
+      else if (card.classList.contains("expiry")) navigateToPane("pane-ai-analytics");
       else if (card.classList.contains("inventory")) navigateToPane("pane-inventory");
     });
   });
