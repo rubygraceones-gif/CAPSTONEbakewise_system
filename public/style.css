@@ -1089,9 +1089,18 @@ select {
 /* Static non-clickable KPI summary cards (Branch Management & User Management) */
 #pane-admin-branches .summary-card,
 #pane-admin-users .summary-card,
-.summary-card.static-kpi-card {
+.summary-card.static-kpi-card,
+#pane-admin-branches .summary-card *,
+#pane-admin-users .summary-card *,
+.summary-card.static-kpi-card * {
   cursor: default !important;
   transform: none !important;
+  user-select: none;
+}
+
+#pane-admin-branches .summary-card,
+#pane-admin-users .summary-card,
+.summary-card.static-kpi-card {
   border-color: var(--card-border) !important;
   box-shadow: var(--card-shadow) !important;
 }
