@@ -1075,12 +1075,15 @@ select {
   gap: 20px;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  will-change: transform, box-shadow;
 }
 
 .summary-card:hover {
+  transform: translateY(-4px);
   border-color: var(--primary-color);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
 }
 
 .card-icon-container {
@@ -2769,6 +2772,18 @@ select {
   box-shadow: var(--card-shadow) !important;
   border-radius: 12px !important;
   padding: 24px !important;
+  cursor: pointer !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.dark-mode .summary-card:hover {
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.25) !important;
 }
 
 .card-stats .stats-label {

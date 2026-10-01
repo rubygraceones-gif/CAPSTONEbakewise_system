@@ -1004,6 +1004,7 @@ function navigateToPane(paneId) {
       "pane-production": "Baking & Production Logs",
       "pane-waste": "Unsold & Defect Waste Tracker",
       "pane-ai-analytics": "Optimization & Analytics",
+      "pane-shelf-life": "Shelf Life Prediction & Repurposing",
       "pane-products": "Product Catalog & Pricing Directory",
       "pane-reports": "Performance Reporting Dashboard",
       "pane-admin-users": "Staff Directory & Accounts Manager",
@@ -1021,6 +1022,7 @@ function navigateToPane(paneId) {
   else if (paneId === "pane-production") refreshProductionPane();
   else if (paneId === "pane-waste") refreshWastePane();
   else if (paneId === "pane-ai-analytics") refreshAIAnalyticsPane();
+  else if (paneId === "pane-shelf-life") refreshShelfLifePane();
   else if (paneId === "pane-products") refreshProductsPane();
   else if (paneId === "pane-reports") refreshReportsPane();
   else if (paneId === "pane-admin-users") refreshAdminUsersPane();
@@ -2727,6 +2729,10 @@ function renderRepurposingAlerts() {
   });
 
   lucide.createIcons();
+}
+
+function refreshShelfLifePane() {
+  renderRepurposingAlerts();
 }
 
 // 7. PRODUCT CATALOG VIEW REFRESHER
