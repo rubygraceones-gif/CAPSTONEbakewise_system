@@ -2758,17 +2758,19 @@ async function refreshPosHistory() {
   try {
     const res = await fetch(`/api/pos/transactions?branch_id=${selectedBranchId}`);
     const data = await res.json();
-    let transactions = data.success ? data.transactions : [];
+    let transactions = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.transactions) ? data.transactions : []);
 
     // Filter locally
     transactions = transactions.filter(tx => {
+      const cashierStr = tx.cashier_name || tx.cashier || "";
+      const dateStr = tx.transaction_date || tx.date || "";
       const matchSearch = !searchInput || 
         tx.transaction_number.toLowerCase().includes(searchInput) ||
-        (tx.cashier_name && tx.cashier_name.toLowerCase().includes(searchInput)) ||
-        (tx.items && tx.items.some(i => i.product_name.toLowerCase().includes(searchInput)));
+        cashierStr.toLowerCase().includes(searchInput) ||
+        (tx.items && tx.items.some(i => (i.product_name || i.product_id || "").toLowerCase().includes(searchInput)));
       const matchPayment = selectedPayment === 'all' || tx.payment_method === selectedPayment;
       const matchStatus = selectedStatus === 'all' || tx.status === selectedStatus;
-      const matchDate = !selectedDate || (tx.transaction_date && tx.transaction_date.startsWith(selectedDate));
+      const matchDate = !selectedDate || dateStr.startsWith(selectedDate);
       return matchSearch && matchPayment && matchStatus && matchDate;
     });
 
@@ -2784,8 +2786,11 @@ async function refreshPosHistory() {
     }
 
     tbody.innerHTML = transactions.map(tx => {
-      const dateFormatted = new Date(tx.transaction_date).toLocaleDateString() + ' ' + new Date(tx.transaction_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
+      const dateVal = tx.transaction_date || tx.date || Date.now();
+      const dateFormatted = new Date(dateVal).toLocaleDateString() + ' ' + new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
+      const branchName = tx.branch_name || (store.branches.find(b => b.id === tx.branch_id)?.name) || 'Main Branch';
+      const cashierName = tx.cashier_name || tx.cashier || 'Staff';
       const statusBadge = tx.status === 'Completed' 
         ? `<span class="status-badge active" style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Completed</span>`
         : `<span class="status-badge inactive" style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Voided</span>`;
@@ -2794,11 +2799,11 @@ async function refreshPosHistory() {
         <tr>
           <td style="font-weight: 700; color: var(--primary-color);">${tx.transaction_number}</td>
           <td style="font-size: 0.82rem; color: var(--text-secondary);">${dateFormatted}</td>
-          <td>${tx.branch_name || 'Main Branch'}</td>
-          <td>${tx.cashier_name || 'Staff'}</td>
+          <td>${branchName}</td>
+          <td>${cashierName}</td>
           <td><strong>${tx.items ? tx.items.length : 0} items</strong> (${itemsCount} units)</td>
-          <td style="font-weight: 800; color: var(--accent-color);">₱${parseFloat(tx.total).toFixed(2)}</td>
-          <td>${tx.payment_method}</td>
+          <td style="font-weight: 800; color: var(--accent-color);">₱${parseFloat(tx.total || 0).toFixed(2)}</td>
+          <td>${tx.payment_method || 'Cash'}</td>
           <td>${statusBadge}</td>
           <td>
             <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="viewPosTransactionDetails(${tx.id})">
@@ -2809,7 +2814,7 @@ async function refreshPosHistory() {
       `;
     }).join('');
 
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   } catch (err) {
     console.error("Error fetching POS transactions:", err);
   }
@@ -2820,9 +2825,8 @@ async function viewPosTransactionDetails(txId) {
   try {
     const res = await fetch(`/api/pos/transactions/${txId}`);
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error("Transaction details not found");
-
-    const tx = data.transaction;
+    const tx = (data && data.transaction) ? data.transaction : data;
+    if (!res.ok || !tx || (!tx.id && !tx.transaction_number)) throw new Error("Transaction details not found");
     currentDetailsTxData = tx;
 
     const overlay = document.getElementById("pos-details-overlay");
