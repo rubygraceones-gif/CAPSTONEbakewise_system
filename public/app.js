@@ -963,9 +963,12 @@ function setupNavigation() {
     });
   });
 
-  // Explicitly bind all dashboard summary cards to their respective destination panes
-  const summaryCards = document.querySelectorAll(".summary-card");
-  summaryCards.forEach(card => {
+  // Explicitly bind ONLY dashboard summary cards to their respective destination panes
+  const dashboardCards = document.querySelectorAll("#pane-dashboard .summary-card");
+  dashboardCards.forEach(card => {
+    if (card.closest('#pane-admin-branches') || card.closest('#pane-admin-users') || card.classList.contains('static-kpi-card')) {
+      return;
+    }
     card.addEventListener("click", (e) => {
       e.preventDefault();
       if (card.classList.contains("sales")) navigateToPane("pane-sales");
