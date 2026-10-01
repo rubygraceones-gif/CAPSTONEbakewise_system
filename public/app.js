@@ -1229,18 +1229,24 @@ function setupThemeToggles() {
 }
 
 window.branchComboboxes = window.branchComboboxes || {};
+window.customComboboxes = window.customComboboxes || {};
 
-class SearchableBranchCombobox {
+class SearchableCombobox {
   constructor(targetElementId, options = {}) {
     this.targetId = targetElementId;
+    this.icon = options.icon || 'tag';
+    this.placeholder = options.placeholder || 'Search...';
     this.onChange = options.onChange || null;
-    this.selectedValue = options.defaultValue || 'all';
+    this.roleScoped = options.roleScoped || false;
+    this.items = options.items || null;
+    this.selectedValue = options.defaultValue || '';
     this.wrapper = null;
     this.trigger = null;
     this.dropdown = null;
     this.searchInput = null;
     this.optionsList = null;
     this.hiddenInput = null;
+    this.currentItemsList = [];
     this.init();
   }
 
@@ -1248,18 +1254,32 @@ class SearchableBranchCombobox {
     const existingElement = document.getElementById(this.targetId);
     if (!existingElement) return;
 
-    let wrapper = existingElement.closest('.branch-combobox-wrapper');
+    if (!this.items && existingElement.tagName === 'SELECT') {
+      this.items = Array.from(existingElement.options).map(opt => ({
+        id: opt.value,
+        name: opt.text || opt.textContent
+      }));
+      if (!this.selectedValue) {
+        this.selectedValue = existingElement.value || (this.items[0] ? this.items[0].id : '');
+      }
+    }
+
+    let wrapper = existingElement.closest('.custom-combobox-wrapper, .branch-combobox-wrapper');
     if (!wrapper) {
       wrapper = document.createElement('div');
-      wrapper.className = 'branch-combobox-wrapper';
+      wrapper.className = 'custom-combobox-wrapper';
       wrapper.id = `combobox-wrapper-${this.targetId}`;
+
+      const existingStyle = existingElement.getAttribute('style');
+      if (existingStyle) wrapper.setAttribute('style', existingStyle);
+
       existingElement.parentNode.insertBefore(wrapper, existingElement);
 
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden';
       hiddenInput.id = this.targetId;
       hiddenInput.value = this.selectedValue;
-      
+
       existingElement.parentNode.removeChild(existingElement);
       wrapper.appendChild(hiddenInput);
       this.hiddenInput = hiddenInput;
@@ -1268,14 +1288,15 @@ class SearchableBranchCombobox {
     }
 
     this.wrapper = wrapper;
+    this.setupProperties();
 
     if (!wrapper.querySelector('.combobox-trigger')) {
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'combobox-trigger';
       trigger.innerHTML = `
-        <i data-lucide="store" class="combobox-icon"></i>
-        <span class="combobox-label">All Branches</span>
+        <i data-lucide="${this.icon}" class="combobox-icon"></i>
+        <span class="combobox-label">Select...</span>
         <i data-lucide="chevron-down" class="combobox-arrow"></i>
       `;
       wrapper.appendChild(trigger);
@@ -1291,7 +1312,7 @@ class SearchableBranchCombobox {
       dropdown.innerHTML = `
         <div class="combobox-search-box">
           <i data-lucide="search" class="combobox-search-icon"></i>
-          <input type="text" class="combobox-search-input" placeholder="Search branch..." autocomplete="off">
+          <input type="text" class="combobox-search-input" placeholder="${this.placeholder}" autocomplete="off">
         </div>
         <div class="combobox-options-list"></div>
       `;
@@ -1306,6 +1327,53 @@ class SearchableBranchCombobox {
 
     this.bindEvents();
     this.render();
+  }
+
+  setupProperties() {
+    if (!this.hiddenInput || this.hiddenInput._comboboxConfigured) return;
+    this.hiddenInput._comboboxConfigured = true;
+    const self = this;
+    const proto = HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+
+    Object.defineProperty(this.hiddenInput, 'value', {
+      get() {
+        return desc.get.call(this);
+      },
+      set(val) {
+        desc.set.call(this, val);
+        self.selectedValue = String(val);
+        self.updateTriggerText();
+        self.updateOptionHighlights();
+      },
+      configurable: true
+    });
+
+    Object.defineProperty(this.hiddenInput, 'options', {
+      get() {
+        const list = self.currentItemsList || self.items || [];
+        const optsArr = list.map(item => ({
+          value: String(item.id),
+          text: item.name,
+          textContent: item.name
+        }));
+        optsArr.selectedIndex = self.getSelectedIndex();
+        return optsArr;
+      },
+      configurable: true
+    });
+
+    Object.defineProperty(this.hiddenInput, 'selectedIndex', {
+      get() {
+        return self.getSelectedIndex();
+      },
+      configurable: true
+    });
+  }
+
+  getSelectedIndex() {
+    const list = this.currentItemsList || this.items || [];
+    return list.findIndex(x => String(x.id) === String(this.selectedValue));
   }
 
   bindEvents() {
@@ -1325,16 +1393,26 @@ class SearchableBranchCombobox {
       });
     }
 
-    if (!document.datasetComboboxListening) {
-      document.datasetComboboxListening = 'true';
+    if (!document.datasetGlobalComboboxListening) {
+      document.datasetGlobalComboboxListening = 'true';
       document.addEventListener('click', (e) => {
-        document.querySelectorAll('.branch-combobox-wrapper.open').forEach(w => {
+        document.querySelectorAll('.custom-combobox-wrapper.open, .branch-combobox-wrapper.open').forEach(w => {
           if (!w.contains(e.target)) {
             w.classList.remove('open');
             const d = w.querySelector('.combobox-dropdown');
             if (d) d.style.display = 'none';
           }
         });
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.custom-combobox-wrapper.open, .branch-combobox-wrapper.open').forEach(w => {
+            w.classList.remove('open');
+            const d = w.querySelector('.combobox-dropdown');
+            if (d) d.style.display = 'none';
+          });
+        }
       });
     }
   }
@@ -1344,7 +1422,7 @@ class SearchableBranchCombobox {
     if (isOpen) {
       this.closeDropdown();
     } else {
-      document.querySelectorAll('.branch-combobox-wrapper.open').forEach(w => {
+      document.querySelectorAll('.custom-combobox-wrapper.open, .branch-combobox-wrapper.open').forEach(w => {
         w.classList.remove('open');
         const d = w.querySelector('.combobox-dropdown');
         if (d) d.style.display = 'none';
@@ -1363,27 +1441,42 @@ class SearchableBranchCombobox {
     if (this.dropdown) this.dropdown.style.display = 'none';
   }
 
+  setItems(newItems) {
+    this.items = newItems;
+    this.render();
+  }
+
   render() {
     if (!this.hiddenInput) return;
-    const user = store.currentUser;
-    const isAdmin = !user || user.role === 'admin';
-    const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+    let list = this.items || [];
 
-    let branchList = [];
-    if (isAdmin) {
-      branchList = [{ id: 'all', name: 'All Branches' }, ...store.branches];
-      this.trigger.disabled = false;
-    } else {
-      const uBranch = store.branches.find(b => parseInt(b.id) === userBranchId);
-      const bName = uBranch ? uBranch.name : `Branch ${userBranchId}`;
-      branchList = [{ id: userBranchId, name: bName }];
-      this.selectedValue = String(userBranchId);
-      this.hiddenInput.value = String(userBranchId);
-      this.trigger.disabled = true;
+    if (this.roleScoped || this.targetId.includes('branch')) {
+      const user = store.currentUser;
+      const isAdmin = !user || user.role === 'admin';
+      const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+
+      if (!isAdmin) {
+        const uBranch = store.branches.find(b => parseInt(b.id) === userBranchId);
+        const bName = uBranch ? uBranch.name : `Branch ${userBranchId}`;
+        list = [{ id: String(userBranchId), name: bName }];
+        this.selectedValue = String(userBranchId);
+        const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        if (desc && desc.set) desc.set.call(this.hiddenInput, String(userBranchId));
+        this.trigger.disabled = true;
+      } else {
+        this.trigger.disabled = false;
+      }
     }
 
-    this.currentBranchList = branchList;
-    this.populateOptions(branchList);
+    this.currentItemsList = list;
+
+    if (list.length > 0 && !list.some(x => String(x.id) === String(this.selectedValue))) {
+      this.selectedValue = String(list[0].id);
+      const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      if (desc && desc.set) desc.set.call(this.hiddenInput, this.selectedValue);
+    }
+
+    this.populateOptions(list);
     this.updateTriggerText();
 
     if (window.lucide && window.lucide.createIcons) {
@@ -1393,16 +1486,16 @@ class SearchableBranchCombobox {
 
   populateOptions(list) {
     if (!this.optionsList) return;
-    if (list.length === 0) {
-      this.optionsList.innerHTML = `<div class="combobox-empty-state">No branches found</div>`;
+    if (!list || list.length === 0) {
+      this.optionsList.innerHTML = `<div class="combobox-empty-state">No options found</div>`;
       return;
     }
 
-    this.optionsList.innerHTML = list.map(b => {
-      const isSelected = String(b.id) === String(this.selectedValue);
+    this.optionsList.innerHTML = list.map(item => {
+      const isSelected = String(item.id) === String(this.selectedValue);
       return `
-        <div class="combobox-option-item ${isSelected ? 'selected' : ''}" data-id="${b.id}" data-name="${b.name}">
-          <span>${b.name}</span>
+        <div class="combobox-option-item ${isSelected ? 'selected' : ''}" data-id="${item.id}" data-name="${item.name}">
+          <span>${item.name}</span>
           ${isSelected ? '<i data-lucide="check" style="width: 14px; height: 14px;"></i>' : ''}
         </div>
       `;
@@ -1411,8 +1504,8 @@ class SearchableBranchCombobox {
     this.optionsList.querySelectorAll('.combobox-option-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
-        const bId = item.getAttribute('data-id');
-        this.selectValue(bId);
+        const id = item.getAttribute('data-id');
+        this.selectValue(id);
         this.closeDropdown();
       });
     });
@@ -1425,21 +1518,23 @@ class SearchableBranchCombobox {
   filterOptions(query) {
     const q = (query || '').toLowerCase().trim();
     if (!q) {
-      this.populateOptions(this.currentBranchList);
+      this.populateOptions(this.currentItemsList);
       return;
     }
-    const filtered = this.currentBranchList.filter(b => b.name.toLowerCase().includes(q));
+    const filtered = (this.currentItemsList || []).filter(i => i.name.toLowerCase().includes(q));
     this.populateOptions(filtered);
   }
 
   selectValue(val) {
     this.selectedValue = String(val);
     if (this.hiddenInput) {
-      this.hiddenInput.value = String(val);
+      const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      if (desc && desc.set) desc.set.call(this.hiddenInput, String(val));
       this.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
       this.hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     this.updateTriggerText();
+    this.updateOptionHighlights();
 
     if (typeof this.onChange === 'function') {
       this.onChange(val);
@@ -1451,59 +1546,161 @@ class SearchableBranchCombobox {
     const label = this.trigger.querySelector('.combobox-label');
     if (!label) return;
 
-    if (this.selectedValue === 'all') {
+    const list = this.currentItemsList || this.items || [];
+    const item = list.find(x => String(x.id) === String(this.selectedValue));
+    if (item) {
+      label.textContent = item.name;
+    } else if (this.selectedValue === 'all') {
       label.textContent = 'All Branches';
     } else {
-      const b = store.branches.find(x => String(x.id) === String(this.selectedValue));
-      label.textContent = b ? b.name : `Branch ${this.selectedValue}`;
+      label.textContent = this.selectedValue || 'Select...';
     }
+  }
+
+  updateOptionHighlights() {
+    if (!this.optionsList) return;
+    this.optionsList.querySelectorAll('.combobox-option-item').forEach(item => {
+      const isSelected = item.getAttribute('data-id') === String(this.selectedValue);
+      item.classList.toggle('selected', isSelected);
+      let checkIcon = item.querySelector('[data-lucide="check"], svg.lucide-check');
+      if (isSelected && !checkIcon) {
+        const i = document.createElement('i');
+        i.setAttribute('data-lucide', 'check');
+        i.style.width = '14px';
+        i.style.height = '14px';
+        item.appendChild(i);
+        if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: item });
+      } else if (!isSelected && checkIcon) {
+        checkIcon.remove();
+      }
+    });
   }
 }
 
+window.SearchableCombobox = SearchableCombobox;
+window.SearchableBranchCombobox = SearchableCombobox;
+
 function populateSelectDropdowns() {
-  const selectSales = document.getElementById("sales-select-product");
-  const selectInv = document.getElementById("inv-select-product");
-  const selectProd = document.getElementById("prod-select-product");
-  const selectWaste = document.getElementById("waste-select-product");
-  const selectUsrBranch = document.getElementById("usr-branch-select");
-  const selectInvBranch = document.getElementById("inv-select-branch");
+  window.customComboboxes = window.customComboboxes || {};
 
-  const optionsHTML = store.products.map(p => `<option value="${p.id}">${p.name} (${p.category})</option>`).join('');
-  const branchOptionsHTML = store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+  const productItems = (store.products || []).map(p => ({ id: p.id, name: `${p.name} (${p.category})` }));
+  const branchItems = (store.branches || []).map(b => ({ id: b.id, name: b.name }));
+  const branchFilterItems = [{ id: 'all', name: 'All Branches' }, ...(store.branches || []).map(b => ({ id: b.id, name: b.name }))];
 
-  if (selectSales) selectSales.innerHTML = optionsHTML;
-  if (selectInv) selectInv.innerHTML = optionsHTML;
-  if (selectProd) selectProd.innerHTML = optionsHTML;
-  if (selectWaste) selectWaste.innerHTML = optionsHTML;
-
-  if (selectUsrBranch) {
-    selectUsrBranch.innerHTML = branchOptionsHTML;
-  }
-  if (selectInvBranch) {
-    selectInvBranch.innerHTML = branchOptionsHTML;
-  }
-
-  // Initialize and synchronize searchable branch comboboxes across table headers
-  const comboboxConfigs = [
-    { id: "inventory-branch-filter", refreshFn: refreshInventoryPane },
-    { id: "prod-branch-filter", refreshFn: refreshProductionPane },
-    { id: "waste-branch-filter", refreshFn: refreshWastePane },
-    { id: "pos-history-branch", refreshFn: refreshPosHistory }
-  ];
-
-  comboboxConfigs.forEach(item => {
-    if (document.getElementById(item.id)) {
-      if (!window.branchComboboxes[item.id]) {
-        window.branchComboboxes[item.id] = new SearchableBranchCombobox(item.id, {
-          onChange: (val) => {
-            if (typeof item.refreshFn === 'function') item.refreshFn();
-          }
-        });
+  const initCombobox = (id, config) => {
+    if (document.getElementById(id)) {
+      if (!window.customComboboxes[id]) {
+        window.customComboboxes[id] = new SearchableCombobox(id, config);
       } else {
-        window.branchComboboxes[item.id].render();
+        if (config.items) window.customComboboxes[id].setItems(config.items);
+        else window.customComboboxes[id].render();
+      }
+      if (id.includes('branch')) {
+        window.branchComboboxes[id] = window.customComboboxes[id];
       }
     }
+  };
+
+  // Header & Navbar
+  initCombobox("branch-switcher-select", {
+    icon: "store",
+    placeholder: "Search branch...",
+    items: branchFilterItems,
+    roleScoped: true,
+    onChange: (val) => {
+      store.setSelectedBranchId(val);
+      if (typeof refreshActiveView === 'function') refreshActiveView();
+    }
   });
+
+  // Table Branch Filters
+  initCombobox("inventory-branch-filter", { icon: "store", placeholder: "Search branch...", items: branchFilterItems, roleScoped: true, onChange: refreshInventoryPane });
+  initCombobox("prod-branch-filter", { icon: "store", placeholder: "Search branch...", items: branchFilterItems, roleScoped: true, onChange: refreshProductionPane });
+  initCombobox("waste-branch-filter", { icon: "store", placeholder: "Search branch...", items: branchFilterItems, roleScoped: true, onChange: refreshWastePane });
+  initCombobox("pos-history-branch", { icon: "store", placeholder: "Search branch...", items: branchFilterItems, roleScoped: true, onChange: refreshPosHistory });
+
+  // Other Table Filters
+  initCombobox("prod-status-filter", {
+    icon: "activity",
+    placeholder: "Search status...",
+    items: [{ id: 'all', name: 'All Statuses' }, { id: 'Completed', name: 'Completed' }, { id: 'In Progress', name: 'In Progress' }],
+    onChange: refreshProductionPane
+  });
+
+  initCombobox("pos-history-payment", {
+    icon: "credit-card",
+    placeholder: "Search payment...",
+    items: [{ id: 'all', name: 'All Payment Methods' }, { id: 'Cash', name: 'Cash' }, { id: 'GCash', name: 'GCash' }, { id: 'Credit Card', name: 'Credit Card' }],
+    onChange: refreshPosHistory
+  });
+
+  initCombobox("pos-history-status", {
+    icon: "activity",
+    placeholder: "Search status...",
+    items: [{ id: 'all', name: 'All Statuses' }, { id: 'Completed', name: 'Completed' }, { id: 'Voided', name: 'Voided' }],
+    onChange: refreshPosHistory
+  });
+
+  initCombobox("user-role-filter", {
+    icon: "shield",
+    placeholder: "Search role...",
+    items: [{ id: 'all', name: 'All Roles' }, { id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }],
+    onChange: refreshAdminUsersPane
+  });
+
+  // Form & Modal Dropdowns
+  initCombobox("inv-select-product", { icon: "package", placeholder: "Search product...", items: productItems });
+  initCombobox("prod-select-product", { icon: "package", placeholder: "Search product...", items: productItems });
+  initCombobox("waste-select-product", { icon: "package", placeholder: "Search product...", items: productItems });
+  initCombobox("inv-select-branch", { icon: "store", placeholder: "Search branch...", items: branchItems, roleScoped: true });
+  initCombobox("usr-branch-select", { icon: "store", placeholder: "Search branch...", items: branchItems });
+  initCombobox("edit-usr-branch", { icon: "store", placeholder: "Search branch...", items: branchItems });
+
+  initCombobox("usr-role-select", {
+    icon: "shield",
+    placeholder: "Search role...",
+    items: [{ id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }]
+  });
+
+  initCombobox("edit-usr-role", {
+    icon: "shield",
+    placeholder: "Search role...",
+    items: [{ id: 'admin', name: 'Admin / Manager' }, { id: 'staff', name: 'Store Staff / Cashier' }]
+  });
+
+  initCombobox("waste-reason-select", {
+    icon: "alert-triangle",
+    placeholder: "Search reason...",
+    items: [{ id: 'Expired', name: 'Expired' }, { id: 'Damaged', name: 'Damaged' }, { id: 'Overproduction', name: 'Overproduction' }, { id: 'Quality Control', name: 'Quality Control' }]
+  });
+
+  initCombobox("shelf-storage", {
+    icon: "box",
+    placeholder: "Search storage...",
+    items: [{ id: 'Ambient Room Temp (25°C)', name: 'Ambient Room Temp (25°C)' }, { id: 'Refrigerated (4°C)', name: 'Refrigerated (4°C)' }, { id: 'High Humidity / Display Showcase', name: 'High Humidity / Display Showcase' }]
+  });
+
+  initCombobox("edit-br-status", {
+    icon: "activity",
+    placeholder: "Search status...",
+    items: [{ id: 'Active', name: 'Active' }, { id: 'Inactive', name: 'Inactive' }]
+  });
+
+  initCombobox("prod-category-select", {
+    icon: "tag",
+    placeholder: "Search category...",
+    items: [{ id: 'Bread', name: 'Bread' }, { id: 'Pastries', name: 'Pastries' }, { id: 'Cakes', name: 'Cakes' }, { id: 'Beverages', name: 'Beverages' }]
+  });
+
+  initCombobox("announcement-target", {
+    icon: "users",
+    placeholder: "Search target...",
+    items: [{ id: 'all', name: 'All Staff & Managers' }, { id: 'admins', name: 'Store Managers Only' }, { id: 'staff', name: 'Floor Staff Only' }]
+  });
+
+  if (typeof populateShelfBreadTypeDropdown === 'function') {
+    populateShelfBreadTypeDropdown();
+  }
 }
 
 function setupFormSubmissions() {
@@ -3955,12 +4152,6 @@ async function handleMarkAsRepurposed(productId, productName, qty, recipe, batch
 window.handleMarkAsRepurposed = handleMarkAsRepurposed;
 
 function populateShelfBreadTypeDropdown() {
-  const selectEl = document.getElementById("shelf-bread-type");
-  if (!selectEl) return;
-
-  const currentVal = selectEl.value;
-
-  // Filter baked goods (exclude drinks / beverages)
   const bakedProducts = (store.products || []).filter(p => {
     const cat = (p.category || '').toLowerCase();
     const name = (p.name || '').toLowerCase();
@@ -3972,12 +4163,17 @@ function populateShelfBreadTypeDropdown() {
 
   if (bakedProducts.length === 0) return;
 
-  selectEl.innerHTML = bakedProducts.map(p => {
-    return `<option value="${p.id}">${p.name}</option>`;
-  }).join('');
+  const items = bakedProducts.map(p => ({ id: p.name, name: p.name }));
 
-  if (currentVal && Array.from(selectEl.options).some(o => String(o.value) === String(currentVal))) {
-    selectEl.value = currentVal;
+  if (window.customComboboxes && window.customComboboxes["shelf-bread-type"]) {
+    window.customComboboxes["shelf-bread-type"].setItems(items);
+  } else if (document.getElementById("shelf-bread-type")) {
+    window.customComboboxes = window.customComboboxes || {};
+    window.customComboboxes["shelf-bread-type"] = new SearchableCombobox("shelf-bread-type", {
+      icon: "tag",
+      placeholder: "Search bread type...",
+      items: items
+    });
   }
 }
 

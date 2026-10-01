@@ -3522,11 +3522,13 @@ body.dark-mode .dashboard-ai-insight {
 /* ==========================================================================
    SEARCHABLE BRANCH COMBOBOX COMPONENT STYLING
    ========================================================================== */
-.branch-combobox-wrapper {
+.branch-combobox-wrapper,
+.custom-combobox-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-width: 170px;
+  width: 100%;
+  min-width: 140px;
 }
 
 .combobox-trigger {
@@ -3534,7 +3536,7 @@ body.dark-mode .dashboard-ai-insight {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 12px;
+  padding: 8px 12px;
   font-size: 0.85rem;
   font-family: var(--font-main);
   font-weight: 600;
@@ -3581,7 +3583,8 @@ body.dark-mode .dashboard-ai-insight {
   flex-shrink: 0;
 }
 
-.branch-combobox-wrapper.open .combobox-arrow {
+.branch-combobox-wrapper.open .combobox-arrow,
+.custom-combobox-wrapper.open .combobox-arrow {
   transform: rotate(180deg);
 }
 
