@@ -1207,6 +1207,7 @@ app.post('/api/pos/checkout', async (req, res) => {
     const lowStockWarnings = [];
 
     for (const item of items) {
+      const altPid = String(item.product_id).startsWith('p') ? String(item.product_id).substring(1) : `p${item.product_id}`;
       const itemSubtotal = parseFloat(item.unit_price) * parseInt(item.quantity);
 
       // 1. Insert Item Record
