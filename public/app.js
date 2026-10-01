@@ -1228,6 +1228,238 @@ function setupThemeToggles() {
   if (toggleBtnApp) toggleBtnApp.addEventListener("click", toggleHandler);
 }
 
+window.branchComboboxes = window.branchComboboxes || {};
+
+class SearchableBranchCombobox {
+  constructor(targetElementId, options = {}) {
+    this.targetId = targetElementId;
+    this.onChange = options.onChange || null;
+    this.selectedValue = options.defaultValue || 'all';
+    this.wrapper = null;
+    this.trigger = null;
+    this.dropdown = null;
+    this.searchInput = null;
+    this.optionsList = null;
+    this.hiddenInput = null;
+    this.init();
+  }
+
+  init() {
+    const existingElement = document.getElementById(this.targetId);
+    if (!existingElement) return;
+
+    let wrapper = existingElement.closest('.branch-combobox-wrapper');
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'branch-combobox-wrapper';
+      wrapper.id = `combobox-wrapper-${this.targetId}`;
+      existingElement.parentNode.insertBefore(wrapper, existingElement);
+
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.id = this.targetId;
+      hiddenInput.value = this.selectedValue;
+      
+      existingElement.parentNode.removeChild(existingElement);
+      wrapper.appendChild(hiddenInput);
+      this.hiddenInput = hiddenInput;
+    } else {
+      this.hiddenInput = document.getElementById(this.targetId);
+    }
+
+    this.wrapper = wrapper;
+
+    if (!wrapper.querySelector('.combobox-trigger')) {
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'combobox-trigger';
+      trigger.innerHTML = `
+        <i data-lucide="store" class="combobox-icon"></i>
+        <span class="combobox-label">All Branches</span>
+        <i data-lucide="chevron-down" class="combobox-arrow"></i>
+      `;
+      wrapper.appendChild(trigger);
+      this.trigger = trigger;
+    } else {
+      this.trigger = wrapper.querySelector('.combobox-trigger');
+    }
+
+    if (!wrapper.querySelector('.combobox-dropdown')) {
+      const dropdown = document.createElement('div');
+      dropdown.className = 'combobox-dropdown';
+      dropdown.style.display = 'none';
+      dropdown.innerHTML = `
+        <div class="combobox-search-box">
+          <i data-lucide="search" class="combobox-search-icon"></i>
+          <input type="text" class="combobox-search-input" placeholder="Search branch..." autocomplete="off">
+        </div>
+        <div class="combobox-options-list"></div>
+      `;
+      wrapper.appendChild(dropdown);
+      this.dropdown = dropdown;
+    } else {
+      this.dropdown = wrapper.querySelector('.combobox-dropdown');
+    }
+
+    this.searchInput = this.dropdown.querySelector('.combobox-search-input');
+    this.optionsList = this.dropdown.querySelector('.combobox-options-list');
+
+    this.bindEvents();
+    this.render();
+  }
+
+  bindEvents() {
+    if (this.trigger && !this.trigger.dataset.listening) {
+      this.trigger.dataset.listening = 'true';
+      this.trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.trigger.disabled) return;
+        this.toggleDropdown();
+      });
+    }
+
+    if (this.searchInput && !this.searchInput.dataset.listening) {
+      this.searchInput.dataset.listening = 'true';
+      this.searchInput.addEventListener('input', () => {
+        this.filterOptions(this.searchInput.value);
+      });
+    }
+
+    if (!document.datasetComboboxListening) {
+      document.datasetComboboxListening = 'true';
+      document.addEventListener('click', (e) => {
+        document.querySelectorAll('.branch-combobox-wrapper.open').forEach(w => {
+          if (!w.contains(e.target)) {
+            w.classList.remove('open');
+            const d = w.querySelector('.combobox-dropdown');
+            if (d) d.style.display = 'none';
+          }
+        });
+      });
+    }
+  }
+
+  toggleDropdown() {
+    const isOpen = this.wrapper.classList.contains('open');
+    if (isOpen) {
+      this.closeDropdown();
+    } else {
+      document.querySelectorAll('.branch-combobox-wrapper.open').forEach(w => {
+        w.classList.remove('open');
+        const d = w.querySelector('.combobox-dropdown');
+        if (d) d.style.display = 'none';
+      });
+
+      this.wrapper.classList.add('open');
+      this.dropdown.style.display = 'flex';
+      this.searchInput.value = '';
+      this.filterOptions('');
+      setTimeout(() => this.searchInput.focus(), 50);
+    }
+  }
+
+  closeDropdown() {
+    if (this.wrapper) this.wrapper.classList.remove('open');
+    if (this.dropdown) this.dropdown.style.display = 'none';
+  }
+
+  render() {
+    if (!this.hiddenInput) return;
+    const user = store.currentUser;
+    const isAdmin = !user || user.role === 'admin';
+    const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+
+    let branchList = [];
+    if (isAdmin) {
+      branchList = [{ id: 'all', name: 'All Branches' }, ...store.branches];
+      this.trigger.disabled = false;
+    } else {
+      const uBranch = store.branches.find(b => parseInt(b.id) === userBranchId);
+      const bName = uBranch ? uBranch.name : `Branch ${userBranchId}`;
+      branchList = [{ id: userBranchId, name: bName }];
+      this.selectedValue = String(userBranchId);
+      this.hiddenInput.value = String(userBranchId);
+      this.trigger.disabled = true;
+    }
+
+    this.currentBranchList = branchList;
+    this.populateOptions(branchList);
+    this.updateTriggerText();
+
+    if (window.lucide && window.lucide.createIcons) {
+      window.lucide.createIcons({ root: this.wrapper });
+    }
+  }
+
+  populateOptions(list) {
+    if (!this.optionsList) return;
+    if (list.length === 0) {
+      this.optionsList.innerHTML = `<div class="combobox-empty-state">No branches found</div>`;
+      return;
+    }
+
+    this.optionsList.innerHTML = list.map(b => {
+      const isSelected = String(b.id) === String(this.selectedValue);
+      return `
+        <div class="combobox-option-item ${isSelected ? 'selected' : ''}" data-id="${b.id}" data-name="${b.name}">
+          <span>${b.name}</span>
+          ${isSelected ? '<i data-lucide="check" style="width: 14px; height: 14px;"></i>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    this.optionsList.querySelectorAll('.combobox-option-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const bId = item.getAttribute('data-id');
+        this.selectValue(bId);
+        this.closeDropdown();
+      });
+    });
+
+    if (window.lucide && window.lucide.createIcons) {
+      window.lucide.createIcons({ root: this.optionsList });
+    }
+  }
+
+  filterOptions(query) {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+      this.populateOptions(this.currentBranchList);
+      return;
+    }
+    const filtered = this.currentBranchList.filter(b => b.name.toLowerCase().includes(q));
+    this.populateOptions(filtered);
+  }
+
+  selectValue(val) {
+    this.selectedValue = String(val);
+    if (this.hiddenInput) {
+      this.hiddenInput.value = String(val);
+      this.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+      this.hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    this.updateTriggerText();
+
+    if (typeof this.onChange === 'function') {
+      this.onChange(val);
+    }
+  }
+
+  updateTriggerText() {
+    if (!this.trigger) return;
+    const label = this.trigger.querySelector('.combobox-label');
+    if (!label) return;
+
+    if (this.selectedValue === 'all') {
+      label.textContent = 'All Branches';
+    } else {
+      const b = store.branches.find(x => String(x.id) === String(this.selectedValue));
+      label.textContent = b ? b.name : `Branch ${this.selectedValue}`;
+    }
+  }
+}
+
 function populateSelectDropdowns() {
   const selectSales = document.getElementById("sales-select-product");
   const selectInv = document.getElementById("inv-select-product");
@@ -1250,6 +1482,28 @@ function populateSelectDropdowns() {
   if (selectInvBranch) {
     selectInvBranch.innerHTML = branchOptionsHTML;
   }
+
+  // Initialize and synchronize searchable branch comboboxes across table headers
+  const comboboxConfigs = [
+    { id: "inventory-branch-filter", refreshFn: refreshInventoryPane },
+    { id: "prod-branch-filter", refreshFn: refreshProductionPane },
+    { id: "waste-branch-filter", refreshFn: refreshWastePane },
+    { id: "pos-history-branch", refreshFn: refreshPosHistory }
+  ];
+
+  comboboxConfigs.forEach(item => {
+    if (document.getElementById(item.id)) {
+      if (!window.branchComboboxes[item.id]) {
+        window.branchComboboxes[item.id] = new SearchableBranchCombobox(item.id, {
+          onChange: (val) => {
+            if (typeof item.refreshFn === 'function') item.refreshFn();
+          }
+        });
+      } else {
+        window.branchComboboxes[item.id].render();
+      }
+    }
+  });
 }
 
 function setupFormSubmissions() {
@@ -3211,8 +3465,11 @@ function refreshProductionPane() {
   const searchInput = document.getElementById('prod-search-input')?.value.toLowerCase() || '';
   const batchFilter = document.getElementById('prod-batch-filter')?.value.toLowerCase() || '';
   const statusFilter = document.getElementById('prod-status-filter')?.value || 'all';
+  const localBranchFilter = document.getElementById('prod-branch-filter')?.value || 'all';
+  const effectiveBranchId = localBranchFilter !== 'all' ? parseInt(localBranchFilter) : branchId;
+
   const sortedProd = [...store.production]
-    .filter(p => branchId === 'all' || p.branchId === branchId)
+    .filter(p => effectiveBranchId === 'all' || parseInt(p.branchId) === parseInt(effectiveBranchId))
     .filter(p => {
       const prodObj = store.products.find(x => x.id === p.productId);
       const nameMatch = prodObj ? prodObj.name.toLowerCase().includes(searchInput) : true;
@@ -3286,8 +3543,11 @@ function refreshWastePane() {
 
   const searchInput = document.getElementById('waste-search-input')?.value.toLowerCase() || '';
   const dateFilter = document.getElementById('waste-date-filter')?.value || '';
+  const localBranchFilter = document.getElementById('waste-branch-filter')?.value || 'all';
+  const effectiveBranchId = localBranchFilter !== 'all' ? parseInt(localBranchFilter) : branchId;
+
   const sortedWaste = [...store.waste]
-    .filter(w => branchId === 'all' || w.branchId === branchId)
+    .filter(w => effectiveBranchId === 'all' || parseInt(w.branchId) === parseInt(effectiveBranchId))
     .filter(w => {
       const p = store.products.find(x => x.id === w.productId);
       const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
