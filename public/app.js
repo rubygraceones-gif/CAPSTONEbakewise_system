@@ -2991,6 +2991,20 @@ function setupPOSModule() {
 
   // Global document click delegation for POS Action Buttons & Tabs
   document.addEventListener("click", (e) => {
+    const closeReceiptBtn = e.target.closest("#btn-pos-receipt-close, #pos-receipt-overlay");
+    if (closeReceiptBtn) {
+      e.preventDefault();
+      closePosReceiptModal();
+      return;
+    }
+
+    const printReceiptBtn = e.target.closest("#btn-pos-receipt-print");
+    if (printReceiptBtn) {
+      e.preventDefault();
+      printPosReceipt();
+      return;
+    }
+
     const clearBtn = e.target.closest("#btn-pos-clear-cart");
     if (clearBtn) {
       e.preventDefault();
