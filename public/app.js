@@ -2253,14 +2253,21 @@ async function refreshSalesPane() {
 
 function getBranchProductStock(productId) {
   const selectedBranchId = store.getSelectedBranchId();
-  const effectiveBranchId = (selectedBranchId === 'all' || !selectedBranchId) 
-    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1) 
-    : parseInt(selectedBranchId);
+  let effectiveBranchId = 1;
+  if (selectedBranchId && selectedBranchId !== 'all') {
+    effectiveBranchId = parseInt(selectedBranchId);
+  } else if (store.currentUser && store.currentUser.branch_id) {
+    effectiveBranchId = parseInt(store.currentUser.branch_id);
+  } else if (store.branches && store.branches.length > 0) {
+    effectiveBranchId = parseInt(store.branches[0].id);
+  }
 
-  const altPid = String(productId).startsWith('p') ? String(productId).substring(1) : `p${productId}`;
+  const pStr = String(productId).trim();
+  const altPid = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
   const inventoryRecords = (store._inventory || []).filter(i => {
-    const pidMatch = i.productId === productId || String(i.productId) === String(productId) || String(i.productId) === altPid;
+    const iPid = String(i.productId).trim();
+    const pidMatch = iPid === pStr || iPid === altPid;
     const bidMatch = parseInt(i.branchId) === parseInt(effectiveBranchId);
     return pidMatch && bidMatch;
   });
