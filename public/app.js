@@ -2263,6 +2263,16 @@ function getBranchProductStock(productId) {
   return inventoryRecords.reduce((sum, item) => sum + (parseInt(item.stockLevel !== undefined ? item.stockLevel : (item.quantity !== undefined ? item.quantity : item.stock_level)) || 0), 0);
 }
 
+function findPosProduct(productId) {
+  if (!store || !store.products) return null;
+  const pStr = String(productId).trim();
+  const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
+  return store.products.find(p => {
+    const idStr = String(p.id).trim();
+    return idStr === pStr || idStr === altStr;
+  });
+}
+
 function renderPosProducts() {
   const grid = document.getElementById("pos-products-grid");
   if (!grid) return;
@@ -2288,7 +2298,13 @@ function renderPosProducts() {
 
   grid.innerHTML = filtered.map(p => {
     const stockAvailable = getBranchProductStock(p.id);
-    const cartItem = posCart.find(c => c.productId === p.id);
+    const pStr = String(p.id).trim();
+    const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
+
+    const cartItem = posCart.find(c => {
+      const cStr = String(c.productId).trim();
+      return cStr === pStr || cStr === altStr;
+    });
     const inCartQty = cartItem ? cartItem.qty : 0;
     const remainingStock = Math.max(0, stockAvailable - inCartQty);
 
@@ -2325,7 +2341,7 @@ function renderPosProducts() {
             <i data-lucide="${stockAvailable > 0 ? 'check-circle' : 'x-circle'}" style="width: 12px; height: 12px;"></i>
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+          <button type="button" class="pos-product-add-btn" onclick="event.stopPropagation(); addToPosCart('${p.id}')" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
             <i data-lucide="plus-circle" style="width: 14px; height: 14px;"></i>
             <span>${remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart')}</span>
           </button>
@@ -2338,11 +2354,21 @@ function renderPosProducts() {
 }
 
 function addToPosCart(productId) {
-  const p = store.products.find(x => x.id === productId || String(x.id) === String(productId));
-  if (!p) return;
+  const p = findPosProduct(productId);
+  if (!p) {
+    console.warn("Product not found for ID:", productId);
+    return;
+  }
+
+  const pStr = String(p.id).trim();
+  const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
   const stockAvailable = getBranchProductStock(p.id);
-  const existingIndex = posCart.findIndex(c => c.productId === p.id);
+
+  const existingIndex = posCart.findIndex(c => {
+    const cStr = String(c.productId).trim();
+    return cStr === pStr || cStr === altStr;
+  });
 
   if (existingIndex >= 0) {
     if (posCart[existingIndex].qty + 1 > stockAvailable) {
@@ -2370,21 +2396,27 @@ function addToPosCart(productId) {
 window.addToPosCart = addToPosCart;
 
 function updatePosCartQty(productId, delta) {
-  const index = posCart.findIndex(c => c.productId === productId);
+  const pStr = String(productId).trim();
+  const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
+
+  const index = posCart.findIndex(c => {
+    const cStr = String(c.productId).trim();
+    return cStr === pStr || cStr === altStr;
+  });
   if (index < 0) return;
 
-  const p = posCart[index];
-  const stockAvailable = getBranchProductStock(p.productId);
+  const item = posCart[index];
+  const stockAvailable = getBranchProductStock(item.productId);
 
   if (delta > 0) {
-    if (p.qty + 1 > stockAvailable) {
+    if (item.qty + 1 > stockAvailable) {
       showToast(`Insufficient stock. Only ${stockAvailable} units are available.`, "warning");
       return;
     }
-    p.qty += 1;
+    item.qty += 1;
   } else {
-    p.qty -= 1;
-    if (p.qty <= 0) {
+    item.qty -= 1;
+    if (item.qty <= 0) {
       posCart.splice(index, 1);
     }
   }
@@ -2395,7 +2427,13 @@ function updatePosCartQty(productId, delta) {
 window.updatePosCartQty = updatePosCartQty;
 
 function removeFromPosCart(productId) {
-  posCart = posCart.filter(c => c.productId !== productId);
+  const pStr = String(productId).trim();
+  const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
+
+  posCart = posCart.filter(c => {
+    const cStr = String(c.productId).trim();
+    return cStr !== pStr && cStr !== altStr;
+  });
   updatePosCartUI();
   renderPosProducts();
 }
