@@ -2330,31 +2330,18 @@ function renderPosProducts() {
       stockLabel = `Low Stock: ${stockAvailable}`;
     }
 
-    let iconName = "package";
-    if (p.category === "Bread") iconName = "wheat";
-    else if (p.category === "Pastries") iconName = "pie-chart";
-    else if (p.category === "Cakes") iconName = "cake";
-    else if (p.category === "Drinks") iconName = "cup-soda";
-
     return `
       <div class="pos-product-card" onclick="addToPosCart('${p.id}')">
-        <div>
-          <div class="pos-product-icon">
-            <i data-lucide="${iconName}" style="width: 22px; height: 22px;"></i>
-          </div>
-          <div class="pos-product-info">
-            <span class="pos-product-category">${p.category || 'BAKERY'}</span>
-            <h4>${p.name}</h4>
-          </div>
+        <div class="pos-product-info">
+          <span class="pos-product-category">${p.category || 'BAKERY'}</span>
+          <h4>${p.name}</h4>
         </div>
         <div>
           <div class="pos-product-price">₱${parseFloat(p.price).toFixed(2)}</div>
           <div class="pos-product-stock ${stockBadgeClass}">
-            <i data-lucide="${stockAvailable > 0 ? 'check-circle' : 'x-circle'}" style="width: 12px; height: 12px;"></i>
             <span>${stockLabel}</span>
           </div>
           <button type="button" class="pos-product-add-btn" onclick="event.stopPropagation(); addToPosCart('${p.id}')" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-            <i data-lucide="plus-circle" style="width: 14px; height: 14px;"></i>
             <span>${remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart')}</span>
           </button>
         </div>
