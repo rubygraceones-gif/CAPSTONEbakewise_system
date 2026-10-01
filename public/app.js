@@ -3729,12 +3729,41 @@ function handleMarkAsRepurposed(productId, productName, qty, recipe) {
   if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
 }
 
+function populateShelfBreadTypeDropdown() {
+  const selectEl = document.getElementById("shelf-bread-type");
+  if (!selectEl) return;
+
+  const currentVal = selectEl.value;
+
+  // Filter baked goods (exclude drinks / beverages)
+  const bakedProducts = (store.products || []).filter(p => {
+    const cat = (p.category || '').toLowerCase();
+    const name = (p.name || '').toLowerCase();
+    if (cat.includes('drink') || cat.includes('beverage') || name.includes('coke') || name.includes('sprite') || name.includes('water')) {
+      return false;
+    }
+    return true;
+  });
+
+  if (bakedProducts.length === 0) return;
+
+  selectEl.innerHTML = bakedProducts.map(p => {
+    return `<option value="${p.id}">${p.name}</option>`;
+  }).join('');
+
+  if (currentVal && Array.from(selectEl.options).some(o => String(o.value) === String(currentVal))) {
+    selectEl.value = currentVal;
+  }
+}
+
 function refreshShelfLifePane() {
+  populateShelfBreadTypeDropdown();
   renderRepurposingAlerts();
 }
 
 // 7. PRODUCT CATALOG VIEW REFRESHER
 function refreshProductsPane() {
+  populateShelfBreadTypeDropdown();
   const tbody = document.getElementById("products-tbody");
   const addBtn = document.getElementById("btn-add-product-modal");
 
@@ -4321,6 +4350,8 @@ async function refreshAdminBranchesPane() {
 
 // --- SHELF LIFE PREDICTION MODULE ---
 function setupShelfLifeModule() {
+  populateShelfBreadTypeDropdown();
+
   const btnPredict = document.getElementById("btn-predict-shelf");
   if (!btnPredict) return;
 
@@ -4350,8 +4381,14 @@ function setupShelfLifeModule() {
 
   // Prediction Logic
   btnPredict.addEventListener("click", () => {
-    const breadType = document.getElementById("shelf-bread-type").value;
-    const breadName = document.getElementById("shelf-bread-type").options[document.getElementById("shelf-bread-type").selectedIndex].text;
+    const selectEl = document.getElementById("shelf-bread-type");
+    if (!selectEl || selectEl.options.length === 0) {
+      populateShelfBreadTypeDropdown();
+    }
+    const breadTypeVal = selectEl ? selectEl.value : "";
+    const selectedOption = selectEl && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+    const breadName = selectedOption ? selectedOption.text : "Bread";
+
     const storage = document.getElementById("shelf-storage").value;
     const temp = parseInt(tempSlider.value, 10);
     const humid = parseInt(humidSlider.value, 10);
@@ -4369,12 +4406,27 @@ function setupShelfLifeModule() {
     let daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     if (daysSince < 0) daysSince = 0;
 
-    // Base Shelf Life Mapping
-    let baseShelfLife = 3; // default
-    if (breadType === "pandesal") baseShelfLife = 3;
-    else if (breadType === "sliced_bread") baseShelfLife = 7;
-    else if (breadType === "ensaymada") baseShelfLife = 4;
-    else if (breadType === "cake") baseShelfLife = 5;
+    // Dynamic Base Shelf Life Lookup from Product Catalog
+    const targetProduct = (store.products || []).find(p => String(p.id) === String(breadTypeVal) || p.name === breadName);
+
+    let baseShelfLife = 3;
+    if (targetProduct) {
+      if (targetProduct.shelfLifeDays) {
+        baseShelfLife = parseInt(targetProduct.shelfLifeDays, 10);
+      } else {
+        const pNameLower = targetProduct.name.toLowerCase();
+        const pCatLower = (targetProduct.category || '').toLowerCase();
+        if (pNameLower.includes('sliced') || pNameLower.includes('loaf')) baseShelfLife = 7;
+        else if (pCatLower.includes('cake') || pNameLower.includes('cake')) baseShelfLife = 5;
+        else if (pCatLower.includes('pastr') || pNameLower.includes('ensaymada') || pNameLower.includes('croissant') || pNameLower.includes('muffin')) baseShelfLife = 4;
+        else baseShelfLife = 3;
+      }
+    } else {
+      if (breadTypeVal === "pandesal") baseShelfLife = 3;
+      else if (breadTypeVal === "sliced_bread") baseShelfLife = 7;
+      else if (breadTypeVal === "ensaymada") baseShelfLife = 4;
+      else if (breadTypeVal === "cake") baseShelfLife = 5;
+    }
 
     // Apply storage modifiers
     let storageMsg = "";
