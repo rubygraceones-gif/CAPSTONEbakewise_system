@@ -284,8 +284,8 @@ class BakeWiseStore {
           this.save("bakewise_v2_sales", this._sales);
         }
 
-        // Fetch inventory
-        const iRes = await fetch(`/api/inventory${queryStr}`);
+        // Fetch inventory (always fetch complete multi-branch inventory for accurate POS sync)
+        const iRes = await fetch('/api/inventory');
         if (iRes.ok) {
           const fetchedInv = await iRes.json();
           this._inventory = fetchedInv.map(inv => ({
@@ -2242,7 +2242,12 @@ function switchPosTab(tabName) {
 }
 window.switchPosTab = switchPosTab;
 
-function refreshSalesPane() {
+async function refreshSalesPane() {
+  if (store && store.isBackendOnline) {
+    try {
+      await store.syncWithBackend();
+    } catch(e) {}
+  }
   switchPosTab(currentPosTab || 'new-sale');
 }
 
