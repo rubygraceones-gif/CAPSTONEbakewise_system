@@ -2671,28 +2671,57 @@ async function refreshSalesPane() {
   switchPosTab(currentPosTab || 'new-sale');
 }
 
-function getBranchProductStock(productId) {
+function getPosProductStockInfo(productId) {
+  const user = store.currentUser;
+  const isAdmin = !user || user.role === 'admin';
   const selectedBranchId = store.getSelectedBranchId();
-  let effectiveBranchId = 1;
-  if (selectedBranchId && selectedBranchId !== 'all') {
-    effectiveBranchId = parseInt(selectedBranchId);
-  } else if (store.currentUser && store.currentUser.branch_id) {
-    effectiveBranchId = parseInt(store.currentUser.branch_id);
-  } else if (store.branches && store.branches.length > 0) {
-    effectiveBranchId = parseInt(store.branches[0].id);
-  }
+  const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
 
   const pStr = String(productId).trim();
   const altPid = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
+  let isNetwork = false;
+  let effectiveBranchId = null;
+  let scopeLabel = "";
+
+  if (isAdmin) {
+    if (selectedBranchId === 'all' || !selectedBranchId) {
+      isNetwork = true;
+      scopeLabel = "[Network Total]";
+    } else {
+      effectiveBranchId = parseInt(selectedBranchId);
+      const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
+      scopeLabel = `[${bObj ? bObj.name : 'Branch ' + effectiveBranchId}]`;
+    }
+  } else {
+    effectiveBranchId = userBranchId;
+    const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
+    scopeLabel = `[${bObj ? bObj.name : 'Branch ' + effectiveBranchId}]`;
+  }
+
   const inventoryRecords = (store._inventory || []).filter(i => {
     const iPid = String(i.productId).trim();
     const pidMatch = iPid === pStr || iPid === altPid;
+    if (isNetwork) return pidMatch;
     const bidMatch = parseInt(i.branchId) === parseInt(effectiveBranchId);
     return pidMatch && bidMatch;
   });
 
-  return inventoryRecords.reduce((sum, item) => sum + (parseInt(item.stockLevel !== undefined ? item.stockLevel : (item.quantity !== undefined ? item.quantity : item.stock_level)) || 0), 0);
+  const stockAvailable = inventoryRecords.reduce((sum, item) => {
+    const qty = parseInt(item.stockLevel !== undefined ? item.stockLevel : (item.quantity !== undefined ? item.quantity : item.stock_level)) || 0;
+    return sum + qty;
+  }, 0);
+
+  return {
+    stock: Math.max(0, stockAvailable),
+    scopeLabel: scopeLabel,
+    isNetwork: isNetwork,
+    effectiveBranchId: effectiveBranchId
+  };
+}
+
+function getBranchProductStock(productId) {
+  return getPosProductStockInfo(productId).stock;
 }
 
 function findPosProduct(productId) {
@@ -2729,7 +2758,10 @@ function renderPosProducts() {
   }
 
   grid.innerHTML = filtered.map(p => {
-    const stockAvailable = getBranchProductStock(p.id);
+    const stockInfo = getPosProductStockInfo(p.id);
+    const stockAvailable = stockInfo.stock;
+    const scopeLabelStr = stockInfo.scopeLabel ? ` ${stockInfo.scopeLabel}` : "";
+
     const pStr = String(p.id).trim();
     const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
@@ -2742,17 +2774,17 @@ function renderPosProducts() {
     const isOutOfStock = stockAvailable <= 0 || remainingStock <= 0;
 
     let stockBadgeClass = "in-stock";
-    let stockLabel = `In Stock: ${stockAvailable}`;
+    let stockLabel = `In Stock: ${stockAvailable}${scopeLabelStr}`;
     if (stockAvailable <= 0) {
       stockBadgeClass = "out-stock";
       stockLabel = "Out of Stock (0)";
     } else if (stockAvailable <= 10) {
       stockBadgeClass = "low-stock";
-      stockLabel = `Low Stock: ${stockAvailable}`;
+      stockLabel = `Low Stock: ${stockAvailable}${scopeLabelStr}`;
     }
 
     return `
-      <div class="pos-product-card ${stockAvailable <= 0 ? 'disabled-card' : ''}" data-product-id="${p.id}" ${stockAvailable > 0 ? `onclick="addToPosCart('${p.id}')"` : 'style="opacity: 0.55; cursor: not-allowed;"'}>
+      <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${!isOutOfStock ? `onclick="addToPosCart('${p.id}')"` : 'style="opacity: 0.55; cursor: not-allowed;"'}>
         <div class="pos-product-info">
           <span class="pos-product-category">${p.category || 'BAKERY'}</span>
           <h4>${p.name}</h4>
@@ -2762,7 +2794,7 @@ function renderPosProducts() {
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${stockAvailable > 0 ? `onclick="event.stopPropagation(); addToPosCart('${p.id}')"` : ''} ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${!isOutOfStock ? `onclick="event.stopPropagation(); addToPosCart('${p.id}')"` : ''} ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
             <span>${stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'))}</span>
           </button>
         </div>
