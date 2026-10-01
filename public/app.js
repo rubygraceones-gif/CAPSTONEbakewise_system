@@ -2742,26 +2742,49 @@ async function refreshPosHistory() {
   const tbody = document.getElementById("pos-history-tbody");
   if (!tbody) return;
 
+  const user = store.currentUser;
+  const isAdmin = user && user.role === 'admin';
+  const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+
+  // Handle branch filter dropdown according to role
+  const branchSelect = document.getElementById("pos-history-branch");
+  if (branchSelect) {
+    if (isAdmin) {
+      branchSelect.disabled = false;
+      if (branchSelect.options.length <= 1) {
+        branchSelect.innerHTML = '<option value="all">All Branches</option>' + 
+          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+      }
+    } else {
+      const userBranchObj = store.branches.find(b => parseInt(b.id) === userBranchId);
+      const bName = userBranchObj ? userBranchObj.name : `Branch ${userBranchId}`;
+      branchSelect.innerHTML = `<option value="${userBranchId}">${bName}</option>`;
+      branchSelect.value = String(userBranchId);
+      branchSelect.disabled = true;
+    }
+  }
+
+  const effectiveBranchId = isAdmin 
+    ? (branchSelect?.value || store.getSelectedBranchId() || 'all')
+    : userBranchId;
+
   const searchInput = (document.getElementById("pos-history-search")?.value || "").toLowerCase().trim();
-  const selectedBranchId = document.getElementById("pos-history-branch")?.value || store.getSelectedBranchId();
   const selectedPayment = document.getElementById("pos-history-payment")?.value || 'all';
   const selectedStatus = document.getElementById("pos-history-status")?.value || 'all';
   const selectedDate = document.getElementById("pos-history-date")?.value || '';
 
-  // Populate branch select dropdown if empty
-  const branchSelect = document.getElementById("pos-history-branch");
-  if (branchSelect && branchSelect.options.length <= 1) {
-    branchSelect.innerHTML = '<option value="all">All Branches</option>' + 
-      store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-  }
-
   try {
-    const res = await fetch(`/api/pos/transactions?branch_id=${selectedBranchId}`);
+    const res = await fetch(`/api/pos/transactions?branch_id=${effectiveBranchId}`);
     const data = await res.json();
     let transactions = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.transactions) ? data.transactions : []);
 
-    // Filter locally
+    // Filter locally (strictly isolating branch sales for non-admins)
     transactions = transactions.filter(tx => {
+      const txBranchId = parseInt(tx.branch_id || 1);
+      const matchBranch = isAdmin 
+        ? (effectiveBranchId === 'all' || parseInt(effectiveBranchId) === txBranchId)
+        : (txBranchId === userBranchId);
+
       const cashierStr = tx.cashier_name || tx.cashier || "";
       const dateStr = tx.transaction_date || tx.date || "";
       const matchSearch = !searchInput || 
@@ -2771,7 +2794,7 @@ async function refreshPosHistory() {
       const matchPayment = selectedPayment === 'all' || tx.payment_method === selectedPayment;
       const matchStatus = selectedStatus === 'all' || tx.status === selectedStatus;
       const matchDate = !selectedDate || dateStr.startsWith(selectedDate);
-      return matchSearch && matchPayment && matchStatus && matchDate;
+      return matchBranch && matchSearch && matchPayment && matchStatus && matchDate;
     });
 
     if (transactions.length === 0) {
@@ -2789,7 +2812,7 @@ async function refreshPosHistory() {
       const dateVal = tx.transaction_date || tx.date || Date.now();
       const dateFormatted = new Date(dateVal).toLocaleDateString() + ' ' + new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
-      const branchName = tx.branch_name || (store.branches.find(b => b.id === tx.branch_id)?.name) || 'Main Branch';
+      const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';
       const cashierName = tx.cashier_name || tx.cashier || 'Staff';
       const statusBadge = tx.status === 'Completed' 
         ? `<span class="status-badge active" style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Completed</span>`
@@ -2827,6 +2850,15 @@ async function viewPosTransactionDetails(txId) {
     const data = await res.json();
     const tx = (data && data.transaction) ? data.transaction : data;
     if (!res.ok || !tx || (!tx.id && !tx.transaction_number)) throw new Error("Transaction details not found");
+    
+    const user = store.currentUser;
+    const isAdmin = user && user.role === 'admin';
+    const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+    if (!isAdmin && tx.branch_id && parseInt(tx.branch_id) !== userBranchId) {
+      alert("Access denied: You can only view transactions from your assigned branch.");
+      return;
+    }
+    
     currentDetailsTxData = tx;
 
     const overlay = document.getElementById("pos-details-overlay");
