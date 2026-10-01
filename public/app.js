@@ -2687,16 +2687,16 @@ function getPosProductStockInfo(productId) {
   if (isAdmin) {
     if (selectedBranchId === 'all' || !selectedBranchId) {
       isNetwork = true;
-      scopeLabel = "[Network Total]";
+      scopeLabel = "(All Branches)";
     } else {
       effectiveBranchId = parseInt(selectedBranchId);
       const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
-      scopeLabel = `[${bObj ? bObj.name : 'Branch ' + effectiveBranchId}]`;
+      scopeLabel = `(${bObj ? bObj.name : 'Branch ' + effectiveBranchId})`;
     }
   } else {
     effectiveBranchId = userBranchId;
     const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
-    scopeLabel = `[${bObj ? bObj.name : 'Branch ' + effectiveBranchId}]`;
+    scopeLabel = `(${bObj ? bObj.name : 'Branch ' + effectiveBranchId})`;
   }
 
   const inventoryRecords = (store._inventory || []).filter(i => {
