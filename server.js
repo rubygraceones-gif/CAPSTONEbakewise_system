@@ -742,6 +742,34 @@ async function initializePgSchema() {
     console.warn("⚠️ Postgres product seed notice:", err.message);
   }
 
+  // Seed initial stock levels into bw_inventory for products across active branches
+  try {
+    const prods = await pgPool.query('SELECT id FROM bw_products');
+    const branches = await pgPool.query('SELECT id FROM bw_branches');
+    for (const b of branches.rows) {
+      for (const p of prods.rows) {
+        const pIdStr = String(p.id).trim();
+        const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+        const check = await pgPool.query(
+          'SELECT id FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3',
+          [pIdStr, altPid, b.id]
+        );
+        if (check.rows.length === 0) {
+          let stock = 35;
+          if (pIdStr === 'p1') stock = 100;
+          if (pIdStr === 'p4') stock = 20;
+          if (pIdStr === 'p7') stock = 50;
+          await pgPool.query(
+            "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, CURRENT_DATE, CURRENT_DATE + INTERVAL '3 days', $3)",
+            [pIdStr, stock, b.id]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ Postgres inventory auto-seed notice:", err.message);
+  }
+
   // Reset SERIAL sequence values
   try {
     await pgPool.query(`SELECT setval('bw_branches_id_seq', COALESCE((SELECT MAX(id) FROM bw_branches), 1))`);
