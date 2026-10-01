@@ -2248,6 +2248,7 @@ async function refreshSalesPane() {
       await store.syncWithBackend();
     } catch(e) {}
   }
+  setupPOSModule();
   switchPosTab(currentPosTab || 'new-sale');
 }
 
@@ -2956,7 +2957,12 @@ async function voidPosTransaction(txId) {
 }
 window.voidPosTransaction = voidPosTransaction;
 
+let isPosModuleInitialized = false;
+
 function setupPOSModule() {
+  if (isPosModuleInitialized) return;
+  isPosModuleInitialized = true;
+
   // Category pill listeners
   const categoryPills = document.querySelectorAll(".category-pill");
   categoryPills.forEach(pill => {
@@ -2988,19 +2994,58 @@ function setupPOSModule() {
     });
   }
 
-  // Payment method buttons
-  const payButtons = document.querySelectorAll(".pay-method-btn");
-  payButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      payButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentPosPaymentMethod = btn.getAttribute("data-method") || 'Cash';
+  // Global document click delegation for POS Action Buttons & Tabs
+  document.addEventListener("click", (e) => {
+    const clearBtn = e.target.closest("#btn-pos-clear-cart");
+    if (clearBtn) {
+      e.preventDefault();
+      clearPosCart();
+      return;
+    }
+
+    const checkoutBtn = e.target.closest("#btn-pos-checkout");
+    if (checkoutBtn) {
+      e.preventDefault();
+      handlePosCheckout();
+      return;
+    }
+
+    const tabSaleBtn = e.target.closest("#btn-pos-tab-sale");
+    if (tabSaleBtn) {
+      e.preventDefault();
+      switchPosTab('new-sale');
+      return;
+    }
+
+    const tabHistBtn = e.target.closest("#btn-pos-tab-history");
+    if (tabHistBtn) {
+      e.preventDefault();
+      switchPosTab('history');
+      return;
+    }
+
+    const presetBtn = e.target.closest(".preset-btn");
+    if (presetBtn) {
+      e.preventDefault();
+      const txt = presetBtn.innerText.replace('₱','').trim().toLowerCase();
+      if (txt === 'exact') setPosCashPreset('exact');
+      else setPosCashPreset(parseFloat(txt) || 0);
+      return;
+    }
+
+    const payBtn = e.target.closest(".pay-method-btn");
+    if (payBtn) {
+      e.preventDefault();
+      document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
+      payBtn.classList.add("active");
+      currentPosPaymentMethod = payBtn.getAttribute("data-method") || 'Cash';
       const cashGroup = document.getElementById("pos-cash-input-group");
       if (cashGroup) {
         cashGroup.style.display = currentPosPaymentMethod === 'Cash' ? 'block' : 'none';
       }
       updatePosCartUI();
-    });
+      return;
+    }
   });
 
   // Discount & Tendered Inputs
@@ -4596,4 +4641,7 @@ function setupFilters() {
     if(el) el.addEventListener('input', () => { userCurrentPage = 1; refreshAdminUsersPane(); });
   });
 }
-document.addEventListener('DOMContentLoaded', () => setTimeout(setupFilters, 500));
+document.addEventListener('DOMContentLoaded', () => {
+  setupPOSModule();
+  setTimeout(setupFilters, 500);
+});
