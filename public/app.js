@@ -961,6 +961,18 @@ function setupNavigation() {
     });
   });
 
+  // Explicitly bind all dashboard summary cards to their respective destination panes
+  const summaryCards = document.querySelectorAll(".summary-card");
+  summaryCards.forEach(card => {
+    card.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (card.classList.contains("sales")) navigateToPane("pane-sales");
+      else if (card.classList.contains("waste")) navigateToPane("pane-waste");
+      else if (card.classList.contains("expiry")) navigateToPane("pane-shelf-life");
+      else if (card.classList.contains("inventory")) navigateToPane("pane-inventory");
+    });
+  });
+
   const toggleBtn = document.getElementById("btn-menu-toggle");
   const sidebar = document.getElementById("app-sidebar");
 
@@ -979,6 +991,14 @@ function setupNavigation() {
 }
 
 function navigateToPane(paneId) {
+  const targetNavCheck = document.querySelector(`.nav-item[data-pane="${paneId}"]`);
+  if (targetNavCheck && targetNavCheck.style.display === "none") {
+    if (typeof showToast === 'function') {
+      showToast("Your account role does not have access to this section", "warning");
+    }
+    return;
+  }
+
   localStorage.setItem('bakewise_v2_last_pane', paneId);
   const panes = document.querySelectorAll(".view-pane");
   const navItems = document.querySelectorAll(".nav-item");
@@ -1010,7 +1030,8 @@ function navigateToPane(paneId) {
       "pane-admin-users": "Staff Directory & Accounts Manager",
       "pane-admin-branches": "Bakeshop Network Branches"
     };
-    document.getElementById("current-view-title").textContent = titleMap[paneId] || "BakeWise App";
+    const titleElem = document.getElementById("current-view-title");
+    if (titleElem) titleElem.textContent = titleMap[paneId] || "BakeWise App";
     if (sidebar) sidebar.classList.remove("open");
   }
 
@@ -1028,6 +1049,7 @@ function navigateToPane(paneId) {
   else if (paneId === "pane-admin-users") refreshAdminUsersPane();
   else if (paneId === "pane-admin-branches") refreshAdminBranchesPane();
 }
+window.navigateToPane = navigateToPane;
 
 // --- SESSION CHECK ---
 async function checkSessionState() {
