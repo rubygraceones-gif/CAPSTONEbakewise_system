@@ -752,83 +752,199 @@
         </section>
 
         <!-- ====================================================================
-             PANE: SALES MANAGEMENT VIEW
+             PANE: POINT OF SALE (POS) TERMINAL VIEW
              ==================================================================== -->
         <section class="view-pane" id="pane-sales">
-          <div class="form-card-split">
-            <div class="panel-card">
-              <div class="panel-card-header">
-                <h2 class="panel-card-title">Log Sales Transaction</h2>
-              </div>
-              <form id="sales-entry-form">
-                <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="sales-select-product" class="form-label">Bakery Product</label>
-                  <select id="sales-select-product" class="form-input" style="padding-left: 14px;" required></select>
-                </div>
-                <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="sales-qty-input" class="form-label">Quantity Sold</label>
-                  <div class="input-container">
-                    <i data-lucide="hash" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="sales-qty-input" class="form-input" min="1" required placeholder="e.g. 50">
-                  </div>
-                </div>
-                <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="sales-date-input" class="form-label">Transaction Date</label>
-                  <div class="input-container">
-                    <i data-lucide="calendar" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="date" id="sales-date-input" class="form-input" required>
-                  </div>
-                </div>
-                <button type="submit" class="btn-primary" style="margin-top: 10px;">
-                  <i data-lucide="plus" style="width: 18px; height: 18px;"></i>
-                  <span>Record Transaction</span>
-                </button>
-              </form>
+          <!-- POS Header & Navigation Tabs -->
+          <div class="pos-top-header">
+            <div class="pos-header-titles">
+              <h2 class="pos-title">Point of Sale (POS) Terminal</h2>
+              <p class="pos-subtitle">Rose Bakeshop Multi-Product Cashier Checkout & Inventory Sync</p>
             </div>
+            <div class="pos-tab-switcher">
+              <button type="button" class="pos-tab-btn active" id="btn-pos-tab-sale" onclick="switchPosTab('new-sale')">
+                <i data-lucide="shopping-cart" style="width: 18px; height: 18px;"></i>
+                <span>New Sale</span>
+              </button>
+              <button type="button" class="pos-tab-btn" id="btn-pos-tab-history" onclick="switchPosTab('history')">
+                <i data-lucide="history" style="width: 18px; height: 18px;"></i>
+                <span>Sales History</span>
+              </button>
+            </div>
+          </div>
 
-            <div class="panel-card">
-              <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
-                <h2 class="panel-card-title">Recent Sales History</h2>
+          <!-- TAB 1: NEW SALE (POS INTERFACE) -->
+          <div id="pos-view-new-sale" class="pos-tab-content">
+            <div class="pos-container">
+              
+              <!-- LEFT SIDE: PRODUCT SELECTION AREA -->
+              <div class="pos-products-area panel-card">
+                <!-- Search & Category Filters -->
+                <div class="pos-filter-bar">
+                  <div class="input-container pos-search-wrapper">
+                    <i data-lucide="search" class="input-icon" style="width: 18px; height: 18px;"></i>
+                    <input type="text" id="pos-product-search" class="form-input" placeholder="Search product name or category...">
+                  </div>
+                  <div class="pos-category-pills" id="pos-category-pills">
+                    <button type="button" class="category-pill active" data-category="all">All Products</button>
+                    <button type="button" class="category-pill" data-category="Bread">Bread</button>
+                    <button type="button" class="category-pill" data-category="Pastries">Pastries</button>
+                    <button type="button" class="category-pill" data-category="Cakes">Cakes</button>
+                    <button type="button" class="category-pill" data-category="Drinks">Drinks</button>
+                  </div>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="pos-grid" id="pos-products-grid"></div>
               </div>
-              <div class="sales-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+
+              <!-- RIGHT SIDE: SHOPPING CART / CURRENT ORDER PANEL -->
+              <div class="pos-cart-area panel-card">
+                <div class="cart-header">
+                  <div class="cart-title-row">
+                    <div class="cart-title">
+                      <i data-lucide="shopping-bag" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+                      <h3>Current Order</h3>
+                    </div>
+                    <span class="cart-badge" id="pos-cart-count">0 items</span>
+                  </div>
+                  <div class="cart-context-row">
+                    <span class="cart-ctx-pill" id="pos-ctx-branch">Branch: Main</span>
+                    <span class="cart-ctx-pill" id="pos-ctx-cashier">Cashier: Staff</span>
+                  </div>
+                </div>
+
+                <!-- Cart Items Container -->
+                <div class="pos-cart-items" id="pos-cart-items-list">
+                  <div class="cart-empty-state">
+                    <i data-lucide="shopping-cart" style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.5;"></i>
+                    <p style="margin-top: 10px; font-weight: 600; color: var(--text-secondary);">Cart is empty</p>
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
+                  </div>
+                </div>
+
+                <!-- Summary Breakdown & Payment -->
+                <div class="pos-cart-footer">
+                  <div class="summary-line">
+                    <span>Subtotal</span>
+                    <strong id="pos-summary-subtotal">₱0.00</strong>
+                  </div>
+                  <div class="summary-line discount-line">
+                    <span>Discount (₱)</span>
+                    <input type="number" id="pos-discount-input" class="form-input pos-discount-field" min="0" value="0.00" step="1" placeholder="0.00">
+                  </div>
+                  <div class="summary-line grand-total-line">
+                    <span>TOTAL DUE</span>
+                    <strong class="pos-total-price" id="pos-summary-total">₱0.00</strong>
+                  </div>
+
+                  <!-- Payment Method & Tendered Input -->
+                  <div class="pos-payment-box">
+                    <label class="form-label" style="margin-bottom: 6px; font-weight: 600;">Payment Method</label>
+                    <div class="payment-method-selector">
+                      <button type="button" class="pay-method-btn active" data-method="Cash">Cash</button>
+                      <button type="button" class="pay-method-btn" data-method="GCash">GCash</button>
+                      <button type="button" class="pay-method-btn" data-method="Card">Card</button>
+                    </div>
+
+                    <div class="payment-amount-group" id="pos-cash-input-group" style="margin-top: 10px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label for="pos-tendered-input" class="form-label" style="font-weight: 600;">Cash Tendered (₱)</label>
+                        <div class="preset-cash-buttons">
+                          <button type="button" class="preset-btn" onclick="setPosCashPreset('exact')">Exact</button>
+                          <button type="button" class="preset-btn" onclick="setPosCashPreset(100)">₱100</button>
+                          <button type="button" class="preset-btn" onclick="setPosCashPreset(500)">₱500</button>
+                          <button type="button" class="preset-btn" onclick="setPosCashPreset(1000)">₱1000</button>
+                        </div>
+                      </div>
+                      <div class="input-container" style="margin-top: 6px;">
+                        <span class="currency-prefix" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--text-secondary);">₱</span>
+                        <input type="number" id="pos-tendered-input" class="form-input" min="0" step="0.01" placeholder="Enter amount tendered..." style="padding-left: 32px;">
+                      </div>
+                    </div>
+
+                    <div class="change-display-row" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 10px 14px; border-radius: 8px;">
+                      <span style="font-weight: 600; color: var(--text-secondary);">Change</span>
+                      <strong id="pos-change-value" style="font-size: 1.2rem; color: var(--color-success);">₱0.00</strong>
+                    </div>
+                  </div>
+
+                  <!-- Checkout Action Buttons -->
+                  <div class="cart-action-buttons" style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button type="button" class="btn-secondary" id="btn-pos-clear-cart" style="flex: 1;" onclick="clearPosCart()">
+                      <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                      <span>Clear Cart</span>
+                    </button>
+                    <button type="button" class="btn-primary-gold" id="btn-pos-checkout" style="flex: 2; font-size: 1.05rem; padding: 12px;" onclick="handlePosCheckout()">
+                      <i data-lucide="check-circle-2" style="width: 20px; height: 20px;"></i>
+                      <span id="btn-pos-checkout-text">CHECKOUT (₱0.00)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- TAB 2: SALES HISTORY INTERFACE -->
+          <div id="pos-view-history" class="pos-tab-content" style="display: none;">
+            <div class="panel-card">
+              <div class="panel-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 15px; align-items: center;">
+                <h2 class="panel-card-title">Completed POS Transactions History</h2>
+                <button type="button" class="btn-secondary" onclick="refreshPosHistory()" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 0.85rem;">
+                  <i data-lucide="rotate-cw" style="width: 16px; height: 16px;"></i> Refresh Logs
+                </button>
+              </div>
+
+              <div class="sales-filters" style="display: flex; gap: 15px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="sales-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
-                  <select id="sales-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
-                    <option value="all">All Branches</option>
+                  <label for="pos-history-search" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Search:</label>
+                  <input type="text" id="pos-history-search" class="form-input" placeholder="Tx #, Cashier, Item..." style="padding: 6px 12px; font-size: 0.85rem; width: 180px;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="pos-history-branch" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Branch:</label>
+                  <select id="pos-history-branch" class="form-input" style="padding: 6px 12px; font-size: 0.85rem; min-width: 140px;"></select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label for="pos-history-payment" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Payment:</label>
+                  <select id="pos-history-payment" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
+                    <option value="all">All Methods</option>
+                    <option value="Cash">Cash</option>
+                    <option value="GCash">GCash</option>
+                    <option value="Card">Card</option>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="sales-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
-                  <input type="text" id="sales-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                  <label for="pos-history-status" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Status:</label>
+                  <select id="pos-history-status" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
+                    <option value="all">All Statuses</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Voided">Voided</option>
+                  </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="sales-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Date:</label>
-                  <input type="date" id="sales-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                  <label for="pos-history-date" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Date:</label>
+                  <input type="date" id="pos-history-date" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
                 </div>
               </div>
+
               <div class="table-responsive">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th>Product</th>
-                      <th>Branch</th>
-                      <th>Quantity</th>
-                      <th>Price/Unit</th>
-                      <th>Total Sales</th>
+                      <th>Transaction ID</th>
                       <th>Date</th>
+                      <th>Branch</th>
+                      <th>Cashier</th>
+                      <th>Items Purchased</th>
+                      <th>Total Amount</th>
+                      <th>Payment Method</th>
+                      <th>Status</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
-                  <tbody id="sales-history-tbody"></tbody>
+                  <tbody id="pos-history-tbody"></tbody>
                 </table>
-              </div>
-              <div id="sales-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="sales-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
-                </button>
-                <span id="sales-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="sales-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
-                </button>
               </div>
             </div>
           </div>
@@ -1673,6 +1789,44 @@
     </div>
     <div class="form-actions" style="margin-top: 16px;">
       <button type="button" class="btn-primary" id="btn-privacy-modal-ok" style="width: 100%;">I Understand</button>
+    </div>
+  </div>
+
+  <!-- POS Receipt Preview Modal -->
+  <div class="modal-overlay" id="pos-receipt-overlay" style="display: none;"></div>
+  <div class="panel-card modal-dialog" id="pos-receipt-modal" style="display: none; max-width: 440px; z-index: 2100; padding: 24px;">
+    <div id="pos-receipt-printable" class="thermal-receipt-preview">
+      <!-- Receipt content injected by JS -->
+    </div>
+    <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+      <button type="button" class="btn-secondary" id="btn-pos-receipt-close" style="flex: 1;" onclick="closePosReceiptModal()">Close</button>
+      <button type="button" class="btn-primary-gold" id="btn-pos-receipt-print" style="flex: 1.5;" onclick="printPosReceipt()">
+        <i data-lucide="printer" style="width: 18px; height: 18px;"></i>
+        <span>Print Receipt</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- POS Transaction Details Modal (Sales History) -->
+  <div class="modal-overlay" id="pos-details-overlay" style="display: none;"></div>
+  <div class="panel-card modal-dialog" id="pos-details-modal" style="display: none; max-width: 600px; z-index: 2050; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+      <h2 class="panel-card-title" id="pos-details-modal-title">Transaction Details</h2>
+      <button type="button" class="kanban-action-btn" onclick="closePosDetailsModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <div id="pos-details-body" style="margin-top: 16px;">
+      <!-- Detailed item list & info injected by JS -->
+    </div>
+    <div class="modal-actions" style="display: flex; justify-content: space-between; margin-top: 20px; align-items: center;">
+      <button type="button" class="btn-danger" id="btn-pos-void-tx" style="display: none; background: #dc2626; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer;">
+        <i data-lucide="slash" style="width: 16px; height: 16px;"></i> Void Transaction
+      </button>
+      <div style="display: flex; gap: 10px; margin-left: auto;">
+        <button type="button" class="btn-secondary" onclick="closePosDetailsModal()">Close</button>
+        <button type="button" class="btn-primary-gold" id="btn-pos-details-reprint" onclick="printPosReceiptFromDetails()">
+          <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Print Receipt
+        </button>
+      </div>
     </div>
   </div>
 

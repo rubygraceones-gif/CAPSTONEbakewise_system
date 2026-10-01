@@ -78,12 +78,13 @@ const getRelativeDateString = (offsetDays) => {
 
 // --- INITIAL DATABASE SEED DATA & FALLBACK STATE ---
 const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "Pandesal (10pcs/pack)", category: "Bread", price: 45, cost: 18, shelfLifeDays: 2, repurposeRecipe: "Garlic Croutons or Fine Breadcrumbs" },
+  { id: "p1", name: "Pandesal", category: "Bread", price: 45, cost: 18, shelfLifeDays: 2, repurposeRecipe: "Garlic Croutons or Fine Breadcrumbs" },
   { id: "p2", name: "Special Ensaymada", category: "Pastries", price: 30, cost: 12, shelfLifeDays: 3, repurposeRecipe: "Baked Ensaymada Pudding" },
   { id: "p3", name: "Classic Sliced Bread", category: "Bread", price: 65, cost: 28, shelfLifeDays: 4, repurposeRecipe: "Cinnamon Bread Pudding or French Toast Sliders" },
   { id: "p4", name: "Premium Chocolate Cake", category: "Cakes", price: 380, cost: 160, shelfLifeDays: 5, repurposeRecipe: "Chocolate Truffle Cake Pops" },
   { id: "p5", name: "Spanish Bread", category: "Bread", price: 10, cost: 4, shelfLifeDays: 2, repurposeRecipe: "Bread Pudding Base" },
-  { id: "p6", name: "Butter Croissant", category: "Pastries", price: 50, cost: 22, shelfLifeDays: 2, repurposeRecipe: "Double Baked Almond Croissants" }
+  { id: "p6", name: "Butter Croissant", category: "Pastries", price: 50, cost: 22, shelfLifeDays: 2, repurposeRecipe: "Double Baked Almond Croissants" },
+  { id: "p7", name: "Coke", category: "Drinks", price: 25, cost: 12, shelfLifeDays: 90, repurposeRecipe: "N/A" }
 ];
 
 const DEFAULT_SALES = [];
@@ -854,6 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupProductModal();
   setupShelfLifeModule();
   setupNotifications();
+  setupPOSModule();
 
   // Chart Date Filters
   const dashFilterBtn = document.getElementById("btn-dash-filter-apply");
@@ -2208,76 +2210,767 @@ function renderRealtimeAlerts() {
   lucide.createIcons();
 }
 
-// 2. SALES RECORD VIEW REFRESHER
+// 2. POINT-OF-SALE (POS) CONTROLLER & REFRESHER
+let posCart = [];
+let activePosCategory = 'all';
+let currentPosPaymentMethod = 'Cash';
+let currentReceiptTxData = null;
+let currentDetailsTxData = null;
+let currentPosTab = 'new-sale';
+
+function switchPosTab(tabName) {
+  currentPosTab = tabName;
+  const saleBtn = document.getElementById("btn-pos-tab-sale");
+  const historyBtn = document.getElementById("btn-pos-tab-history");
+  const saleContent = document.getElementById("pos-view-new-sale");
+  const historyContent = document.getElementById("pos-view-history");
+
+  if (tabName === 'new-sale') {
+    if (saleBtn) saleBtn.classList.add('active');
+    if (historyBtn) historyBtn.classList.remove('active');
+    if (saleContent) saleContent.style.display = 'block';
+    if (historyContent) historyContent.style.display = 'none';
+    renderPosProducts();
+    updatePosCartUI();
+  } else {
+    if (historyBtn) historyBtn.classList.add('active');
+    if (saleBtn) saleBtn.classList.remove('active');
+    if (historyContent) historyContent.style.display = 'block';
+    if (saleContent) saleContent.style.display = 'none';
+    refreshPosHistory();
+  }
+}
+window.switchPosTab = switchPosTab;
+
 function refreshSalesPane() {
-  const tbody = document.getElementById("sales-history-tbody");
-  if (!tbody) return;
+  switchPosTab(currentPosTab || 'new-sale');
+}
 
-  const branchIdStr = store.getSelectedBranchId();
-  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+function getBranchProductStock(productId) {
+  const selectedBranchId = store.getSelectedBranchId();
+  const effectiveBranchId = (selectedBranchId === 'all' || !selectedBranchId) 
+    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1) 
+    : parseInt(selectedBranchId);
 
-  const searchInput = document.getElementById('sales-search-input')?.value.toLowerCase() || '';
-  const dateFilter = document.getElementById('sales-date-filter')?.value || '';
-  const sortedSales = [...store.sales]
-    .filter(s => branchId === 'all' || s.branchId === branchId)
-    .filter(s => {
-      const p = store.products.find(x => x.id === s.productId);
-      const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
-      const dateMatch = dateFilter ? s.date.startsWith(dateFilter) : true;
-      return nameMatch && dateMatch;
-    })
-    .sort((a, b) => {
-    const dA = parseLocalDate(a.date);
-    const dB = parseLocalDate(b.date);
-    return dB.getTime() - dA.getTime();
+  const inventoryRecords = store.inventory.filter(i => {
+    const pidMatch = i.productId === productId || String(i.productId) === String(productId);
+    const bidMatch = i.branchId === effectiveBranchId || String(i.branchId) === String(effectiveBranchId);
+    return pidMatch && bidMatch;
   });
-  const totalPages = Math.ceil(sortedSales.length / ITEMS_PER_PAGE) || 1;
-  if (salesHistCurrentPage > totalPages) salesHistCurrentPage = totalPages;
-  const startIndex = (salesHistCurrentPage - 1) * ITEMS_PER_PAGE;
-  const pagedSales = sortedSales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedSales.map(s => {
-    const p = store.products.find(x => x.id === s.productId) || { name: "Unknown", price: 0 };
-    const b = store.branches.find(x => x.id === s.branchId) || { name: "Unknown Branch" };
-    const total = s.qty * s.price;
-    const dateObj = parseLocalDate(s.date);
+  if (!inventoryRecords.length) {
+    // Seed fallback default stocks for primary bakery items if not yet in inventory list
+    if (productId === 'p1') return 100; // Pandesal
+    if (productId === 'p4') return 20;  // Premium Chocolate Cake
+    if (productId === 'p7') return 50;  // Coke
+    return 35;
+  }
+  return inventoryRecords.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+}
+
+function renderPosProducts() {
+  const grid = document.getElementById("pos-products-grid");
+  if (!grid) return;
+
+  const searchText = (document.getElementById("pos-product-search")?.value || "").toLowerCase().trim();
+
+  const filtered = store.products.filter(p => {
+    const matchesCategory = activePosCategory === 'all' || (p.category && p.category.toLowerCase() === activePosCategory.toLowerCase());
+    const matchesSearch = !searchText || p.name.toLowerCase().includes(searchText) || (p.category && p.category.toLowerCase().includes(searchText));
+    return matchesCategory && matchesSearch;
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+        <i data-lucide="package-x" style="width: 36px; height: 36px; opacity: 0.5; margin-bottom: 8px;"></i>
+        <p style="font-weight: 600;">No bakery products found matching your search</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => {
+    const stockAvailable = getBranchProductStock(p.id);
+    const cartItem = posCart.find(c => c.productId === p.id);
+    const inCartQty = cartItem ? cartItem.qty : 0;
+    const remainingStock = Math.max(0, stockAvailable - inCartQty);
+
+    let stockBadgeClass = "in-stock";
+    let stockLabel = `In Stock: ${stockAvailable}`;
+    if (stockAvailable <= 0) {
+      stockBadgeClass = "out-stock";
+      stockLabel = "Out of Stock (0)";
+    } else if (stockAvailable <= 10) {
+      stockBadgeClass = "low-stock";
+      stockLabel = `Low Stock: ${stockAvailable}`;
+    }
+
+    let iconName = "package";
+    if (p.category === "Bread") iconName = "wheat";
+    else if (p.category === "Pastries") iconName = "pie-chart";
+    else if (p.category === "Cakes") iconName = "cake";
+    else if (p.category === "Drinks") iconName = "cup-soda";
+
     return `
-      <tr>
-        <td style="font-weight: 600;">${p.name}</td>
-        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
-        <td>${s.qty} packs/pcs</td>
-        <td>₱${s.price.toFixed(2)}</td>
-        <td style="font-weight: 600; color: var(--primary-color);">₱${total.toFixed(2)}</td>
-        <td>${dateObj.toLocaleDateString()}</td>
-      </tr>
+      <div class="pos-product-card" onclick="addToPosCart('${p.id}')">
+        <div>
+          <div class="pos-product-icon">
+            <i data-lucide="${iconName}" style="width: 22px; height: 22px;"></i>
+          </div>
+          <div class="pos-product-info">
+            <span class="pos-product-category">${p.category || 'BAKERY'}</span>
+            <h4>${p.name}</h4>
+          </div>
+        </div>
+        <div>
+          <div class="pos-product-price">₱${parseFloat(p.price).toFixed(2)}</div>
+          <div class="pos-product-stock ${stockBadgeClass}">
+            <i data-lucide="${stockAvailable > 0 ? 'check-circle' : 'x-circle'}" style="width: 12px; height: 12px;"></i>
+            <span>${stockLabel}</span>
+          </div>
+          <button type="button" class="pos-product-add-btn" ${remainingStock <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+            <i data-lucide="plus-circle" style="width: 14px; height: 14px;"></i>
+            <span>${remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart')}</span>
+          </button>
+        </div>
+      </div>
     `;
   }).join('');
 
-  const prevBtn = document.getElementById("sales-hist-prev-page");
-  const nextBtn = document.getElementById("sales-hist-next-page");
-  const pageInfo = document.getElementById("sales-hist-page-info");
+  lucide.createIcons();
+}
 
-  if (pageInfo) pageInfo.textContent = `Page ${salesHistCurrentPage} of ${totalPages}`;
-  if (prevBtn) {
-    prevBtn.disabled = salesHistCurrentPage <= 1;
-    prevBtn.style.opacity = salesHistCurrentPage <= 1 ? "0.5" : "1";
-    prevBtn.onclick = () => {
-      if (salesHistCurrentPage > 1) {
-        salesHistCurrentPage--;
-        refreshSalesPane();
-      }
-    };
+function addToPosCart(productId) {
+  const p = store.products.find(x => x.id === productId || String(x.id) === String(productId));
+  if (!p) return;
+
+  const stockAvailable = getBranchProductStock(p.id);
+  const existingIndex = posCart.findIndex(c => c.productId === p.id);
+
+  if (existingIndex >= 0) {
+    if (posCart[existingIndex].qty + 1 > stockAvailable) {
+      showToast(`Insufficient stock for ${p.name}. Only ${stockAvailable} units are available.`, "warning");
+      return;
+    }
+    posCart[existingIndex].qty += 1;
+  } else {
+    if (stockAvailable <= 0) {
+      showToast(`Cannot add ${p.name}. Item is out of stock.`, "danger");
+      return;
+    }
+    posCart.push({
+      productId: p.id,
+      name: p.name,
+      price: parseFloat(p.price),
+      category: p.category,
+      qty: 1
+    });
   }
-  if (nextBtn) {
-    nextBtn.disabled = salesHistCurrentPage >= totalPages;
-    nextBtn.style.opacity = salesHistCurrentPage >= totalPages ? "0.5" : "1";
-    nextBtn.onclick = () => {
-      if (salesHistCurrentPage < totalPages) {
-        salesHistCurrentPage++;
-        refreshSalesPane();
-      }
-    };
+
+  updatePosCartUI();
+  renderPosProducts();
+}
+window.addToPosCart = addToPosCart;
+
+function updatePosCartQty(productId, delta) {
+  const index = posCart.findIndex(c => c.productId === productId);
+  if (index < 0) return;
+
+  const p = posCart[index];
+  const stockAvailable = getBranchProductStock(p.productId);
+
+  if (delta > 0) {
+    if (p.qty + 1 > stockAvailable) {
+      showToast(`Insufficient stock. Only ${stockAvailable} units are available.`, "warning");
+      return;
+    }
+    p.qty += 1;
+  } else {
+    p.qty -= 1;
+    if (p.qty <= 0) {
+      posCart.splice(index, 1);
+    }
   }
+
+  updatePosCartUI();
+  renderPosProducts();
+}
+window.updatePosCartQty = updatePosCartQty;
+
+function removeFromPosCart(productId) {
+  posCart = posCart.filter(c => c.productId !== productId);
+  updatePosCartUI();
+  renderPosProducts();
+}
+window.removeFromPosCart = removeFromPosCart;
+
+function clearPosCart() {
+  posCart = [];
+  const discountInput = document.getElementById("pos-discount-input");
+  if (discountInput) discountInput.value = "0.00";
+  const tenderedInput = document.getElementById("pos-tendered-input");
+  if (tenderedInput) tenderedInput.value = "";
+  updatePosCartUI();
+  renderPosProducts();
+}
+window.clearPosCart = clearPosCart;
+
+function updatePosCartUI() {
+  const listElem = document.getElementById("pos-cart-items-list");
+  const countElem = document.getElementById("pos-cart-count");
+  const subtotalElem = document.getElementById("pos-summary-subtotal");
+  const totalElem = document.getElementById("pos-summary-total");
+  const checkoutBtnText = document.getElementById("btn-pos-checkout-text");
+  const changeValueElem = document.getElementById("pos-change-value");
+  const branchCtxElem = document.getElementById("pos-ctx-branch");
+  const cashierCtxElem = document.getElementById("pos-ctx-cashier");
+
+  // Context updates
+  const selectedBranchId = store.getSelectedBranchId();
+  const effBranchId = (selectedBranchId === 'all' || !selectedBranchId)
+    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1)
+    : parseInt(selectedBranchId);
+  const branchObj = store.branches.find(b => b.id === effBranchId);
+  if (branchCtxElem) branchCtxElem.textContent = `Branch: ${branchObj ? branchObj.name : 'Main Branch'}`;
+  if (cashierCtxElem) cashierCtxElem.textContent = `Cashier: ${store.currentUser ? store.currentUser.name : 'System Administrator'}`;
+
+  const totalItemCount = posCart.reduce((acc, item) => acc + item.qty, 0);
+  if (countElem) countElem.textContent = `${totalItemCount} items`;
+
+  if (!posCart.length) {
+    if (listElem) {
+      listElem.innerHTML = `
+        <div class="cart-empty-state">
+          <i data-lucide="shopping-cart" style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.5;"></i>
+          <p style="margin-top: 10px; font-weight: 600; color: var(--text-secondary);">Cart is empty</p>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+    if (subtotalElem) subtotalElem.textContent = "₱0.00";
+    if (totalElem) totalElem.textContent = "₱0.00";
+    if (checkoutBtnText) checkoutBtnText.textContent = "CHECKOUT (₱0.00)";
+    if (changeValueElem) changeValueElem.textContent = "₱0.00";
+    return;
+  }
+
+  if (listElem) {
+    listElem.innerHTML = posCart.map(item => {
+      const itemSubtotal = item.qty * item.price;
+      return `
+        <div class="cart-item-row">
+          <div class="cart-item-left">
+            <div class="cart-item-name">${item.name}</div>
+            <div class="cart-item-price-unit">₱${item.price.toFixed(2)} × ${item.qty}</div>
+          </div>
+          <div class="cart-item-controls">
+            <button type="button" class="qty-btn" onclick="updatePosCartQty('${item.productId}', -1)">-</button>
+            <span class="qty-val">${item.qty}</span>
+            <button type="button" class="qty-btn" onclick="updatePosCartQty('${item.productId}', 1)">+</button>
+          </div>
+          <div class="cart-item-subtotal">₱${itemSubtotal.toFixed(2)}</div>
+          <button type="button" class="cart-item-remove" onclick="removeFromPosCart('${item.productId}')" title="Remove item">
+            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      `;
+    }).join('');
+    lucide.createIcons();
+  }
+
+  const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const discountVal = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const grandTotal = Math.max(0, subtotal - discountVal);
+
+  if (subtotalElem) subtotalElem.textContent = `₱${subtotal.toFixed(2)}`;
+  if (totalElem) totalElem.textContent = `₱${grandTotal.toFixed(2)}`;
+  if (checkoutBtnText) checkoutBtnText.textContent = `CHECKOUT (₱${grandTotal.toFixed(2)})`;
+
+  // Calculate change
+  const tenderedVal = parseFloat(document.getElementById("pos-tendered-input")?.value || 0) || 0;
+  const changeVal = currentPosPaymentMethod === 'Cash' ? Math.max(0, tenderedVal - grandTotal) : 0;
+  if (changeValueElem) changeValueElem.textContent = `₱${changeVal.toFixed(2)}`;
+}
+
+function setPosCashPreset(value) {
+  const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const discountVal = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const grandTotal = Math.max(0, subtotal - discountVal);
+  const inputElem = document.getElementById("pos-tendered-input");
+  if (!inputElem) return;
+
+  if (value === 'exact') {
+    inputElem.value = grandTotal.toFixed(2);
+  } else {
+    inputElem.value = parseFloat(value).toFixed(2);
+  }
+  updatePosCartUI();
+}
+window.setPosCashPreset = setPosCashPreset;
+
+async function handlePosCheckout() {
+  if (!posCart.length) {
+    showToast("Shopping cart is empty. Add products before checking out.", "warning");
+    return;
+  }
+
+  // Stock validation before checkout
+  for (const item of posCart) {
+    const stockAvailable = getBranchProductStock(item.productId);
+    if (item.qty > stockAvailable) {
+      showToast(`Insufficient stock. Only ${stockAvailable} units are available for ${item.name}.`, "danger");
+      return;
+    }
+  }
+
+  const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  const discount = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const total = Math.max(0, subtotal - discount);
+  const tendered = parseFloat(document.getElementById("pos-tendered-input")?.value || 0) || 0;
+
+  if (currentPosPaymentMethod === 'Cash' && tendered < total) {
+    showToast(`Insufficient payment. Please enter an amount equal to or greater than ₱${total.toFixed(2)}.`, "danger");
+    return;
+  }
+
+  const selectedBranchId = store.getSelectedBranchId();
+  const branch_id = (selectedBranchId === 'all' || !selectedBranchId)
+    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1)
+    : parseInt(selectedBranchId);
+  const branchObj = store.branches.find(b => b.id === branch_id);
+
+  const payload = {
+    branch_id: branch_id,
+    cashier_id: store.currentUser ? store.currentUser.id : 1,
+    cashier_name: store.currentUser ? store.currentUser.name : 'System Administrator',
+    subtotal: subtotal,
+    discount: discount,
+    total: total,
+    payment_amount: currentPosPaymentMethod === 'Cash' ? tendered : total,
+    change_amount: currentPosPaymentMethod === 'Cash' ? Math.max(0, tendered - total) : 0,
+    payment_method: currentPosPaymentMethod,
+    items: posCart.map(item => ({
+      product_id: item.productId,
+      product_name: item.name,
+      quantity: item.qty,
+      unit_price: item.price,
+      subtotal: item.qty * item.price
+    }))
+  };
+
+  try {
+    const checkoutBtn = document.getElementById("btn-pos-checkout");
+    if (checkoutBtn) checkoutBtn.disabled = true;
+
+    const res = await fetch("/api/pos/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Failed to process POS checkout");
+    }
+
+    showToast(`POS Transaction ${data.transaction.transaction_number} completed successfully!`, "success");
+
+    if (data.low_stock_warnings && data.low_stock_warnings.length > 0) {
+      data.low_stock_warnings.forEach(w => {
+        showToast(`Low Stock Alert: ${w.product_name} has only ${w.remaining_stock} units remaining.`, "warning");
+      });
+    }
+
+    // Refresh store dataset from server
+    await store.syncWithBackend();
+
+    // Prepare receipt object
+    currentReceiptTxData = {
+      transaction_number: data.transaction.transaction_number,
+      transaction_date: data.transaction.transaction_date,
+      branch_name: branchObj ? branchObj.name : 'Main Branch',
+      cashier_name: payload.cashier_name,
+      items: payload.items,
+      subtotal: subtotal,
+      discount: discount,
+      total: total,
+      payment_amount: payload.payment_amount,
+      change_amount: payload.change_amount,
+      payment_method: currentPosPaymentMethod
+    };
+
+    // Reset cart state
+    posCart = [];
+    document.getElementById("pos-discount-input").value = "0.00";
+    document.getElementById("pos-tendered-input").value = "";
+    updatePosCartUI();
+    renderPosProducts();
+
+    // Show thermal receipt modal
+    showPosReceiptModal(currentReceiptTxData);
+
+  } catch (err) {
+    showToast(`Checkout Error: ${err.message}`, "danger");
+  } finally {
+    const checkoutBtn = document.getElementById("btn-pos-checkout");
+    if (checkoutBtn) checkoutBtn.disabled = false;
+  }
+}
+window.handlePosCheckout = handlePosCheckout;
+
+function showPosReceiptModal(tx) {
+  const container = document.getElementById("pos-receipt-printable");
+  const overlay = document.getElementById("pos-receipt-overlay");
+  const modal = document.getElementById("pos-receipt-modal");
+  if (!container || !modal) return;
+
+  const dateFormatted = new Date(tx.transaction_date || Date.now()).toLocaleString();
+
+  container.innerHTML = `
+    <div class="receipt-logo-header">
+      <h2>ROSE BAKESHOP</h2>
+      <p style="color: #666; font-size: 0.75rem;">BakeWise POS Receipt</p>
+    </div>
+    <div style="margin-bottom: 8px; font-size: 0.8rem;">
+      <div><strong>Tx #:</strong> ${tx.transaction_number}</div>
+      <div><strong>Date:</strong> ${dateFormatted}</div>
+      <div><strong>Branch:</strong> ${tx.branch_name}</div>
+      <div><strong>Cashier:</strong> ${tx.cashier_name}</div>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="margin-bottom: 8px;">
+      ${tx.items.map(item => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <div>
+            <div style="font-weight: bold;">${item.product_name}</div>
+            <div style="font-size: 0.75rem; color: #555;">${item.quantity} × ₱${parseFloat(item.unit_price).toFixed(2)}</div>
+          </div>
+          <div style="font-weight: bold;">₱${parseFloat(item.subtotal).toFixed(2)}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="font-size: 0.82rem; margin-bottom: 6px;">
+      <div style="display: flex; justify-content: space-between;">
+        <span>Subtotal:</span>
+        <span>₱${parseFloat(tx.subtotal).toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span>Discount:</span>
+        <span>₱${parseFloat(tx.discount).toFixed(2)}</span>
+      </div>
+      <div class="receipt-total-row" style="margin-top: 4px; font-size: 1rem;">
+        <span>TOTAL:</span>
+        <span>₱${parseFloat(tx.total).toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="font-size: 0.82rem;">
+      <div style="display: flex; justify-content: space-between;">
+        <span>Payment Method:</span>
+        <span>${tx.payment_method}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span>Payment Amount:</span>
+        <span>₱${parseFloat(tx.payment_amount).toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-weight: bold;">
+        <span>Change:</span>
+        <span>₱${parseFloat(tx.change_amount).toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="text-align: center; font-size: 0.78rem; margin-top: 10px;">
+      <p style="margin: 0; font-weight: bold;">Thank You for Choosing Rose Bakeshop!</p>
+      <p style="margin: 2px 0 0 0; color: #666;">Please come again!</p>
+    </div>
+  `;
+
+  if (overlay) overlay.style.display = 'block';
+  modal.style.display = 'block';
+}
+
+function closePosReceiptModal() {
+  const overlay = document.getElementById("pos-receipt-overlay");
+  const modal = document.getElementById("pos-receipt-modal");
+  if (overlay) overlay.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+}
+window.closePosReceiptModal = closePosReceiptModal;
+
+function printPosReceipt() {
+  window.print();
+}
+window.printPosReceipt = printPosReceipt;
+
+async function refreshPosHistory() {
+  const tbody = document.getElementById("pos-history-tbody");
+  if (!tbody) return;
+
+  const searchInput = (document.getElementById("pos-history-search")?.value || "").toLowerCase().trim();
+  const selectedBranchId = document.getElementById("pos-history-branch")?.value || store.getSelectedBranchId();
+  const selectedPayment = document.getElementById("pos-history-payment")?.value || 'all';
+  const selectedStatus = document.getElementById("pos-history-status")?.value || 'all';
+  const selectedDate = document.getElementById("pos-history-date")?.value || '';
+
+  // Populate branch select dropdown if empty
+  const branchSelect = document.getElementById("pos-history-branch");
+  if (branchSelect && branchSelect.options.length <= 1) {
+    branchSelect.innerHTML = '<option value="all">All Branches</option>' + 
+      store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+  }
+
+  try {
+    const res = await fetch(`/api/pos/transactions?branch_id=${selectedBranchId}`);
+    const data = await res.json();
+    let transactions = data.success ? data.transactions : [];
+
+    // Filter locally
+    transactions = transactions.filter(tx => {
+      const matchSearch = !searchInput || 
+        tx.transaction_number.toLowerCase().includes(searchInput) ||
+        (tx.cashier_name && tx.cashier_name.toLowerCase().includes(searchInput)) ||
+        (tx.items && tx.items.some(i => i.product_name.toLowerCase().includes(searchInput)));
+      const matchPayment = selectedPayment === 'all' || tx.payment_method === selectedPayment;
+      const matchStatus = selectedStatus === 'all' || tx.status === selectedStatus;
+      const matchDate = !selectedDate || (tx.transaction_date && tx.transaction_date.startsWith(selectedDate));
+      return matchSearch && matchPayment && matchStatus && matchDate;
+    });
+
+    if (transactions.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            No POS transactions found matching the selected filters.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = transactions.map(tx => {
+      const dateFormatted = new Date(tx.transaction_date).toLocaleDateString() + ' ' + new Date(tx.transaction_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
+      const statusBadge = tx.status === 'Completed' 
+        ? `<span class="status-badge active" style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Completed</span>`
+        : `<span class="status-badge inactive" style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Voided</span>`;
+
+      return `
+        <tr>
+          <td style="font-weight: 700; color: var(--primary-color);">${tx.transaction_number}</td>
+          <td style="font-size: 0.82rem; color: var(--text-secondary);">${dateFormatted}</td>
+          <td>${tx.branch_name || 'Main Branch'}</td>
+          <td>${tx.cashier_name || 'Staff'}</td>
+          <td><strong>${tx.items ? tx.items.length : 0} items</strong> (${itemsCount} units)</td>
+          <td style="font-weight: 800; color: var(--accent-color);">₱${parseFloat(tx.total).toFixed(2)}</td>
+          <td>${tx.payment_method}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="viewPosTransactionDetails(${tx.id})">
+              <i data-lucide="eye" style="width: 14px; height: 14px;"></i> View
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    lucide.createIcons();
+  } catch (err) {
+    console.error("Error fetching POS transactions:", err);
+  }
+}
+window.refreshPosHistory = refreshPosHistory;
+
+async function viewPosTransactionDetails(txId) {
+  try {
+    const res = await fetch(`/api/pos/transactions/${txId}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error("Transaction details not found");
+
+    const tx = data.transaction;
+    currentDetailsTxData = tx;
+
+    const overlay = document.getElementById("pos-details-overlay");
+    const modal = document.getElementById("pos-details-modal");
+    const body = document.getElementById("pos-details-body");
+    const title = document.getElementById("pos-details-modal-title");
+    const voidBtn = document.getElementById("btn-pos-void-tx");
+
+    if (title) title.textContent = `Transaction Details — ${tx.transaction_number}`;
+
+    const dateFormatted = new Date(tx.transaction_date).toLocaleString();
+
+    body.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-secondary); padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem;">
+        <div><strong>Date/Time:</strong> ${dateFormatted}</div>
+        <div><strong>Branch:</strong> ${tx.branch_name || 'Main Branch'}</div>
+        <div><strong>Cashier:</strong> ${tx.cashier_name || 'System Administrator'}</div>
+        <div><strong>Status:</strong> <span style="font-weight: 700; color: ${tx.status === 'Completed' ? 'var(--color-success)' : 'var(--color-error)'}">${tx.status}</span></div>
+      </div>
+
+      <h4 style="margin-bottom: 8px; font-size: 0.95rem; font-weight: 700;">Items Purchased (${tx.items ? tx.items.length : 0})</h4>
+      <table class="data-table" style="margin-bottom: 16px;">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Unit Price</th>
+            <th>Qty</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tx.items.map(i => `
+            <tr>
+              <td style="font-weight: 600;">${i.product_name}</td>
+              <td>₱${parseFloat(i.unit_price).toFixed(2)}</td>
+              <td>${i.quantity}</td>
+              <td style="font-weight: 700;">₱${parseFloat(i.subtotal).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div style="background: var(--bg-secondary); padding: 14px; border-radius: 8px; font-size: 0.9rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>Subtotal:</span> <strong>₱${parseFloat(tx.subtotal).toFixed(2)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>Discount:</span> <strong>₱${parseFloat(tx.discount).toFixed(2)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 1.1rem; color: var(--accent-color); font-weight: 800; border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 4px;">
+          <span>Grand Total:</span> <span>₱${parseFloat(tx.total).toFixed(2)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+          <span>Payment (${tx.payment_method}):</span> <span>₱${parseFloat(tx.payment_amount).toFixed(2)} (Change: ₱${parseFloat(tx.change_amount).toFixed(2)})</span>
+        </div>
+      </div>
+    `;
+
+    if (voidBtn) {
+      if (tx.status === 'Completed') {
+        voidBtn.style.display = 'flex';
+        voidBtn.onclick = () => voidPosTransaction(tx.id);
+      } else {
+        voidBtn.style.display = 'none';
+      }
+    }
+
+    if (overlay) overlay.style.display = 'block';
+    if (modal) modal.style.display = 'block';
+  } catch (err) {
+    showToast(err.message, "danger");
+  }
+}
+window.viewPosTransactionDetails = viewPosTransactionDetails;
+
+function closePosDetailsModal() {
+  const overlay = document.getElementById("pos-details-overlay");
+  const modal = document.getElementById("pos-details-modal");
+  if (overlay) overlay.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+}
+window.closePosDetailsModal = closePosDetailsModal;
+
+function printPosReceiptFromDetails() {
+  if (currentDetailsTxData) {
+    showPosReceiptModal({
+      transaction_number: currentDetailsTxData.transaction_number,
+      transaction_date: currentDetailsTxData.transaction_date,
+      branch_name: currentDetailsTxData.branch_name,
+      cashier_name: currentDetailsTxData.cashier_name,
+      items: currentDetailsTxData.items,
+      subtotal: currentDetailsTxData.subtotal,
+      discount: currentDetailsTxData.discount,
+      total: currentDetailsTxData.total,
+      payment_amount: currentDetailsTxData.payment_amount,
+      change_amount: currentDetailsTxData.change_amount,
+      payment_method: currentDetailsTxData.payment_method
+    });
+  }
+}
+window.printPosReceiptFromDetails = printPosReceiptFromDetails;
+
+async function voidPosTransaction(txId) {
+  showConfirmModal(
+    "Void POS Transaction",
+    "Are you sure you want to void this transaction? The deducted inventory will be automatically restored back to stock.",
+    async () => {
+      try {
+        const res = await fetch(`/api/pos/void/${txId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voided_by: store.currentUser ? store.currentUser.name : "System Administrator" })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || "Failed to void transaction");
+
+        showToast("Transaction voided successfully and inventory restored!", "success");
+        await store.syncWithBackend();
+        closePosDetailsModal();
+        refreshPosHistory();
+        refreshInventoryPane();
+      } catch (err) {
+        showToast(err.message, "danger");
+      }
+    }
+  );
+}
+window.voidPosTransaction = voidPosTransaction;
+
+function setupPOSModule() {
+  // Category pill listeners
+  const categoryPills = document.querySelectorAll(".category-pill");
+  categoryPills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      categoryPills.forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      activePosCategory = pill.getAttribute("data-category") || 'all';
+      renderPosProducts();
+    });
+  });
+
+  // Product search input
+  const searchInput = document.getElementById("pos-product-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", renderPosProducts);
+  }
+
+  // Payment method buttons
+  const payButtons = document.querySelectorAll(".pay-method-btn");
+  payButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      payButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentPosPaymentMethod = btn.getAttribute("data-method") || 'Cash';
+      const cashGroup = document.getElementById("pos-cash-input-group");
+      if (cashGroup) {
+        cashGroup.style.display = currentPosPaymentMethod === 'Cash' ? 'block' : 'none';
+      }
+      updatePosCartUI();
+    });
+  });
+
+  // Discount & Tendered Inputs
+  const discountInput = document.getElementById("pos-discount-input");
+  if (discountInput) discountInput.addEventListener("input", updatePosCartUI);
+
+  const tenderedInput = document.getElementById("pos-tendered-input");
+  if (tenderedInput) tenderedInput.addEventListener("input", updatePosCartUI);
+
+  // Sales History filter listeners
+  const histSearch = document.getElementById("pos-history-search");
+  const histBranch = document.getElementById("pos-history-branch");
+  const histPay = document.getElementById("pos-history-payment");
+  const histStatus = document.getElementById("pos-history-status");
+  const histDate = document.getElementById("pos-history-date");
+
+  [histSearch, histBranch, histPay, histStatus, histDate].forEach(el => {
+    if (el) el.addEventListener("change", refreshPosHistory);
+    if (el && el.tagName === "INPUT") el.addEventListener("keyup", refreshPosHistory);
+  });
 }
 
 // 3. INVENTORY CHECK VIEW REFRESHER
