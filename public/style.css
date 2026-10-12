@@ -453,19 +453,61 @@ body {
 
 .password-toggle {
   position: absolute;
-  right: 14px;
+  right: 12px;
   background: none;
   border: none;
   color: var(--text-light);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  z-index: 2;
+  user-select: none;
 }
 
 .password-toggle:hover {
-  color: var(--text-secondary);
+  color: var(--primary-color);
+  background-color: rgba(217, 119, 6, 0.08);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.password-toggle svg,
+.password-toggle i {
+  display: block;
+  pointer-events: none;
+}
+
+/* Visibility states for password toggle icons */
+.password-toggle[data-visible="false"] .eye-closed,
+.password-toggle:not([data-visible="true"]) .eye-closed {
+  display: none !important;
+}
+
+.password-toggle[data-visible="false"] .eye-open,
+.password-toggle:not([data-visible="true"]) .eye-open {
+  display: block !important;
+}
+
+.password-toggle[data-visible="true"] .eye-open {
+  display: none !important;
+}
+
+.password-toggle[data-visible="true"] .eye-closed {
+  display: block !important;
+}
+
+/* Ensure password input text doesn't overlap toggle button */
+.input-container:has(.password-toggle) .form-input,
+.input-container .form-input[type="password"],
+.input-container .form-input.has-password-toggle {
+  padding-right: 44px;
 }
 
 /* Roles Quick Selector */

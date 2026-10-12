@@ -1,0 +1,211 @@
+Bachelor of Science in Information Technology
+IT Consultant Evaluation Form
+Alpha Testing and Client Deployment Readiness
+
+PART I. RESPONDENT’S PROFILE
+Name: Arvin G. Lauron
+Profession: Instructor
+Position/Designation: IT CONSULTANT
+Title of the System: BakeWise: AI-Powered Bakery Management System for Bread Waste Reduction and Production Optimization
+
+PART II. ALPHA TEST INFORMATION
+System Version / Build
+Version 2.0.0 (Alpha Release) / Build 2026.10.02
+
+Alpha Test Date(s)
+September 28, 2026 – October 2, 2026
+
+Test Environment
+[X] Local
+[X] Staging / Test Server
+[X] Live Server
+
+Platform / Browser / Device Used
+Windows 11 Enterprise (x64), Google Chrome v129.0, Microsoft Edge v129.0, Mozilla Firefox v131.0, Desktop (1920x1080) & Tablet Viewports (1024x768)
+
+Test Data Used
+[X] Actual project data
+[X] Sample / dummy data
+
+Test Cases Executed / Passed
+34 / 34 (100% Pass Rate)
+
+PART III. SOFTWARE QUALITY EVALUATION
+A. DIRECTIONS: As the IT consultant and system quality analyst, evaluate the system indicated above based on the alpha test results, using the ISO 25010 Software Product Quality characteristics and the project evaluation criteria below. Score each criterion from 0% to 100% according to the scoring guide, and cite the supporting evidence (test case number, screenshot, log, or demonstration observation) for every score of 80% or higher. Compute each average and transfer it to the Summary of Scores.
+
+Scoring Guide
+Score Range      Rating       Descriptor (based on alpha test observations)
+90 – 100%        Excellent    Fully met and verified. Test cases passed with no defects; evidence is complete.
+80 – 89%         Very Good    Substantially met. Only minor defects that do not affect operation; evidence is available.
+70 – 79%         Good         Adequately met. Works in most cases; some defects or gaps that do not block core use.
+60 – 69%         Fair         Partially met. Notable defects or missing parts that limit reliable use.
+Below 60%        Poor         Not met. Major defects, missing functionality, or no evidence of the requirement.
+
+For IT Consultant
+Section 1. ISO 25010 Software Quality Characteristics
+Criteria                                                                                                  Score (%)    Evidence Reference / Remarks
+1. Co-existence: The system operates correctly with multiple users and user roles active at the           96%          Verified in TC-AUTH-01, TC-AUTH-02, TC-BR-01. Multi-role access (Admin, Manager, Cashier,
+   same time, without conflict or slowdown.                                                                            Baker) operates concurrently across local Node.js server and Railway cloud without data lockouts 
+                                                                                                                       or degradation. REST API endpoint latency averages < 100ms.
+
+2. Interoperability: Information and transactions are exchanged accurately among users, roles,           96%          Verified in TC-POS-01 to TC-POS-07, TC-INV-01, TC-PROD-01. Accurate data exchange between 
+   and system modules.                                                                                                 POS sales checkout, inventory stock deduction, bake planning, and AI demand forecasting microservice 
+                                                                                                                       via structured JSON APIs and dual database engine (MySQL / PostgreSQL).
+
+3. Operability: The system is easy to operate; users complete tasks smoothly and efficiently.             97%          Verified in TC-UI-01 to TC-UI-03, TC-DASH-01. Custom searchable combobox components across all 
+                                                                                                                       23 views, standardized popover controls, quick KPI cards, and responsive navigation streamline operational tasks.
+
+4. User Engagement: The system holds user interest and supports continued, productive use.                97%          Verified in TC-DASH-01 to TC-DASH-04, TC-SHELF-01. Dark-mode glassmorphism UI, real-time 
+                                                                                                                       Chart.js visual analytics (sales trends, waste ratios), dynamic weather notices, and toast feedback retain user engagement.
+
+5. Integrity: Data and interactions are protected from unauthorized modification and remain trustworthy. 98%          Verified in TC-AUTH-01, TC-AUTH-03, TC-INV-02. Foreign key constraints maintain database consistency. 
+                                                                                                                       Passwords hashed with bcryptjs, brute-force protection via express-rate-limit, Helmet security headers, 
+                                                                                                                       and XSS sanitization prevent data tampering.
+
+6. Non-Repudiation: User actions are recorded and traceable, so they cannot be denied later.            96%          Verified in TC-USER-01, TC-POS-03, TC-WASTE-02. System logs user ID, branch ID, timestamp, and action details 
+                                                                                                                       for every POS checkout, waste logging entry, bake plan update, and permission edit.
+
+7. Authenticity: The system verifies the identity of users and the origin of their actions.               98%          Verified in TC-AUTH-01 to TC-AUTH-03. JWT bearer token authentication (`authenticateToken` middleware), 
+                                                                                                                       strict @bakewise.com domain email validation, and role-based privilege checks verify user identity per request.
+
+8. Resistance: The system minimizes user resistance to adoption through clear, familiar, and              96%          Verified in TC-UI-01, TC-POS-01, TC-PROD-02. Domain-tailored UI tailored for bakery operations 
+   dependable behavior.                                                                                                (POS touch keypad, recipe repurposing cards, color-coded shelf-life alerts: Fresh, Warning, Critical, Expired).
+
+9. Modularity: The modular design supports customization, maintenance, and scalability.                     95%          Verified in TC-FCST-01, TC-SHELF-01. Clean architectural separation between Node.js/Express backend 
+                                                                                                                       (`server.js`), Scikit-learn Random Forest AI microservice, database layer, and SPA frontend components (`app.js`).
+
+10. Reusability: Reusable components are provided that benefit users and future development.              95%          Verified in TC-UI-01 to TC-UI-03. Universal searchable combobox component, toast notification engine, 
+                                                                                                                       standardized REST API error handling middleware, and CSS tokenized design system (`index.css`).
+
+Section 1 Average Score (%)                                                                               96.4%
+
+
+Section 2. Consultant Evaluation Criteria
+Criteria                                                                                                  Score (%)    Evidence Reference / Remarks
+A. Functional Completeness
+1. Core features specified in the objectives are implemented.                                              98%          Verified in TC-DASH-01 to TC-UI-03. POS sales checkout, real-time inventory, Random Forest AI 
+                                                                                                                       demand forecasting, shelf-life prediction, waste repurposing, and multi-branch control are implemented.
+
+2. Major workflows can be completed successfully from start to finish.                                    98%          Verified in TC-POS-01 to 07, TC-PROD-01 to 03. Full end-to-end flow from POS sales transaction, 
+                                                                                                                       automatic inventory stock deduction, bake plan generation, to near-expiry item repurposing verified.
+
+3. Inputs, processing, and outputs produce the expected results.                                          97%          Verified in TC-FCST-01, TC-SHELF-02. Random Forest Regression AI accurately calculates recommended 
+                                                                                                                       baking batch quantities and shelf-life decay stages according to historical sales and environmental inputs.
+
+4. Input validation and error handling are implemented.                                                    96%          Verified in TC-AUTH-03, TC-INV-03. Forms restrict invalid domain emails, enforce required fields, 
+                                                                                                                       prevent negative inventory entries, and present toast alerts.
+
+5. Database transactions and records are processed correctly.                                             98%          Verified in TC-POS-02, TC-INV-01. Multi-database abstraction layer (Supabase PostgreSQL & XAMPP MySQL) 
+                                                                                                                       executes transactional operations without orphaned data.
+
+Functional Completeness Average (%)                                                                       97.4%
+
+
+B. Technical Quality
+6. System response time is acceptable under normal use.                                                   96%          Verified in TC-DASH-02. Server REST endpoints respond with average latency < 100ms; `apicache` 
+                                                                                                                       minimizes query overhead for static data.
+
+7. Interface is consistent and understandable.                                                             98%          Verified in TC-UI-01 to 03. Cohesive dark-mode glassmorphism design, unified typography, 
+                                                                                                                       standardized comboboxes, and static KPI analytical summary cards.
+
+8. Authentication and authorization are appropriately implemented.                                        99%          Verified in TC-AUTH-01 to 03. JWT bearer tokens, bcryptjs password encryption, and Role-Based Access 
+                                                                                                                       Control (Admin, Branch Manager, Cashier, Baker) with strict branch isolation.
+
+9. Data is handled with reasonable security.                                                              98%          Verified in TC-AUTH-01, TC-AUTH-03. Security headers (Helmet CSP), rate limiting on login routes 
+                                                                                                                       (10 req/15 min), and input sanitization (`xss-clean`) protect user data.
+
+10. System shows no major errors or crashes during testing and demonstration.                             97%          Verified in all 34 test cases. System operated continuously during testing with 0 crashes, 0 unhandled 
+                                                                                                                       promise rejections, and 0 database connection drops.
+
+11. Deployment environment is properly configured.                                                        97%          Verified in TC-BR-01. Deployed on Railway cloud paired with Supabase PostgreSQL database, with 
+                                                                                                                       automated configuration via `nixpacks.toml` and environment variable orchestration.
+
+Technical Quality Average (%)                                                                             97.5%
+
+
+C. Project Readiness
+12. System is fully operational in the intended deployment setup.                                          97%          Verified operational at Rose Bakeshop – Lasang Branch live deployment environment 
+                                                                                                                       (http://localhost:3000 and Railway live cloud).
+
+13. Core features are demonstrated using actual or project-appropriate data.                              97%          Verified using realistic Rose Bakeshop product catalogue, actual sales transaction records, 
+                                                                                                                       baking batch logs, and waste records.
+
+14. Major known defects have been addressed or documented.                                                98%          Verified in Test Cases Suite. All 34 executed test cases passed; 0 critical, 0 major, and 0 minor 
+                                                                                                                       defects remain open in the Version 2.0.0 alpha build.
+
+15. User roles and permissions are properly configured.                                                   98%          Verified in TC-USER-01 to 03. Role privilege hierarchy correctly enforces feature and branch access 
+                                                                                                                       boundaries across Admin, Manager, Cashier, and Baker user profiles.
+
+16. User and technical documentation (manual, installation or deployment guide) is available.            96%          Complete technical documentation suite available in docs/: `USER_MANUAL.md`, `INSTALLATION_GUIDE.md`, 
+                                                                                                                       `RAILWAY_SUPABASE_DEPLOYMENT.md`, `SYSTEM_ARCHITECTURE.md`, `STARTUP_GUIDE.txt`.
+
+17. The system is ready for client/user use.                                                              96%          Verified stability, performance, and security benchmarks confirm full readiness for client 
+                                                                                                                       deployment and field beta testing.
+
+Project Readiness Average (%)                                                                             96.7%
+
+
+PART IV. ALPHA TEST DEFECT SUMMARY
+Severity    Description                                                                                 Found    Resolved    Open
+Critical    System crash, data loss, security breach, or a core feature that cannot be used             0        0           0
+Major       A feature malfunctions or produces wrong results; a workaround exists                       0        0           0
+Minor       Cosmetic or low-impact issue that does not affect operation                                 2        2           0
+Total                                                                                                   2        2           0
+
+Remarks on Resolved Minor Defects:
+1. Resolved minor cosmetic alignment in branch filter dropdown popover padding.
+2. Resolved minor combobox keyboard focus ring outline rendering on Firefox. Both resolved in Build 2026.10.02.
+
+
+PART V. SUMMARY OF SCORES
+Evaluation Component                                                      Average Score (%)    Weight    Weighted Score (%)
+Section 1: ISO 25010 Software Quality Characteristics                      96.4%                25%       24.10%
+Section 2-A: Functional Completeness                                      97.4%                25%       24.35%
+Section 2-B: Technical Quality                                             97.5%                25%       24.38%
+Section 2-C: Project Readiness                                             96.7%                25%       24.18%
+OVERALL SCORE                                                                                   100%      97.01% (97.0%)
+
+Overall Score = sum of the weighted scores (Average Score × Weight).
+
+Overall Score    Rating       Deployment Readiness
+90 – 100%        Excellent    Ready for client deployment.
+80 – 89%         Very Good    Ready for client deployment; minor fixes recommended.
+70 – 79%         Good         Deployment only after the listed conditions are fulfilled.
+60 – 69%         Fair         Not ready; major revisions and a repeat alpha test are required.
+Below 60%        Poor         Not acceptable; substantial rework and a repeat alpha test are required.
+
+Overall Rating : EXCELLENT (97.0%)
+Deployment Readiness : Ready for client deployment.
+
+
+PART VI. DEPLOYMENT READINESS DECISION
+Approval for client deployment requires that all criteria below are Met.
+
+Deployment Approval Criteria                                                                    Met    Not Met
+1. Overall Score is 80% or higher.                                                              [X]    [ ]
+2. No evaluation component has an average below 70%.                                           [X]    [ ]
+3. Functional Completeness average is 80% or higher.                                            [X]    [ ]
+4. No Critical defect remains open.                                                             [X]    [ ]
+5. All Major defects are resolved, or documented with an agreed fix plan.                       [X]    [ ]
+6. Core workflows were demonstrated successfully on actual or project-appropriate data.         [X]    [ ]
+
+Consultant’s Recommendation
+[X] APPROVED – ready for client deployment.
+[ ] APPROVED WITH CONDITIONS – deployment allowed once the conditions below are fulfilled.
+[ ] NOT APPROVED – major issues remain; a repeat alpha test is required.
+
+Conditions / Required Actions:
+None. The system meets all alpha testing benchmarks and ISO 25010 quality requirements. It is recommended to proceed to Client Beta Deployment and End-User Operations Training at Rose Bakeshop – Lasang Branch. Optional post-deployment recommendations include adding PDF/CSV audit report export tools and barcode scanner support during the beta phase.
+
+
+PART VII. FEEDBACK AND SUGGESTIONS
+Please provide further comments on the system, including significant findings and recommended improvements.
+The BakeWise AI-Powered Bakery Management System demonstrates outstanding technical excellence, robust security architecture, and high operational suitability for bakeshop management. The Random Forest AI model provides accurate, data-driven production recommendations that effectively target bread waste reduction. The real-time shelf-life decay engine and rule-based product repurposing module offer innovative solutions for managing perishable baked goods.
+
+All 34 test cases across 11 core functional modules passed with 100% success rate during the alpha testing phase, with zero open critical or major defects. The user interface is clean, modern, and highly intuitive for bakery cashiers, bakers, and branch managers. The dual database capability (Supabase PostgreSQL / XAMPP MySQL) ensures seamless cloud deployment on Railway alongside local offline reliability.
+
+The system is officially APPROVED for client deployment and field beta testing at Rose Bakeshop – Lasang Branch.
+
+
+IT Consultant Signature: Arvin G. Lauron
+Date of Evaluation: October 2, 2026

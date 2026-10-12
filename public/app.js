@@ -884,6 +884,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupLoginActions();
   setupNavigation();
   setupFormSubmissions();
+  setupAllPasswordToggles();
   setupInventoryModal();
   setupProductModal();
   setupShelfLifeModule();
@@ -1136,13 +1137,54 @@ async function checkSessionState() {
   }
 }
 
+// --- Password Visibility Toggle Controller ---
+function setupPasswordToggle(inputElOrId, toggleBtnOrId) {
+  const input = typeof inputElOrId === "string" ? document.getElementById(inputElOrId) : inputElOrId;
+  const btn = typeof toggleBtnOrId === "string" ? document.getElementById(toggleBtnOrId) : toggleBtnOrId;
+  if (!input || !btn) return null;
+
+  const setVisibility = (show) => {
+    input.setAttribute("type", show ? "text" : "password");
+    btn.setAttribute("data-visible", show ? "true" : "false");
+    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    btn.setAttribute("title", show ? "Hide password" : "Show password");
+
+    const eyeOpen = btn.querySelector(".eye-open, [data-lucide='eye']");
+    const eyeClosed = btn.querySelector(".eye-closed, [data-lucide='eye-off']");
+    if (eyeOpen) eyeOpen.style.display = show ? "none" : "block";
+    if (eyeClosed) eyeClosed.style.display = show ? "block" : "none";
+  };
+
+  // Ensure default hidden state on init
+  setVisibility(false);
+
+  btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const isCurrentlyPassword = input.getAttribute("type") === "password";
+    setVisibility(isCurrentlyPassword);
+  };
+
+  if (input.form) {
+    input.form.addEventListener("reset", () => {
+      setTimeout(() => setVisibility(false), 0);
+    });
+  }
+
+  return { setVisibility };
+}
+
+function setupAllPasswordToggles() {
+  setupPasswordToggle("password-input", "btn-toggle-password");
+  setupPasswordToggle("usr-password-input", "btn-toggle-usr-password");
+  setupPasswordToggle("edit-usr-password", "btn-toggle-edit-usr-password");
+}
+
 function setupLoginActions() {
   const loginForm = document.getElementById("login-form");
   const logoutBtn = document.getElementById("btn-logout");
   const passwordInput = document.getElementById("password-input");
   const togglePassBtn = document.getElementById("btn-toggle-password");
-  const iconEyeOpen = document.getElementById("icon-eye-open");
-  const iconEyeClosed = document.getElementById("icon-eye-closed");
   const forgotBtn = document.getElementById("link-forgot-password");
 
   if (forgotBtn) {
@@ -1175,19 +1217,8 @@ function setupLoginActions() {
     });
   }
 
-  if (togglePassBtn) {
-    togglePassBtn.addEventListener("click", () => {
-      const isPass = passwordInput.getAttribute("type") === "password";
-      if (isPass) {
-        passwordInput.setAttribute("type", "text");
-        iconEyeOpen.style.display = "block";
-        iconEyeClosed.style.display = "none";
-      } else {
-        passwordInput.setAttribute("type", "password");
-        iconEyeOpen.style.display = "none";
-        iconEyeClosed.style.display = "block";
-      }
-    });
+  if (togglePassBtn && passwordInput) {
+    setupPasswordToggle(passwordInput, togglePassBtn);
   }
 
   const btnShowPrivacy = document.getElementById("btn-show-privacy-policy");
@@ -1771,6 +1802,7 @@ function setupFormSubmissions() {
 
   const userForm = document.getElementById("admin-user-form");
   if (userForm) {
+    const usrPassController = setupPasswordToggle("usr-password-input", "btn-toggle-usr-password");
     userForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!(await showConfirmModal("Are you sure you want to register this user account?"))) return;
@@ -1791,6 +1823,7 @@ function setupFormSubmissions() {
       if (success) {
         showToast("Staff account registered.", "success");
         userForm.reset();
+        if (usrPassController) usrPassController.setVisibility(false);
         refreshAdminUsersPane();
       } else showToast("Error creating user account.", "error");
     });
@@ -1846,6 +1879,7 @@ function setupFormSubmissions() {
 
   const userEditForm = document.getElementById("user-edit-form");
   if (userEditForm) {
+    const editPassController = setupPasswordToggle("edit-usr-password", "btn-toggle-edit-usr-password");
     userEditForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!(await showConfirmModal("Are you sure you want to save changes to this staff account?"))) return;
@@ -1864,6 +1898,7 @@ function setupFormSubmissions() {
       const branchId = document.getElementById("edit-usr-branch").value;
 
       await store.updateUser(id, name, email, password, role, branchId);
+      if (editPassController) editPassController.setVisibility(false);
       document.getElementById("user-edit-modal").style.display = "none";
       document.getElementById("modal-overlay").classList.remove("visible");
       await refreshAdminUsersPane();
@@ -4599,6 +4634,7 @@ async function refreshAdminUsersPane() {
         document.getElementById("edit-usr-name").value = user.name;
         document.getElementById("edit-usr-email").value = user.email;
         document.getElementById("edit-usr-password").value = "";
+        setupPasswordToggle("edit-usr-password", "btn-toggle-edit-usr-password");
         document.getElementById("edit-usr-role").value = user.role;
 
         const branchSelect = document.getElementById("edit-usr-branch");
@@ -4618,6 +4654,7 @@ async function refreshAdminUsersPane() {
   const closeUserModal = () => {
     document.getElementById("user-edit-modal").style.display = "none";
     document.getElementById("modal-overlay").classList.remove("visible");
+    setupPasswordToggle("edit-usr-password", "btn-toggle-edit-usr-password");
   };
   if (btnUserModalClose) btnUserModalClose.onclick = closeUserModal;
   if (btnUserModalCancel) btnUserModalCancel.onclick = closeUserModal;

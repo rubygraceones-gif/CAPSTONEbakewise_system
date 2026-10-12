@@ -142,9 +142,9 @@
               <i data-lucide="lock" class="input-icon" style="width: 18px; height: 18px;"></i>
               <input type="password" id="password-input" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
               <button type="button" class="password-toggle" id="btn-toggle-password"
-                aria-label="Toggle Password Visibility">
-                <i data-lucide="eye" id="icon-eye-open" style="width: 18px; height: 18px; display: none;"></i>
-                <i data-lucide="eye-off" id="icon-eye-closed" style="width: 18px; height: 18px;"></i>
+                aria-label="Show password" title="Show password" data-visible="false">
+                <i data-lucide="eye" id="icon-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
+                <i data-lucide="eye-off" id="icon-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
               </button>
             </div>
           </div>
@@ -695,7 +695,12 @@
                   <label for="usr-password-input" class="form-label">Password</label>
                   <div class="input-container">
                     <i data-lucide="lock" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="usr-password-input" class="form-input" required placeholder="Enter secure password" value="password123">
+                    <input type="password" id="usr-password-input" class="form-input" required placeholder="Enter secure password" value="password123" autocomplete="new-password">
+                    <button type="button" class="password-toggle" id="btn-toggle-usr-password"
+                      aria-label="Show password" title="Show password" data-visible="false">
+                      <i data-lucide="eye" id="icon-usr-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
+                      <i data-lucide="eye-off" id="icon-usr-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
+                    </button>
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -1700,7 +1705,14 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-password" class="form-label">New Password (Leave blank to keep unchanged)</label>
-        <input type="text" id="edit-usr-password" class="form-input" style="padding-left: 14px;" placeholder="••••••••">
+        <div class="input-container">
+          <input type="password" id="edit-usr-password" class="form-input" style="padding-left: 14px; padding-right: 44px;" placeholder="••••••••" autocomplete="new-password">
+          <button type="button" class="password-toggle" id="btn-toggle-edit-usr-password"
+            aria-label="Show password" title="Show password" data-visible="false">
+            <i data-lucide="eye" id="icon-edit-usr-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
+            <i data-lucide="eye-off" id="icon-edit-usr-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-role" class="form-label">System Role</label>

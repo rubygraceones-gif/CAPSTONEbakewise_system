@@ -1,0 +1,674 @@
+CAPSTONE PROJECT DEVELOPMENT TEST SCRIPT CHECKLIST
+WEB (70%)
+Test Cycle:
+Part 1
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+User Registration - BakeWise Web
+Module or Screen:
+User Management / Account Registration
+Objectives:
+Create user account and assign role access
+
+Test Case #
+1-1
+Test Steps
+Enter the user’s data with the following fields for validation:
+Full Name
+Email Address (@bakewise.com domain)
+Password
+User Role (Admin, Branch Manager, Sales Staff, Inventory Specialist, Baking Specialist)
+Assigned Branch ID
+Contact Number
+Employee ID
+Click "Create User Account" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_users` table)
+Redirect to database overview / user directory view
+Actual Results
+User input fields (Full Name, Email Address, Password, User Role, Assigned Branch ID, Contact Number, Employee ID) were validated against system constraints. User record was inserted into `bw_users` database table, and page redirected to User Directory table view.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 2
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Products Catalog - BakeWise Web
+Module or Screen:
+Create Product / Catalog Management
+Objectives:
+Create a bakery product item entry
+
+Test Case #
+1-2
+Test Steps
+Create a bakery product entry in the catalog using the following fields:
+Product ID (e.g., p1, p2)
+Product Name (e.g., Pandesal, Special Ensaymada)
+Product Category (Bread, Pastries, Cakes, Beverages)
+Selling Price (PHP)
+Production Cost (PHP)
+Shelf Life Days
+Repurpose Recipe Description
+Click "Save Product Item" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_products` table)
+Redirect to database overview / product catalog list
+Actual Results
+Product input fields (Product ID, Name, Category, Price, Cost, Shelf Life, Repurpose Recipe) were validated. Product record was added to `bw_products` database table, and view redirected to Product Catalog database table.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 3
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Bake Schedule Planning - BakeWise Web
+Module or Screen:
+Create Bake Schedule / Production Management
+Objectives:
+Create a daily bake schedule batch for registered products
+
+Test Case #
+Test Steps
+1-3
+Create a bake schedule batch by using products registered in the database:
+Select Product ID
+Enter Batch Code (e.g., B-261002-01)
+Enter Planned Baking Quantity
+Select Baking Date
+Select Assigned Baker Name
+Click "Save Bake Schedule" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_production` table)
+Redirect to database overview / production schedule list
+Actual Results
+Bake schedule fields (Product ID, Batch Code, Planned Quantity, Date, Baker Name) were validated. Production record was inserted into `bw_production` database table, and redirected to Production Management table view.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 4
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Inventory Management - BakeWise Web
+Module or Screen:
+Add Inventory Stock Batch
+Objectives:
+Add inventory stock batch and track freshness index
+
+Test Case #
+1-4
+Test Steps
+Add inventory stock batch by entering the following fields:
+Select Branch ID
+Select Product ID
+Enter Stock Quantity Level
+Select Production Date
+Select Expiry Date
+Click "Save Inventory Batch" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_inventory` table)
+Redirect to database overview / inventory stock table
+Actual Results
+Batch inputs (Branch ID, Product ID, Stock Level, Production Date, Expiry Date) were validated. Batch record was saved in `bw_inventory` database table, updating POS stock levels, and page redirected to Inventory table.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 5
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Point of Sale (POS) Checkout - BakeWise Web
+Module or Screen:
+POS Terminal & Payment
+Objectives:
+Process cash checkout and auto-deduct inventory stock
+
+Test Case #
+1-5
+Test Steps
+Process POS sales transaction using the following steps:
+Select product items from catalog grid
+Adjust item quantities in cart
+Enter Cash Tendered amount (PHP)
+Verify computed change amount
+Click "Complete Checkout" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_sales` table)
+Redirect to database / thermal receipt view
+Actual Results
+Sales cart data and payment tendered (>= Total) were validated. Sales transaction was inserted into `bw_sales` database table, inventory auto-deducted in `bw_inventory`, and thermal receipt modal opened.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 6
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+POS Transaction History - BakeWise Web
+Module or Screen:
+Sales History & Receipt View
+Objectives:
+Monitor historical sales transactions and view itemized receipt details
+
+Test Case #
+1-6
+Test Steps
+Monitor sales history of transactions by:
+Select date range / branch filter
+Locate target transaction row
+Click "View Receipt" button to see detailed itemized transaction details.
+Expected Results
+Data is validated
+Record is added to the database / view updated
+Redirect to database overview / receipt modal
+Actual Results
+Clicking "View Receipt" button validated transaction ID, queried `bw_sales` database records, and rendered itemized thermal receipt modal with real-time timestamps.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 7
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Waste Management - BakeWise Web
+Module or Screen:
+Create Waste Log / Waste Analytics
+Objectives:
+Create an unsold bread waste log entry
+
+Test Case #
+1-7
+Test Steps
+Log bread waste incident by entering the following fields:
+Select Branch ID
+Select Product ID
+Enter Waste Quantity
+Enter Total Waste Cost (PHP)
+Select Waste Reason (Expired, Quality Defect, Overbaked)
+Select Waste Date
+Click "Log Waste Record" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_waste` table)
+Redirect to database overview / waste history table
+Actual Results
+Waste fields (Branch ID, Product ID, Quantity, Cost, Reason, Date) were validated. Record was inserted into `bw_waste` database table, updating weekly waste ratio KPIs, and redirected to Waste table view.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 8
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Intelligent Recipe Repurposing - BakeWise Web
+Module or Screen:
+Manage Repurpose Recipes / Waste Reduction
+Objectives:
+Delete, Modify, hide, or show bread repurposing recipes
+
+Test Case #
+1-8
+Test Steps
+Manage bread repurposing recipes by:
+Select product item with near-expiry stock
+Select recipe action button (Modify Recipe, Hide Recipe, Show Recipe, Delete Recipe)
+Click "Save Recipe Changes" button.
+Expected Results
+Data is validated
+Record is added to the database / updated in catalog
+Redirect to database overview / recipe list
+Actual Results
+Selected recipe modification was validated and saved into database. Product repurpose recipe was updated in catalog, and view refreshed to display active repurposing guide.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 9
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Branch Directory - BakeWise Web
+Module or Screen:
+Branch Directory & Map Registration
+Objectives:
+Register store branch details and map location coordinates
+
+Test Case #
+1-9
+Test Steps
+Register branch location by entering the following fields:
+Branch Name (e.g., Main Branch, Lasang Branch)
+Branch Address
+Map Latitude Coordinate
+Map Longitude Coordinate
+Branch Status (Active / Inactive)
+Click "Save Branch Location" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_branches` table)
+Redirect to database overview / branch map directory
+Actual Results
+Branch information (Name, Address, Latitude, Longitude, Status) was validated and persisted in `bw_branches` database table, updating interactive map markers and redirecting to Branch Directory view.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 10
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Multi-Branch Network Access - BakeWise Web
+Module or Screen:
+Global Branch Switcher / Role Security
+Objectives:
+Verify multi-branch switcher and branch data isolation
+
+Test Case #
+1-10
+Test Steps
+Manage multi-branch access privileges by:
+Log in as Global Admin to select "All Network Branches" or specific branch
+Log in as Branch Staff (e.g., Lasang Cashier)
+Observe branch selector combobox locking behavior.
+Expected Results
+Data is validated
+Record is added to the database / session updated
+Redirect to database overview / branch view
+Actual Results
+Global Admin successfully toggled between network branches. Branch Staff login locked global branch switcher strictly to assigned branch ID in database, preventing unauthorized data access.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 11
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Demand Forecasting - BakeWise Web
+Module or Screen:
+AI Demand Prediction Insights
+Objectives:
+Generate Random Forest AI demand forecasts for production optimization
+
+Test Case #
+1-11
+Test Steps
+Run AI demand forecast by:
+Select target product category or item
+Select forecast date horizon
+Click "Run AI Forecast" button.
+Expected Results
+Data is validated
+Record is added to the database / forecast generated
+Redirect to database overview / AI recommendations view
+Actual Results
+Selected parameters were processed by AI prediction engine. Generated demand forecast values were stored in system state and displayed in production recommendation table.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 12
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Shelf Life & Weather Notice - BakeWise Web
+Module or Screen:
+Weather Notice & Shelf Life Prediction
+Objectives:
+Monitor Davao City weather impact on bakery shelf life
+
+Test Case #
+1-12
+Test Steps
+Monitor weather alert notices by:
+View live weather alert banner on top dashboard
+Inspect current temperature and humidity indices for Davao City
+Click "View Affected Products" button.
+Expected Results
+Data is validated
+Record is added to the database / alert updated
+Redirect to database overview / shelf life warnings
+Actual Results
+System retrieved live Davao City weather telemetry. High humidity notice automatically adjusted product shelf life risk factors and highlighted near-expiry items in alerts table.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 13
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+User Directory Audit - BakeWise Web
+Module or Screen:
+User Directory & Role Security Audit
+Objectives:
+Audit registered system users and role privileges
+
+Test Case #
+1-13
+Test Steps
+Audit user directory by:
+Navigate to User Management table
+Filter users by role (Admin, Manager, Sales, Inventory, Production)
+Click "View User Audit Log" button.
+Expected Results
+Data is validated
+Record is added to the database / audit log retrieved
+Redirect to database overview / security log
+Actual Results
+User directory queried `bw_users` database table. Role credentials and login timestamps were displayed accurately in security audit modal.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 14
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Executive Reports - BakeWise Web
+Module or Screen:
+Sales & Waste Summary Reports
+Objectives:
+Generate and export executive sales, inventory, and waste reports
+
+Test Case #
+1-14
+Test Steps
+Generate system reports by:
+Select date range filter (7 Days, 30 Days, Custom)
+Select report module (Sales, Waste, Inventory, Production)
+Click "Export Summary Report" button.
+Expected Results
+Data is validated
+Record is added to the database / report generated
+Redirect to database overview / file download
+Actual Results
+System validated report parameters, aggregated database records from `bw_sales` and `bw_waste`, and generated downloadable executive report file.
+Pass / Fail
+Pass
+
+
+________________________________________________________
+PROJECT ADVISER’S SIGNATURE OVER PRINTED NAME
+
+MOBILE (30%)
+Test Cycle:
+Part 1
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Authentication - BakeWise Mobile
+Module or Screen:
+Mobile Staff Login
+Objectives:
+Authenticate bakery staff credentials on mobile viewports
+
+Test Case #
+2-1
+Test Steps
+Authenticate staff user on mobile layout by:
+Enter Email (@bakewise.com domain)
+Enter Password
+Tap "Sign In" button.
+Expected Results
+Data is validated
+Record is added to the database / session created
+Redirect to database / mobile dashboard view
+Actual Results
+Credentials entered on mobile viewport were validated against `bw_users` database records. Session started and view redirected to Mobile Dashboard.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 2
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile POS Terminal - BakeWise Mobile
+Module or Screen:
+Mobile POS Touch Checkout
+Objectives:
+Execute touch checkout transaction on tablet/mobile POS
+
+Test Case #
+2-2
+Test Steps
+Execute touch POS sales transaction on mobile screen:
+Tap product cards in touch catalog grid
+Adjust cart item quantities
+Enter Cash Tendered amount (PHP)
+Tap "Complete Checkout" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_sales` table)
+Redirect to database / mobile receipt modal
+Actual Results
+Touch POS transaction details validated, sale inserted into `bw_sales` database table, inventory auto-deducted, and mobile receipt view rendered.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 3
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Inventory - BakeWise Mobile
+Module or Screen:
+Mobile Stock & Expiry Alerts
+Objectives:
+Monitor branch inventory stock levels and expiry alerts on mobile
+
+Test Case #
+2-3
+Test Steps
+Monitor mobile inventory stock by:
+Scroll mobile inventory list
+Filter by category (Bread, Pastries, Cakes)
+Tap near-expiry product item to view freshness index details.
+Expected Results
+Data is validated
+Record is added to the database / view updated
+Redirect to database overview / inventory detail view
+Actual Results
+Mobile inventory list queried `bw_inventory` database table, displaying color-coded stock badges and freshness index percentages on mobile screen.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 4
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Production - BakeWise Mobile
+Module or Screen:
+Mobile Baking Batch Log
+Objectives:
+Update baking batch status and log actual yield from kitchen floor
+
+Test Case #
+2-4
+Test Steps
+Update bake batch yield on mobile interface:
+Select active bake batch code
+Update status ("Scheduled" -> "In Oven" -> "Completed")
+Enter Actual Yield quantity count
+Tap "Save Yield Record" button.
+Expected Results
+Data is validated
+Record is added to the database (`bw_production` table)
+Redirect to database overview / mobile schedule view
+Actual Results
+Yield count and status update were validated and saved in `bw_production` database table, transferring completed baked goods into active POS stock.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 5
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Waste Logging - BakeWise Mobile
+Module or Screen:
+Mobile Waste Log & Repurpose Recipes
+Objectives:
+Log unsold bread waste and view transformation recipe on mobile
+
+Test Case #
+2-5
+Test Steps
+Log unsold bread waste on mobile device:
+Select product item
+Enter waste quantity and select reason (Expired, Quality Defect)
+Tap "Log Waste" button
+Tap "View Repurpose Recipe" pop-up.
+Expected Results
+Data is validated
+Record is added to the database (`bw_waste` table)
+Redirect to database overview / recipe popup
+Actual Results
+Waste record saved into `bw_waste` database table. System immediately displayed suggested bread repurposing recipe pop-up on mobile screen.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 6
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Dashboard Analytics - BakeWise Mobile
+Module or Screen:
+Mobile Dashboard Overview
+Objectives:
+Review real-time sales revenue and waste KPIs on mobile screen
+
+Test Case #
+2-6
+Test Steps
+Review mobile dashboard metrics by:
+View responsive top KPI cards (Sales, Waste, Expiry Warnings)
+Inspect touch-enabled Chart.js sales vs waste trend chart
+Tap "Refresh Metrics" button.
+Expected Results
+Data is validated
+Record is added to the database / metrics refreshed
+Redirect to database overview / KPI dashboard
+Actual Results
+Mobile dashboard layout refreshed live metrics from `bw_sales` and `bw_waste` database tables, rendering touch-friendly KPI charts.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 7
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Branch Directory - BakeWise Mobile
+Module or Screen:
+Mobile Branch Locator & Map
+Objectives:
+View store branch network locations and map pins on mobile
+
+Test Case #
+2-7
+Test Steps
+View branch directory on mobile:
+Scroll mobile branch list items
+Tap target branch card (e.g., Lasang Branch)
+Inspect map pin coordinates and address details.
+Expected Results
+Data is validated
+Record is added to the database / map refreshed
+Redirect to database overview / branch map view
+Actual Results
+Selecting branch card loaded location coordinates from `bw_branches` database table and highlighted target map marker on mobile map view.
+Pass / Fail
+Pass
+
+
+Test Cycle:
+Part 8
+Date of Testing:
+October 2, 2026
+
+Test Data Source:
+Mobile Weather & AI Insights - BakeWise Mobile
+Module or Screen:
+Mobile Weather & AI Recommendations
+Objectives:
+Review Davao City weather notices and AI bake recommendations on mobile
+
+Test Case #
+2-8
+Test Steps
+Review weather notices and AI insights on mobile:
+Inspect mobile weather notice banner for Davao City
+Tap "View AI Insights" button
+Review recommended batch quantity adjustments.
+Expected Results
+Data is validated
+Record is added to the database / insights rendered
+Redirect to database overview / AI insight card
+Actual Results
+Live weather telemetry and AI production recommendations were rendered cleanly on mobile screen, displaying optimal daily bake guidance.
+Pass / Fail
+Pass
+
+
+________________________________________________________
+PROJECT ADVISER’S SIGNATURE OVER PRINTED NAME

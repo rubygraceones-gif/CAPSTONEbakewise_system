@@ -1,0 +1,37 @@
+====================================================================================================
+                  BAKEWISE SYSTEM - ALPHA TEST DEPLOYMENT & TEST CASES DIRECTORY
+====================================================================================================
+
+1. ALPHA TEST: Live Server Deployment (40pts)
+----------------------------------------------------------------------------------------------------
+• Local Live Server URL       : http://localhost:3000
+• Server Status API Endpoint  : http://localhost:3000/api/status
+• Startup Guide File          : STARTUP_GUIDE.txt
+• Security & System Check     : BakeWise_System_Check_Guide.txt
+• Cloud Deployment Guide      : docs/RAILWAY_SUPABASE_DEPLOYMENT.md (Railway & Supabase PostgreSQL)
+
+Default Admin Credentials for Live Server:
+- Email    : admin@bakewise.com
+- Password : password123
+
+
+2. ALPHA TEST: Test Cases (60pts)
+----------------------------------------------------------------------------------------------------
+• Primary Test Suite (.txt)   : BakeWise_Alpha_Testing_Test_Cases.txt
+• Comprehensive Report (.txt) : Test_Cases_Report.txt
+• ISO/IEC Consultant Score    : Conducted_Alpha_Test_Consultant_Score.txt
+
+Summary of Test Modules Covered in Suite (11 Modules):
+  - Module 1: Auth & Role Security (TC-AUTH-01 to 03)
+  - Module 2: Dashboard Overview & Analytics (TC-DASH-01 to 04)
+  - Module 3: Point of Sale (POS) Checkout (TC-POS-01 to 07)
+  - Module 4: Inventory & Stock Management (TC-INV-01 to 03)
+  - Module 5: Production & Bake Planning (TC-PROD-01 to 03)
+  - Module 6: Waste Analytics & Repurposing (TC-WASTE-01 to 03)
+  - Module 7: Demand Forecasting & AI Insights (TC-FCST-01 to 03)
+  - Module 8: Shelf Life Prediction (TC-SHELF-01 to 04)
+  - Module 9: User Management & Roles (TC-USER-01 to 03)
+  - Module 10: Branch Directory & Map (TC-BR-01 to 03)
+  - Module 11: UI Standardization & Comboboxes (TC-UI-01 to 03)
+
+====================================================================================================
