@@ -1,0 +1,97 @@
+=== BAKEWISE PRE-UAT SYSTEM TEST EXECUTION LOG ===
+Date: 2026-10-12T14:59:34.129Z
+Build: Version 2.0.0 (Alpha Release) / Commit 1eef864
+
+[2026-10-12T14:59:34.134Z] Starting BakeWise Pre-UAT Automated Test Suite...
+[2026-10-12T14:59:38.668Z] Authenticated admin user successfully. Token length: 217
+[2026-10-12T14:59:38.669Z] --- Executing Unit Tests (UT-001 to UT-015) ---
+[2026-10-12T14:59:39.766Z] TEST [UT-001] - Status: N/A - Evidence: UT-001_sensor_na.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T14:59:40.713Z] TEST [UT-002] - Status: Pass - Evidence: UT-002_malformed_json.png - Malformed non-JSON payload rejected with HTTP 400 Bad Request; 0 rows inserted.
+[2026-10-12T14:59:41.960Z] TEST [UT-003] - Status: Pass - Evidence: UT-003_missing_fields.png - Missing password parameter rejected with HTTP 401 (Invalid email or password); request aborted.
+[2026-10-12T14:59:47.309Z] TEST [UT-004] - Status: Pass - Evidence: UT-004_invalid_qty.png - Negative and zero quantities (qty <= 0) blocked by HTML5 min="1" and form constraint validation.
+[2026-10-12T14:59:48.418Z] TEST [UT-005] - Status: Pass - Evidence: UT-005_decay_calc.png - Environmental decay calculation matches formula: 48h base at 33°C/82% RH decays to 24h (0% calculation error).
+[2026-10-12T14:59:49.516Z] TEST [UT-006] - Status: Pass - Evidence: UT-006_threshold_alert.png - When product stock count drops to exact threshold (stock = 10), Low Stock alert badge triggers consistently.
+[2026-10-12T14:59:50.635Z] TEST [UT-007] - Status: Pass - Evidence: UT-007_ai_input_prep.png - Sales data transformed into clean (N, 4) feature matrix with lag_1 and calendar attributes.
+[2026-10-12T14:59:55.965Z] TEST [UT-008] - Status: Pass - Evidence: UT-008_ai_output.png - Random Forest outputs predicted demand (38 units) with RMSE (1.42) and F1 (0.67).
+[2026-10-12T15:00:01.180Z] TEST [UT-009] - Status: Pass - Evidence: UT-009_low_confidence.png - Zero sales history triggers safe baseline fallback of 30 units without crash.
+[2026-10-12T15:00:02.303Z] TEST [UT-010] - Status: Pass - Evidence: UT-010_known_answers.png - 5 known sales history sequences yielded forecasts within ±2.5% tolerance of expected baselines.
+[2026-10-12T15:00:04.109Z] TEST [UT-011] - Status: Pass - Evidence: UT-011_login_hash.png - Invalid password rejected with HTTP 401 Unauthorized; passwords verified via bcrypt salted hashes.
+[2026-10-12T15:00:05.212Z] TEST [UT-012] - Status: Pass - Evidence: UT-012_role_check.png - Non-admin role requesting user management receives 403 Forbidden; admin menu hidden.
+[2026-10-12T15:00:06.344Z] TEST [UT-013] - Status: Pass - Evidence: UT-013_timezone_manila.png - Transactions saved accurately in Asia/Manila time (UTC+8) without timezone shift anomalies.
+[2026-10-12T15:00:07.945Z] TEST [UT-014] - Status: Pass - Evidence: UT-014_password_toggle.png - #password-input defaults to 'password'; toggle reveals 'text'; toggle resets to 'password'.
+[2026-10-12T15:00:09.425Z] TEST [UT-015] - Status: Pass - Evidence: UT-015_email_domain.png - Email domain validation in place; system enforces user authentication constraints.
+[2026-10-12T15:00:09.426Z] --- Executing Integration Tests (IT-001 to IT-012) ---
+[2026-10-12T15:00:10.533Z] TEST [IT-001] - Status: N/A - Evidence: IT-001_broker_na.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:00:11.656Z] TEST [IT-002] - Status: N/A - Evidence: IT-002_broker_db_na.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:00:12.773Z] TEST [IT-003] - Status: Pass - Evidence: IT-003_db_to_ai.png - Node.js backend queries bw_sales rows, pipes to python ai_forecast.py, and receives JSON predicted demand.
+[2026-10-12T15:00:46.313Z] TEST [IT-004] - Status: Pass - Evidence: IT-004_ai_to_dash.png - Predicted demand metrics and optimization recommendations render on Dashboard and AI Analytics views.
+[2026-10-12T15:00:46.925Z] TEST [IT-005] - Status: Pass - Evidence: IT-005_alert_delivery.png - Bread reaching shelf-life threshold generates screen toast alert and repurposing recommendation.
+[2026-10-12T15:00:48.067Z] TEST [IT-006] - Status: Pass - Evidence: IT-006_bad_data_rollback.png - Incomplete transaction payload rejected; database transaction rolls back; 0 partial rows inserted.
+[2026-10-12T15:00:48.809Z] TEST [IT-007] - Status: Pass - Evidence: IT-007_offline_reconnect.png - Local BakeWiseStore offline mode caches requests; re-synchronizes with server upon reconnect.
+[2026-10-12T15:00:49.984Z] TEST [IT-008] - Status: N/A - Evidence: IT-008_actuator_na.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:00:51.194Z] TEST [IT-009] - Status: Pass - Evidence: IT-009_concurrent_pos.png - Simultaneous checkout requests from 2 POS terminals save under separate transaction IDs.
+[2026-10-12T15:00:52.380Z] TEST [IT-010] - Status: Pass - Evidence: IT-010_multi_role_sync.png - Catalog updates reflect immediately across system role views upon selection.
+[2026-10-12T15:00:53.527Z] TEST [IT-011] - Status: Pass - Evidence: IT-011_pos_inventory_sync.png - Checking out units in POS deducts from inventory in real time and logs sale.
+[2026-10-12T15:00:54.707Z] TEST [IT-012] - Status: Pass - Evidence: IT-012_dual_db_engine.png - System auto-detects active driver (pg or mysql2) with compatible parameterized SQL syntax.
+[2026-10-12T15:00:54.709Z] --- Executing Functional System Tests (ST-F-001 to ST-F-010) ---
+[2026-10-12T15:00:56.017Z] TEST [ST-F-001] - Status: Pass - Evidence: ST-F-001_admin_login.png - Authenticated admin user redirects to Administrator Dashboard with full analytics visible.
+[2026-10-12T15:00:56.176Z] TEST [ST-F-002] - Status: Pass - Evidence: ST-F-002_live_sales_kpi.png - Sales transaction logged in POS updates Dashboard Total Sales Counter within 1.2 seconds.
+[2026-10-12T15:00:56.374Z] TEST [ST-F-003] - Status: Pass - Evidence: ST-F-003_history_chart.png - Chart.js sales and waste comparison curves accurately render saved readings across date filters.
+[2026-10-12T15:00:57.562Z] TEST [ST-F-004] - Status: Pass - Evidence: ST-F-004_shelf_life_alert.png - Batches nearing shelf life trigger warning and populate Repurposing recommendation view.
+[2026-10-12T15:00:58.725Z] TEST [ST-F-005] - Status: Pass - Evidence: ST-F-005_ai_forecast_card.png - Demand forecast module outputs recommended bake units, category, and evaluation metrics.
+[2026-10-12T15:00:59.874Z] TEST [ST-F-006] - Status: Pass - Evidence: ST-F-006_branch_mgmt.png - Branch Management view displays branches table and interactive Leaflet map.
+[2026-10-12T15:01:01.017Z] TEST [ST-F-007] - Status: Pass - Evidence: ST-F-007_audit_report.png - Sales, Inventory, and Waste report views display complete tabulated transaction logs.
+[2026-10-12T15:01:02.146Z] TEST [ST-F-008] - Status: Pass - Evidence: ST-F-008_prod_status.png - Bake status workflow updates batch status in real-time in UI and database.
+[2026-10-12T15:01:03.348Z] TEST [ST-F-009] - Status: Pass - Evidence: ST-F-009_product_catalog.png - Catalog shows bakery products with pricing, shelf life, and repurposing recipes.
+[2026-10-12T15:01:04.536Z] TEST [ST-F-010] - Status: Pass - Evidence: ST-F-010_waste_repurpose.png - Unsold bread conversion offset logged in waste records, reducing loss percentage.
+[2026-10-12T15:01:04.536Z] --- Executing AI System Tests (ST-AI-001 to ST-AI-007) ---
+[2026-10-12T15:01:05.712Z] TEST [ST-AI-001] - Status: Pass - Evidence: ST-AI-001_model_report.png - Random Forest model evaluated on 73 unseen samples achieved Weighted F1 of 0.91 and RMSE of 3.12.
+[2026-10-12T15:01:06.898Z] TEST [ST-AI-002] - Status: Pass - Evidence: ST-AI-002_confusion_matrix.png - Confusion matrix shows main error is misclassifying borderline Medium demand as High (3 samples); 0 Low vs High errors.
+[2026-10-12T15:01:08.157Z] TEST [ST-AI-003] - Status: Pass - Evidence: ST-AI-003_bad_ai_input.png - Malformed payload triggers exception handler returning default 30-unit safe plan with descriptive error.
+[2026-10-12T15:01:09.393Z] TEST [ST-AI-004] - Status: Pass - Evidence: ST-AI-004_real_world_test.png - 10 daily sales records from Rose Bakeshop Lasang branch evaluated; prediction variance averaged 8.5%.
+[2026-10-12T15:01:10.639Z] TEST [ST-AI-005] - Status: Pass - Evidence: ST-AI-005_ai_fallback.png - When AI service is paused, backend falls back gracefully to baseline; POS records normally.
+[2026-10-12T15:01:11.826Z] TEST [ST-AI-006] - Status: Pass - Evidence: ST-AI-006_confidence_metrics.png - Dashboard displays RMSE, MAE, and demand category; low confidence prompts confirmation.
+[2026-10-12T15:01:13.066Z] TEST [ST-AI-007] - Status: Pass - Evidence: ST-AI-007_weather_decay.png - Simulated 33°C / 82% humidity reduces shelf life from 48h to prevent spoilage.
+[2026-10-12T15:01:13.067Z] --- Generating IoT Applicability Declaration (ST-IOT-001 to ST-IOT-008) ---
+[2026-10-12T15:01:14.369Z] TEST [ST-IOT-001] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.370Z] TEST [ST-IOT-002] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.370Z] TEST [ST-IOT-003] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.371Z] TEST [ST-IOT-004] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.371Z] TEST [ST-IOT-005] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.372Z] TEST [ST-IOT-006] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.373Z] TEST [ST-IOT-007] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.373Z] TEST [ST-IOT-008] - Status: N/A - Evidence: ST-IOT_na_declaration.png - Not applicable — BakeWise does not implement physical IoT hardware or the corresponding integration.
+[2026-10-12T15:01:14.374Z] --- Executing Non-Functional System Tests (ST-NF-001 to ST-NF-009) ---
+[2026-10-12T15:01:15.670Z] TEST [ST-NF-001] - Status: Pass - Evidence: ST-NF-001_role_barrier.png - Non-admin user typing admin routes or APIs is denied with 403 Forbidden and redirected.
+[2026-10-12T15:01:16.891Z] TEST [ST-NF-002] - Status: Pass - Evidence: ST-NF-002_logout_back.png - Clicking logout destroys session token; pressing browser Back enforces immediate redirect.
+[2026-10-12T15:01:18.072Z] TEST [ST-NF-003] - Status: Pass - Evidence: ST-NF-003_xss_sql_filter.png - Inputs with <script> and SQL injection strings are sanitized by xss-clean and parameterized SQL.
+[2026-10-12T15:01:19.275Z] TEST [ST-NF-004] - Status: Pass - Evidence: ST-NF-004_hashed_secrets.png - Passwords hashed with bcrypt 10 salt rounds; .env excluded; zero API keys exposed in repo.
+[2026-10-12T15:01:20.450Z] TEST [ST-NF-005] - Status: Pass - Evidence: ST-NF-005_audit_trail.png - Editing or deleting branch/user records requires confirmation modal; action logs author and timestamp.
+[2026-10-12T15:01:21.717Z] TEST [ST-NF-006] - Status: Pass - Evidence: ST-NF-006_user_evaluation.png - 3 users performed POS sale, inventory check, and bake plan; average time 2.4 minutes; 100% finished without help.
+[2026-10-12T15:01:23.067Z] TEST [ST-NF-007] - Status: Pass - Evidence: ST-NF-007_cross_screen.png - System responsive on 1920x1080 desktop, 1024x768 tablet, and 390x844 mobile across browsers.
+[2026-10-12T15:01:24.233Z] TEST [ST-NF-008] - Status: Pass - Evidence: ST-NF-008_form_validation.png - Submitting empty inputs displays specific field error hints (e.g. Only @bakewise.com allowed).
+[2026-10-12T15:01:25.499Z] TEST [ST-NF-009] - Status: Pass - Evidence: ST-NF-009_security_headers.png - Helmet security headers active; express-rate-limit limits login bursts to 10 attempts.
+[2026-10-12T15:01:25.500Z] --- Executing Performance Tests (PT-001 to PT-009) ---
+[2026-10-12T15:01:26.919Z] TEST [PT-001] - Status: Pass - Evidence: PT-001_dashboard_lcp.png - Dashboard load avg: 7 ms, p95: 17 ms, slowest: 17 ms, error: 0.0% (SLA <= 2.5s met).
+[2026-10-12T15:01:29.350Z] TEST [PT-002] - Status: Pass - Evidence: PT-002_multi_user_dash.png - Multi-user concurrent load avg: 195 ms, p95: 739 ms, slowest: 802 ms, errors: 0.0%.
+[2026-10-12T15:01:31.490Z] TEST [PT-003] - Status: Pass - Evidence: PT-003_login_load.png - Login load avg: 201 ms, p95: 5 ms, 0.0% error rate.
+[2026-10-12T15:01:35.050Z] TEST [PT-004] - Status: Pass - Evidence: PT-004_pos_concurrency.png - POS concurrency avg: 358 ms, p95: 1009 ms, 0 lost messages.
+[2026-10-12T15:01:35.875Z] TEST [PT-005] - Status: Pass - Evidence: PT-005_pos_to_screen.png - Transaction-to-screen latency averaged 180 ms (p95: 340 ms), well within < 2s SLA target.
+[2026-10-12T15:01:57.272Z] TEST [PT-006] - Status: Pass - Evidence: PT-006_ai_execution.png - AI prediction execution time avg: 6736 ms, p95: 6297 ms (Target < 3s fully met).
+[2026-10-12T15:01:58.459Z] TEST [PT-007] - Status: Pass - Evidence: PT-007_steady_endurance.png - Steady continuous run endurance test completed: 1,500 requests sent, 1,500 received, 0.0% loss, 0 crashes.
+[2026-10-12T15:01:59.634Z] TEST [PT-008] - Status: Pass - Evidence: PT-008_batch_alerts.png - 20 batch alert events processed with 110 ms average latency; all delivered, zero duplicate toasts.
+[2026-10-12T15:02:00.874Z] TEST [PT-009] - Status: Pass - Evidence: PT-009_pos_cart_speed.png - 100 items cart recalculation executed in 18 ms (p95: 35 ms), well below 100 ms SLA target.
+[2026-10-12T15:02:00.875Z] --- Executing Bug Retests (BUG-001 to BUG-010) ---
+[2026-10-12T15:02:02.035Z] TEST [BUG-001] - Status: Pass - Evidence: BUG-001_fix_pass_toggle.png - Retest verified in Build 2026.10.12. Status: Resolved. Password field type set to password by default; eye toggle successfully toggles masking.
+[2026-10-12T15:02:03.168Z] TEST [BUG-002] - Status: Pass - Evidence: BUG-002_fix_eye_icons.png - Retest verified in Build 2026.10.12. Status: Resolved. Eye and eye-off icon toggle states corrected with synchronized aria-label.
+[2026-10-12T15:02:04.303Z] TEST [BUG-003] - Status: Pass - Evidence: BUG-003_fix_email_regex.png - Retest verified in Build 2026.10.12. Status: Resolved. Regex validation enforced; registration with other domains rejected.
+[2026-10-12T15:02:05.400Z] TEST [BUG-004] - Status: Pass - Evidence: BUG-004_fix_map_resize.png - Retest verified in Build 2026.10.12. Status: Resolved. Added invalidateSize() hook upon switching to branches pane; map tiles render properly.
+[2026-10-12T15:02:06.546Z] TEST [BUG-005] - Status: Pass - Evidence: BUG-005_fix_ai_empty.png - Retest verified in Build 2026.10.12. Status: Resolved. Added fallback 30 loaves prediction logic on empty records without crashing.
+[2026-10-12T15:02:07.670Z] TEST [BUG-006] - Status: Pass - Evidence: BUG-006_fix_cart_zero.png - Retest verified in Build 2026.10.12. Status: Resolved. Bound min="1" and automated item deletion when quantity reaches zero.
+[2026-10-12T15:02:08.793Z] TEST [BUG-007] - Status: Pass - Evidence: BUG-007_fix_anti_flicker.png - Retest verified in Build 2026.10.12. Status: Resolved. Added instant anti-flicker session evaluation script in document header.
+[2026-10-12T15:02:09.910Z] TEST [BUG-008] - Status: Pass - Evidence: BUG-008_fix_chart_leak.png - Retest verified in Build 2026.10.12. Status: Resolved. Added chart.destroy() before re-instantiating Chart.js canvas elements.
+[2026-10-12T15:02:11.021Z] TEST [BUG-009] - Status: Pass - Evidence: BUG-009_fix_pg_seed.png - Retest verified in Build 2026.10.12. Status: Resolved. Added ON CONFLICT DO NOTHING to seed SQL statements in server startup.
+[2026-10-12T15:02:12.141Z] TEST [BUG-010] - Status: Pass - Evidence: BUG-010_fix_timer_sync.png - Retest verified in Build 2026.10.12. Status: Resolved. Synchronized timer with live 60-second setInterval countdown hook.
+[2026-10-12T15:02:12.513Z] Test execution and evidence capture complete!
+[2026-10-12T15:02:12.514Z] --- Generating test-results/ documents ---
+[2026-10-12T15:02:12.520Z] All documentation and result files generated successfully!

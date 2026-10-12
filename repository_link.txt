@@ -1,0 +1,6 @@
+Repository: https://github.com/rubygraceones-gif/CAPSTONEbakewise_system
+Commit Tested: 1eef86427b67f1217d341c9b0b236fc718f20ebf
+Branch: main
+Build: Version 2.0.0 (Alpha Release) / Build 2026.10.12
+Authors: Ruby Grace Oñes & Ceilo Morales
+Adviser: Arvin G. Lauron

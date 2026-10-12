@@ -1,0 +1,24 @@
+OFFICIAL NOT APPLICABLE (N/A) DECLARATION: PHYSICAL IOT HARDWARE TEST CASES
+Project: BakeWise — AI-Powered Bakery Management System for Bread Waste Reduction and Production Optimization
+Standard: ISO/IEC 25010 Software Quality Assessment & Pre-UAT Verification Suite
+Test Cases Covered: ST-IOT-001, ST-IOT-002, ST-IOT-003, ST-IOT-004, ST-IOT-005, ST-IOT-006, ST-IOT-007, ST-IOT-008
+
+DECLARATION STATEMENT:
+The BakeWise development team explicitly certifies that BakeWise is a purely web-based, AI-driven software application deployed on cloud infrastructure (Railway PaaS, Supabase PostgreSQL, Node.js Express, and Scikit-Learn).
+
+BakeWise does NOT contain, integrate, or rely upon physical IoT hardware sensors, microcontrollers (e.g. ESP32, Arduino), physical MQTT brokers, or mechanical actuators/relays.
+
+SPECIFIC EVALUATIONS:
+• ST-IOT-001 (Sensor Accuracy): N/A — Bakery storage temperature references use OpenWeather API data and manual bakery thermometer readings.
+• ST-IOT-002 (Continuous Run): N/A — No IoT microcontrollers utilized. Server endurance verified under PT-007.
+• ST-IOT-003 (WiFi Drop): N/A — No hardware microcontroller WiFi. Browser offline recovery tested under IT-007.
+• ST-IOT-004 (Power Loss): N/A — No physical battery/embedded hardware.
+• ST-IOT-005 (Sensor Disconnected): N/A — No physical sensor wiring. Form data validation verified under UT-003.
+• ST-IOT-006 (Device Identity): N/A — System authenticates users via Bcrypt hashes and JWT tokens, not hardware MAC/chip IDs.
+• ST-IOT-007 (Timestamp): N/A for hardware clocks. Server timestamps verified under UT-013 using Asia/Manila zone.
+• ST-IOT-008 (Custom Hardware): N/A — Hardware IoT tests not applicable to pure web software.
+
+SIGNED BY:
+Ruby Grace Oñes (Project Manager / Full-Stack Developer)
+Ceilo Morales (Frontend & Quality Assurance Lead)
+Date: October 12, 2026

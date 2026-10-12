@@ -24,7 +24,7 @@ Team members                                Ruby Grace Oñes (Project Manager / 
 Capstone adviser                            Arvin G. Lauron
 
 Version or build (or Git commit) tested     Version 2.0.0 (Alpha Release) / Build 2026.10.12
-                                            Git Commit: 4bc772f429529a8e6e88cb9d3fd84c24b72b3839
+                                            Git Commit: 1eef86427b67f1217d341c9b0b236fc718f20ebf
 
 Date(s) tested                              September 28, 2026 – October 12, 2026
 
