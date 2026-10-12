@@ -5,7 +5,7 @@ Project Title: BakeWise: AI-Powered Bakery Management System for Bread Waste Red
 Standard: ISO/IEC 25010 Software Quality Assessment & Pre-UAT Verification Suite
 Instructions: Run each test, fill the shaded cells, attach the evidence file named in the last column. 
               Write N/A and a reason for a test your system does not have.
-Evidence Format: System file name in folder and line numbers of the code (e.g., public/app.js:L1138-1175).
+Evidence Format: Evidence File Name [System Code File & Line Number]
 
 
 ====================================================================================================
@@ -54,120 +54,120 @@ B. UNIT TESTS
 ====================================================================================================
 Coverage: 94.2 %     Tool: Jest / Node.js Native Test Assertions & Python Unittest
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ID      Test (what to do)                          Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID      Test (what to do)                          Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 ------  -----------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-UT-001  Parse a valid sensor message               Values read correctly                       N/A: Pure Web AI Bakery System without      N/A          server.js:L35 (N/A: IoT Sensor)
-        Input: {"temp": 28.5, "hum": 60}                                                       physical sensors. Express body-parser parses
+UT-001  Parse a valid sensor message               Values read correctly                       N/A: Pure Web AI Bakery System without      N/A          evidence/UT-001_sensor_na.png
+        Input: {"temp": 28.5, "hum": 60}                                                       physical sensors. Express body-parser parses             [server.js:L35 (N/A: IoT Sensor)]
                                                                                                POS sales JSON payloads {"pId":1,"qty":5}.
 
-UT-002  Reject a broken message                    Error raised, nothing saved                 Malformed non-JSON payload to REST API      Pass         server.js:L33-35
-        Input: not json                                                                        triggers 400 Bad Request error from
+UT-002  Reject a broken message                    Error raised, nothing saved                 Malformed non-JSON payload to REST API      Pass         evidence/UT-002_malformed_json.png
+        Input: not json                                                                        triggers 400 Bad Request error from                      [server.js:L33-35]
                                                                                                body-parser middleware; 0 rows inserted.
 
-UT-003  Reject a message with a missing field      Rejected with a clear error                 API payload missing required parameters     Pass         server.js:L830-838
-        Input: {"temp": 28.5}                                                                  (e.g., email without password) returns 400
+UT-003  Reject a message with a missing field      Rejected with a clear error                 API payload missing required parameters     Pass         evidence/UT-003_missing_fields.png
+        Input: {"temp": 28.5}                                                                  (e.g., email without password) returns 400               [server.js:L830-838]
                                                                                                "Missing required fields"; request aborted.
 
-UT-004  Flag impossible values                     Marked invalid, not stored as real data     Negative or zero transaction quantities     Pass         public/app.js:L1722-1731
-        Input: temp = 200 or -50                                                               (e.g. qty = -50 or 0) are blocked by
+UT-004  Flag impossible values                     Marked invalid, not stored as real data     Negative or zero transaction quantities     Pass         evidence/UT-004_invalid_qty.png
+        Input: temp = 200 or -50                                                               (e.g. qty = -50 or 0) are blocked by                     [public/app.js:L1722-1731]
                                                                                                HTML5 min="1" and server-side validation.
 
-UT-005  Calibration or unit conversion             Converted value matches your hand           Shelf-life hourly decay formula:            Pass         public/app.js:L4961-4978
-        (if applicable)                            calculation                                 decay_factor = 1.0 + (temp - 25)*0.05.
+UT-005  Calibration or unit conversion             Converted value matches your hand           Shelf-life hourly decay formula:            Pass         evidence/UT-005_decay_calc.png
+        (if applicable)                            calculation                                 decay_factor = 1.0 + (temp - 25)*0.05.                   [public/app.js:L4961-4978]
         Input: raw sensor value 512                                                            Calculated decay matches manual formula.
 
-UT-006  Alert rule at the exact limit              Alert behaves as your rule says,            When product stock count drops to exact     Pass         public/app.js:L4135-4155
-        (if applicable)                            same every time                             reorder limit (threshold = 10), Low Stock
+UT-006  Alert rule at the exact limit              Alert behaves as your rule says,            When product stock count drops to exact     Pass         evidence/UT-006_threshold_alert.png
+        (if applicable)                            same every time                             reorder limit (threshold = 10), Low Stock                [public/app.js:L4135-4155]
         Input: value = threshold                                                               warning badge triggers consistently.
 
-UT-007  AI input preparation                       Resized or cleaned to the exact shape       Sales dataframe missing lag values fills    Pass         src/ai_forecast.py:L32-46
-        Input: image or data row in the            the model needs                             lag_1 with mean, extracts day_of_week,
+UT-007  AI input preparation                       Resized or cleaned to the exact shape       Sales dataframe missing lag values fills    Pass         evidence/UT-007_ai_input_prep.png
+        Input: image or data row in the            the model needs                             lag_1 with mean, extracts day_of_week,                   [src/ai_forecast.py:L32-46]
         wrong size                                                                             day_of_month, and month into (N, 4) matrix.
 
-UT-008  AI prediction output                       Allowed label and a confidence from         Python microservice outputs predicted       Pass         src/ai_forecast.py:L48-70
-        Input: one known sample                    0 to 1                                      demand integer (e.g. 35 loaves) with
+UT-008  AI prediction output                       Allowed label and a confidence from         Python microservice outputs predicted       Pass         evidence/UT-008_ai_output.png
+        Input: one known sample                    0 to 1                                      demand integer (e.g. 35 loaves) with                     [src/ai_forecast.py:L48-70]
                                                                                                RMSE (3.12) and weighted F1-Score (0.91).
 
-UT-009  Low-confidence handling                    "Uncertain" or retry message, not a         Zero sales history triggers safe baseline   Pass         src/ai_forecast.py:L28-30
-        Input: blurry or unclear sample            guess                                       fallback of 30 loaves with informative
+UT-009  Low-confidence handling                    "Uncertain" or retry message, not a         Zero sales history triggers safe baseline   Pass         evidence/UT-009_low_confidence.png
+        Input: blurry or unclear sample            guess                                       fallback of 30 loaves with informative                   [src/ai_forecast.py:L28-30]
                                                                                                advisory notice rather than arbitrary guess.
 
-UT-010  Known-answer check                         Prediction matches each one                 5 known sales history sequences yield       Pass         src/ai_forecast.py:L72-82
-        Input: 5 samples whose answer you know                                                 forecast values within ±2.5% tolerance of
+UT-010  Known-answer check                         Prediction matches each one                 5 known sales history sequences yield       Pass         evidence/UT-010_known_answers.png
+        Input: 5 samples whose answer you know                                                 forecast values within ±2.5% tolerance of                [src/ai_forecast.py:L72-82]
                                                                                                historical expected baseline production.
 
-UT-011  Login check                                Rejected; stored password is not            Invalid password rejected with 401          Pass         server.js:L851-855
-        Input: wrong password                      plain text                                  Unauthorized; passwords verified via
+UT-011  Login check                                Rejected; stored password is not            Invalid password rejected with 401          Pass         evidence/UT-011_login_hash.png
+        Input: wrong password                      plain text                                  Unauthorized; passwords verified via                     [server.js:L851-855]
                                                                                                bcrypt.compareSync against salted hashes.
 
-UT-012  Role permission check (if applicable)      Denied                                      Non-admin role (Cashier/Baker) calling      Pass         public/app.js:L1100-1135
-        Input: student role asks for an admin                                                  User Management API receives 403 Forbidden;
+UT-012  Role permission check (if applicable)      Denied                                      Non-admin role (Cashier/Baker) calling      Pass         evidence/UT-012_role_check.png
+        Input: student role asks for an admin                                                  User Management API receives 403 Forbidden;              [public/app.js:L1100-1135]
         action                                                                                 admin navigation pane completely hidden.
 
-UT-013  Date and time handling                     Saved with the correct date in              Transactions recorded at 23:59 preserve     Pass         public/app.js:L877-880
-        Input: reading sent at 23:59               Asia/Manila time                            accurate Asia/Manila (UTC+8) timestamp
+UT-013  Date and time handling                     Saved with the correct date in              Transactions recorded at 23:59 preserve     Pass         evidence/UT-013_timezone_manila.png
+        Input: reading sent at 23:59               Asia/Manila time                            accurate Asia/Manila (UTC+8) timestamp                   [public/app.js:L877-880]
                                                                                                without date roll-over anomalies.
 
-UT-014  Password Masking & Visibility Toggle       Password characters appear as asterisks;    #usr-password-input defaults to password    Pass         public/app.js:L1138-1175
-        Input: Type password in staff form; click  toggling eye icon reveals text without      type with masked dots; eye toggle reveals
+UT-014  Password Masking & Visibility Toggle       Password characters appear as asterisks;    #usr-password-input defaults to password    Pass         evidence/UT-014_password_toggle.png
+        Input: Type password in staff form; click  toggling eye icon reveals text without      type with masked dots; eye toggle reveals                [public/app.js:L1138-1175]
         eye toggle button                          erasing value; resets on form reset         plain text; resets to masked on form reset.
 
-UT-015  Email Domain Validation Constraint         Registration rejected; clear error message  Email without @bakewise.com domain is       Pass         public/app.js:L1781-1784
-        Input: Enter email 'staff@gmail.com' in    informs user only @bakewise.com allowed     rejected; red validation message displayed;
+UT-015  Email Domain Validation Constraint         Registration rejected; clear error message  Email without @bakewise.com domain is       Pass         evidence/UT-015_email_domain.png
+        Input: Enter email 'staff@gmail.com' in    informs user only @bakewise.com allowed     rejected; red validation message displayed;              [public/app.js:L1781-1784]
         Staff Registration form                                                                no account inserted into bw_users table.
 
 
 ====================================================================================================
 C. INTEGRATION TESTS
 ====================================================================================================
-ID      Test (what to do)                          Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID      Test (what to do)                          Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 ------  -----------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-IT-001  Sensor to broker                           MQTTX shows 31.7 on the correct topic       N/A: BakeWise does not use MQTT brokers or  N/A          server.js:L14-20 (N/A)
-        Input: Device sends temp 31.7              within a few seconds                        hardware sensors. Direct client-to-API
+IT-001  Sensor to broker                           MQTTX shows 31.7 on the correct topic       N/A: BakeWise does not use MQTT brokers or  N/A          evidence/IT-001_broker_na.png
+        Input: Device sends temp 31.7              within a few seconds                        hardware sensors. Direct client-to-API                   [server.js:L14-20 (N/A)]
                                                                                                communication via HTTPS JSON endpoints.
 
-IT-002  Broker to database                         One new row with 31.7, the right device ID  N/A: POS and Inventory checkout endpoints   N/A          server.js:L1060-1072 (N/A)
-        Input: Same message                        and timestamp                               persist transaction rows directly to
+IT-002  Broker to database                         One new row with 31.7, the right device ID  N/A: POS and Inventory checkout endpoints   N/A          evidence/IT-002_broker_db_na.png
+        Input: Same message                        and timestamp                               persist transaction rows directly to                     [server.js:L1060-1072 (N/A)]
                                                                                                PostgreSQL / MySQL via parameterized SQL.
 
-IT-003  Database to AI                             AI result (label and confidence) stored     Node.js backend queries bw_sales rows,      Pass         server.js:L1150-1185
-        Input: A row exists                        or returned for that row                    pipes payload to python ai_forecast.py, and
+IT-003  Database to AI                             AI result (label and confidence) stored     Node.js backend queries bw_sales rows,      Pass         evidence/IT-003_db_to_ai.png
+        Input: A row exists                        or returned for that row                    pipes payload to python ai_forecast.py, and              [server.js:L1150-1185]
                                                                                                receives JSON predicted demand and metrics.
 
-IT-004  AI to dashboard                            Dashboard shows the same result as the      Predicted demand (e.g. 45 units) and        Pass         public/app.js:L2750-2810
-        Input: AI result exists                    database                                    category ("High") render on Dashboard
+IT-004  AI to dashboard                            Dashboard shows the same result as the      Predicted demand (e.g. 45 units) and        Pass         evidence/IT-004_ai_to_dash.png
+        Input: AI result exists                    database                                    category ("High") render on Dashboard                    [public/app.js:L2750-2810]
                                                                                                Analytics view matching model JSON response.
 
-IT-005  Alert rule                                 Alert created and delivered once            Bread reaching shelf-life threshold (0 hrs  Pass         public/app.js:L4980-5020
-        Input: Send a value above your alert       (SMS, email, push or on screen)             left) generates screen toast alert and
+IT-005  Alert rule                                 Alert created and delivered once            Bread reaching shelf-life threshold (0 hrs  Pass         evidence/IT-005_alert_delivery.png
+        Input: Send a value above your alert       (SMS, email, push or on screen)             left) generates screen toast alert and                   [public/app.js:L4980-5020]
         limit                                                                                  repurposing recommendation card once.
 
-IT-006  Bad data                                   Rejected; no half-saved row; error          Incomplete production payload rejected;     Pass         server.js:L1060-1072
-        Input: Send a message with a missing       logged                                      database transaction rolls back; 0 partial
+IT-006  Bad data                                   Rejected; no half-saved row; error          Incomplete production payload rejected;     Pass         evidence/IT-006_bad_data_rollback.png
+        Input: Send a message with a missing       logged                                      database transaction rolls back; 0 partial               [server.js:L1060-1072]
         field                                                                                  rows inserted into bw_production table.
 
-IT-007  Device offline, then back                  Reconnects by itself; dashboard shows       Local BakeWiseStore offline mode caches     Pass         public/app.js:L145-185
-        Input: Switch off the device's WiFi for    offline then online; no duplicate rows      pending requests; re-synchronizes with
+IT-007  Device offline, then back                  Reconnects by itself; dashboard shows       Local BakeWiseStore offline mode caches     Pass         evidence/IT-007_offline_reconnect.png
+        Input: Switch off the device's WiFi for    offline then online; no duplicate rows      pending requests; re-synchronizes with                   [public/app.js:L145-185]
         2 minutes, then on                                                                     server upon connection without duplicates.
 
-IT-008  Control command (if applicable)            Message reaches the device; actuator        N/A: System does not control physical       N/A          public/app.js:L1735-1750 (N/A)
-        Input: Press "turn on" in the app          changes; app shows the new state            actuators or relays. Software state changes
+IT-008  Control command (if applicable)            Message reaches the device; actuator        N/A: System does not control physical       N/A          evidence/IT-008_actuator_na.png
+        Input: Press "turn on" in the app          changes; app shows the new state            actuators or relays. Software state changes              [public/app.js:L1735-1750 (N/A)]
                                                                                                (e.g. Bake Status) update in UI & database.
 
-IT-009  Two devices at once                        Each reading saved under the right device   Simultaneous checkout requests from 2 POS   Pass         server.js:L1076-1120
-        Input: Two devices send together           ID, nothing mixed up                        terminals save under separate transaction
+IT-009  Two devices at once                        Each reading saved under the right device   Simultaneous checkout requests from 2 POS   Pass         evidence/IT-009_concurrent_pos.png
+        Input: Two devices send together           ID, nothing mixed up                        terminals save under separate transaction                [server.js:L1076-1120]
                                                                                                IDs with distinct timestamps and items.
 
-IT-010  Two user roles (if applicable)             The normal user sees the change             Global Admin updates product price or item  Pass         public/app.js:L516-545
-        Input: Admin edits a setting                                                           in Catalog; Cashier POS view reflects new
+IT-010  Two user roles (if applicable)             The normal user sees the change             Global Admin updates product price or item  Pass         evidence/IT-010_multi_role_sync.png
+        Input: Admin edits a setting                                                           in Catalog; Cashier POS view reflects new                [public/app.js:L516-545]
                                                                                                price immediately upon next item selection.
 
-IT-011  POS Checkout to Inventory Deduction        Sales quantity automatically deducted       Checking out 5 Pan de Coco units in POS     Pass         public/app.js:L3380-3430
-        Input: Complete POS order for 5 Pan de     from current inventory stock in real time   instantly deducts 5 units from inventory
+IT-011  POS Checkout to Inventory Deduction        Sales quantity automatically deducted       Checking out 5 Pan de Coco units in POS     Pass         evidence/IT-011_pos_inventory_sync.png
+        Input: Complete POS order for 5 Pan de     from current inventory stock in real time   instantly deducts 5 units from inventory                 [public/app.js:L3380-3430]
         Coco items                                                                             and logs record into bw_sales table.
 
-IT-012  Dual Database Engine Interoperability      Seamless operation across local MySQL       System auto-detects active driver (pg or    Pass         server.js:L105-185
-        Input: Switch DB candidates between local  and cloud Supabase PostgreSQL               mysql2) and executes compatible SQL syntax
+IT-012  Dual Database Engine Interoperability      Seamless operation across local MySQL       System auto-detects active driver (pg or    Pass         evidence/IT-012_dual_db_engine.png
+        Input: Switch DB candidates between local  and cloud Supabase PostgreSQL               mysql2) and executes compatible SQL syntax               [server.js:L105-185]
         XAMPP MySQL and cloud PostgreSQL                                                       with zero transaction syntax failures.
 
 
@@ -177,175 +177,184 @@ D. SYSTEM TESTS
 
 D1. FUNCTIONAL
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 --------  ---------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-ST-F-001  Login                                    Opens the correct dashboard for that role   Authenticated admin user redirects to       Pass         public/app.js:L1154-1168
-          Input: Enter valid email and password                                                Administrator Dashboard with full
+ST-F-001  Login                                    Opens the correct dashboard for that role   Authenticated admin user redirects to       Pass         evidence/ST-F-001_admin_login.png
+          Input: Enter valid email and password                                                Administrator Dashboard with full                        [public/app.js:L1154-1168]
                                                                                                analytics and management tabs visible.
 
-ST-F-002  Live data                                Dashboard updates within the time you       Sales transaction logged in POS updates     Pass         public/app.js:L2180-2225
-          Input: Device sends a new reading        promised (for example 5 seconds)            Dashboard Total Sales Counter and Chart
+ST-F-002  Live data                                Dashboard updates within the time you       Sales transaction logged in POS updates     Pass         evidence/ST-F-002_live_sales_kpi.png
+          Input: Device sends a new reading        promised (for example 5 seconds)            Dashboard Total Sales Counter and Chart                  [public/app.js:L2180-2225]
                                                                                                within 1.2 seconds (< 5s target).
 
-ST-F-003  History and chart                        Chart shows the saved readings for that     Selecting 7-day or 30-day date filters      Pass         public/app.js:L2230-2300
-          Input: Pick yesterday's date             day                                         dynamically re-renders Chart.js sales and
+ST-F-003  History and chart                        Chart shows the saved readings for that     Selecting 7-day or 30-day date filters      Pass         evidence/ST-F-003_history_chart.png
+          Input: Pick yesterday's date             day                                         dynamically re-renders Chart.js sales and                [public/app.js:L2230-2300]
                                                                                                waste trend comparison curves accurately.
 
-ST-F-004  Alert                                    Alert received once; appears in the alert   Batch exceeding shelf life triggers toast   Pass         public/app.js:L4130-4170
-          Input: Raise a value above the limit     history                                     notification and populates Repurposing
+ST-F-004  Alert                                    Alert received once; appears in the alert   Batch exceeding shelf life triggers toast   Pass         evidence/ST-F-004_shelf_life_alert.png
+          Input: Raise a value above the limit     history                                     notification and populates Repurposing                   [public/app.js:L4130-4170]
                                                                                                recommendation card in Waste view once.
 
-ST-F-005  AI result shown                          Dashboard shows the label and confidence    Demand forecast module outputs recommended  Pass         public/app.js:L2780-2820
-          Input: Upload an image or feed a sample                                              bake units, category label ("High"), and
+ST-F-005  AI result shown                          Dashboard shows the label and confidence    Demand forecast module outputs recommended  Pass         evidence/ST-F-005_ai_forecast_card.png
+          Input: Upload an image or feed a sample                                              bake units, category label ("High"), and                 [public/app.js:L2780-2820]
                                                                                                evaluation metrics (RMSE: 3.12, F1: 0.91).
 
-ST-F-006  Device management                        List updates each time; deleted device      N/A for IoT devices. (Branch Management:    Pass         public/app.js:L1799-1845
-          Input: Admin adds, edits, then removes   stops appearing                             Admin registers, edits, and deletes bakeshop
+ST-F-006  Device management                        List updates each time; deleted device      N/A for IoT devices. (Branch Management:    Pass         evidence/ST-F-006_branch_mgmt.png
+          Input: Admin adds, edits, then removes   stops appearing                             Admin registers, edits, and deletes bakeshop             [public/app.js:L1799-1845]
           a device                                                                             branches; table and map update instantly).
 
-ST-F-007  Report or export (if applicable)         File opens and matches what the screen      Sales, Inventory, and Waste report views    Pass         public/app.js:L2450-2520
-          Input: Click export                      shows                                       display complete tabulated transaction logs
+ST-F-007  Report or export (if applicable)         File opens and matches what the screen      Sales, Inventory, and Waste report views    Pass         evidence/ST-F-007_audit_report.png
+          Input: Click export                      shows                                       display complete tabulated transaction logs              [public/app.js:L2450-2520]
                                                                                                with matching totals and printable layout.
 
-ST-F-008  Control command (if applicable)          Device changes state and the app confirms   N/A: No hardware actuators. (Production     Pass         public/app.js:L1735-1760
-          Input: Switch the pump, light or relay   it                                          Workflow: Updating bake batch status from
+ST-F-008  Control command (if applicable)          Device changes state and the app confirms   N/A: No hardware actuators. (Production     Pass         evidence/ST-F-008_prod_status.png
+          Input: Switch the pump, light or relay   it                                          Workflow: Updating bake batch status from                [public/app.js:L1735-1760]
           from the app                                                                         "Baking" to "Completed" updates in UI/DB).
 
-ST-F-009  Product Catalog Management               Product added to catalog and available      Created "Cheese Ensaymada" at 25.00 PHP;    Pass         public/app.js:L2060-2100
-          Input: Admin registers new product with  in POS checkout grid immediately            item immediately selectable in POS checkout
+ST-F-009  Product Catalog Management               Product added to catalog and available      Created "Cheese Ensaymada" at 25.00 PHP;    Pass         evidence/ST-F-009_product_catalog.png
+          Input: Admin registers new product with  in POS checkout grid immediately            item immediately selectable in POS checkout              [public/app.js:L2060-2100]
           price, shelf life, and category                                                      with correct shelf-life decay attributes.
 
-ST-F-010  Waste Repurposing Conversion             Unsold bread converted into repurposed      Selected 10 day-old Pandesal loaves;        Pass         public/app.js:L4160-4210
-          Input: Staff selects expired bread item  item; loss offset logged in waste records   system generated "Bread Pudding" production
+ST-F-010  Waste Repurposing Conversion             Unsold bread converted into repurposed      Selected 10 day-old Pandesal loaves;        Pass         evidence/ST-F-010_waste_repurpose.png
+          Input: Staff selects expired bread item  item; loss offset logged in waste records   system generated "Bread Pudding" production              [public/app.js:L4160-4210]
           and clicks "Repurpose"                                                               entry, reducing waste loss percentage.
 
 
 D2. AI
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 --------  ---------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-ST-AI-001 Accuracy on unseen data                  Accuracy and recall meet the target in      Random Forest model evaluated on 73 unseen  Pass         src/ai_forecast.py:L48-70
-          Input: Run model on test set it never    your objectives; attach the printed report  samples achieved Weighted F1-Score of 0.91,
+ST-AI-001 Accuracy on unseen data                  Accuracy and recall meet the target in      Random Forest model evaluated on 73 unseen  Pass         evidence/ST-AI-001_model_report.png
+          Input: Run model on test set it never    your objectives; attach the printed report  samples achieved Weighted F1-Score of 0.91,              [src/ai_forecast.py:L48-70]
           trained on (suggest 30+ samples per      and confusion matrix                        MAE of 2.45 loaves, and RMSE of 3.12.
           class); print report                                                                 (Target > 85% accuracy fully met).
 
-ST-AI-002 Wrong-answer analysis                    You can name the most common mistake and    Confusion matrix shows main error is        Pass         src/ai_forecast.py:L60-70
-          Input: Read the confusion matrix         which class it hurts most                   misclassifying borderline "Medium" demand
+ST-AI-002 Wrong-answer analysis                    You can name the most common mistake and    Confusion matrix shows main error is        Pass         evidence/ST-AI-002_confusion_matrix.png
+          Input: Read the confusion matrix         which class it hurts most                   misclassifying borderline "Medium" demand                [src/ai_forecast.py:L60-70]
                                                                                                as "High" during holiday spikes (3 samples).
 
-ST-AI-003 Bad input                                No crash; "cannot classify, try again" or   Malformed payload or negative quantities    Pass         src/ai_forecast.py:L17-30
-          Input: Blurry, dark, empty or wrong-type low-confidence warning                      trigger exception handler returning default
+ST-AI-003 Bad input                                No crash; "cannot classify, try again" or   Malformed payload or negative quantities    Pass         evidence/ST-AI-003_bad_ai_input.png
+          Input: Blurry, dark, empty or wrong-type low-confidence warning                      trigger exception handler returning default              [src/ai_forecast.py:L17-30]
           input                                                                                30-unit safe plan with descriptive notice.
 
-ST-AI-004 Real-world input                         Results reported honestly; compared with    10 daily sales records from Rose Bakeshop   Pass         src/ai_forecast.py:L71-93
-          Input: 10 samples from the real site,    the lab result                              Lasang branch evaluated; prediction variance
+ST-AI-004 Real-world input                         Results reported honestly; compared with    10 daily sales records from Rose Bakeshop   Pass         evidence/ST-AI-004_real_world_test.png
+          Input: 10 samples from the real site,    the lab result                              Lasang branch evaluated; prediction variance             [src/ai_forecast.py:L71-93]
           not from the dataset                                                                 averaged 8.5% compared to actual sales.
 
-ST-AI-005 Model unavailable (if applicable)        Clear message shown; sensor data keeps      If Python microservice is paused, backend   Pass         server.js:L1175-1190
-          Input: Stop the AI service               being saved                                 falls back to moving average computation;
+ST-AI-005 Model unavailable (if applicable)        Clear message shown; sensor data keeps      If Python microservice is paused, backend   Pass         evidence/ST-AI-005_ai_fallback.png
+          Input: Stop the AI service               being saved                                 falls back to moving average computation;                [server.js:L1175-1190]
                                                                                                POS and sales transactions record normally.
 
-ST-AI-006 Confidence shown                         Confidence is visible; very low confidence  Dashboard displays RMSE, MAE, and demand    Pass         public/app.js:L2785-2815
-          Input: Check 5 results                   is not acted on automatically               category; low-confidence outliers prompt
+ST-AI-006 Confidence shown                         Confidence is visible; very low confidence  Dashboard displays RMSE, MAE, and demand    Pass         evidence/ST-AI-006_confidence_metrics.png
+          Input: Check 5 results                   is not acted on automatically               category; low-confidence outliers prompt                [public/app.js:L2785-2815]
                                                                                                baker confirmation before baking schedule.
 
-ST-AI-007 Weather-Aware Shelf Life Prediction      Calculated decay accelerates during high    Simulated Davao temperature of 33°C and     Pass         public/app.js:L4961-4978
-          Input: Input ambient temperature (33°C)  heat/humidity; shelf life adjusted          82% humidity reduces Pan de Sal shelf life
+ST-AI-007 Weather-Aware Shelf Life Prediction      Calculated decay accelerates during high    Simulated Davao temperature of 33°C and     Pass         evidence/ST-AI-007_weather_decay.png
+          Input: Input ambient temperature (33°C)  heat/humidity; shelf life adjusted          82% humidity reduces Pan de Sal shelf life               [public/app.js:L4961-4978]
           and humidity (82%) from weather notice                                               from 48 hrs to 36 hrs to prevent spoilage.
 
 
 D3. IOT
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ID          Test (what to do)                      Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID          Test (what to do)                      Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 ----------  -------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-ST-IOT-001  Sensor accuracy                        Average difference is inside the accuracy   N/A: Pure Web AI system. Bakery storage     N/A          server.js:L14-25 (N/A)
-            Input: 10 readings next to trusted ref in the sensor datasheet                     temperature uses OpenWeather API for Davao.
+ST-IOT-001  Sensor accuracy                        Average difference is inside the accuracy   N/A: Pure Web AI system. Bakery storage     N/A          evidence/ST-IOT_na_declaration.png
+            Input: 10 readings next to trusted ref in the sensor datasheet                     temperature uses OpenWeather API for Davao.              [server.js:L14-25 (N/A)]
 
-ST-IOT-002  Continuous run                         Loss within your target (suggest under 1%)  N/A: No IoT microcontrollers utilized.      N/A          server.js:L14-25 (N/A)
-            Input: Leave device running 1+ hour                                                Server continuous run documented in PT-007.
+ST-IOT-002  Continuous run                         Loss within your target (suggest under 1%)  N/A: No IoT microcontrollers utilized.      N/A          evidence/ST-IOT_na_declaration.png
+            Input: Leave device running 1+ hour                                                Server continuous run documented in PT-007.              [server.js:L14-25 (N/A)]
 
-ST-IOT-003  WiFi drop                              Reconnects without manual reset; gap shows  N/A: No hardware microcontroller WiFi.      N/A          public/app.js:L145-185 (N/A)
-            Input: Turn WiFi off for 2 minutes     as offline, not as zero values              Browser network recovery covered in IT-007.
+ST-IOT-003  WiFi drop                              Reconnects without manual reset; gap shows  N/A: No hardware microcontroller WiFi.      N/A          evidence/ST-IOT_na_declaration.png
+            Input: Turn WiFi off for 2 minutes     as offline, not as zero values              Browser network recovery covered in IT-007.              [public/app.js:L145-185 (N/A)]
 
-ST-IOT-004  Power loss                             Starts normally and keeps its settings      N/A: No physical battery/embedded hardware. N/A          server.js:L14-25 (N/A)
-            Input: Unplug device, power back
+ST-IOT-004  Power loss                             Starts normally and keeps its settings      N/A: No physical battery/embedded hardware. N/A          evidence/ST-IOT_na_declaration.png
+            Input: Unplug device, power back                                                                                                            [server.js:L14-25 (N/A)]
 
-ST-IOT-005  Sensor disconnected                    System reports a sensor fault, not a fake   N/A: No physical sensor wiring. Form data   N/A          public/index.html:L680-720 (N/A)
-            Input: Disconnect the sensor           reading                                     validation handles empty inputs in UT-003.
+ST-IOT-005  Sensor disconnected                    System reports a sensor fault, not a fake   N/A: No physical sensor wiring. Form data   N/A          evidence/ST-IOT_na_declaration.png
+            Input: Disconnect the sensor           reading                                     validation handles empty inputs in UT-003.               [public/index.html:L680-720 (N/A)]
 
-ST-IOT-006  Device identity (if applicable)        Rejected and logged                         N/A: System uses JWT tokens and bcrypt      N/A          server.js:L830-860 (N/A)
-            Input: Send msg with unknown device ID                                             user credentials rather than IoT device IDs.
+ST-IOT-006  Device identity (if applicable)        Rejected and logged                         N/A: System uses JWT tokens and bcrypt      N/A          evidence/ST-IOT_na_declaration.png
+            Input: Send msg with unknown device ID                                             user credentials rather than IoT device IDs.             [server.js:L830-860 (N/A)]
 
-ST-IOT-007  Timestamp                              Saved time is correct (Asia/Manila) even    N/A for hardware clocks. Server timestamps  N/A          server.js:L45-55 (N/A)
-            Input: Compare device and saved time   if device clock is off                      verified in UT-013 using Asia/Manila zone.
+ST-IOT-007  Timestamp                              Saved time is correct (Asia/Manila) even    N/A for hardware clocks. Server timestamps  N/A          evidence/ST-IOT_na_declaration.png
+            Input: Compare device and saved time   if device clock is off                      verified in UT-013 using Asia/Manila zone.               [server.js:L45-55 (N/A)]
 
-ST-IOT-008  (your own test)                        N/A                                         N/A: Hardware IoT tests not applicable to   N/A          server.js:L14-25 (N/A)
-                                                                                               pure web bakery management software.
+ST-IOT-008  (your own test)                        N/A                                         N/A: Hardware IoT tests not applicable to   N/A          evidence/ST-IOT_na_declaration.png
+                                                                                               pure web bakery management software.                     [server.js:L14-25 (N/A)]
 
 
 D4. NON-FUNCTIONAL
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name (System file & code line)
+ID        Test (what to do)                        Expected result                             Actual result                               Pass / Fail  Evidence file name [Code File & Line]
 --------  ---------------------------------------  ------------------------------------------  ------------------------------------------  -----------  --------------------------------------------
-ST-NF-001 Only the right role gets in              Access denied                               Non-admin user typing admin routes or       Pass         public/app.js:L1100-1136
-          Input: Log in as a normal user and type                                              triggering admin APIs is denied with 403
+ST-NF-001 Only the right role gets in              Access denied                               Non-admin user typing admin routes or       Pass         evidence/ST-NF-001_role_barrier.png
+          Input: Log in as a normal user and type                                              triggering admin APIs is denied with 403                 [public/app.js:L1100-1136]
           the admin page address                                                               Forbidden and returned to user dashboard.
 
-ST-NF-002 Logout and session                       Private pages cannot be seen                Clicking logout destroys session token;     Pass         public/index.html:L27-36
-          Input: Log out, then press browser Back                                              pressing browser Back button enforces
+ST-NF-002 Logout and session                       Private pages cannot be seen                Clicking logout destroys session token;     Pass         evidence/ST-NF-002_logout_back.png
+          Input: Log out, then press browser Back                                              pressing browser Back button enforces                    [public/index.html:L27-36]
           button                                                                               immediate redirect to secure login view.
 
-ST-NF-003 Bad text in forms                        Treated as plain text or rejected; nothing  Inputs with <script> and SQL injection      Pass         server.js:L33
-          Input: Type <script>alert(1)</script>   runs; no database error shown               strings are sanitized by xss-clean and
+ST-NF-003 Bad text in forms                        Treated as plain text or rejected; nothing  Inputs with <script> and SQL injection      Pass         evidence/ST-NF-003_xss_sql_filter.png
+          Input: Type <script>alert(1)</script>   runs; no database error shown               strings are sanitized by xss-clean and                   [server.js:L33]
           and ' OR 1=1 -- in text fields                                                       bound as parameters; script never executes.
 
-ST-NF-004 Passwords and keys                       Passwords hashed; no passwords or API keys  Passwords hashed with bcrypt 10 salt        Pass         server.js:L461
-          Input: Check the database and code       in screenshots or the public repo           rounds; .env excluded via .gitignore;
+ST-NF-004 Passwords and keys                       Passwords hashed; no passwords or API keys  Passwords hashed with bcrypt 10 salt        Pass         evidence/ST-NF-004_hashed_secrets.png
+          Input: Check the database and code       in screenshots or the public repo           rounds; .env excluded via .gitignore;                    [server.js:L461]
                                                                                                zero API keys exposed in repository code.
 
-ST-NF-005 Audit trail (if applicable)              Log shows who, what and when                Editing or deleting branch/user records     Pass         public/app.js:L1776
-          Input: Edit and delete a record                                                      requires confirmation modal; action logs
+ST-NF-005 Audit trail (if applicable)              Log shows who, what and when                Editing or deleting branch/user records     Pass         evidence/ST-NF-005_audit_trail.png
+          Input: Edit and delete a record                                                      requires confirmation modal; action logs                 [public/app.js:L1776]
                                                                                                author name, timestamp, and entity ID.
 
-ST-NF-006 First-time user                          Record time and mistakes; most finish       3 users performed POS sale, inventory check Pass         public/index.html:L40-190
-          Input: 3 classmates do your 3 main tasks without help                                and bake plan; average time 2.4 minutes;
+ST-NF-006 First-time user                          Record time and mistakes; most finish       3 users performed POS sale, inventory check Pass         evidence/ST-NF-006_user_evaluation.png
+          Input: 3 classmates do your 3 main tasks without help                                and bake plan; average time 2.4 minutes;                 [public/index.html:L40-190]
           without help                                                                         100% finished without assistance.
 
-ST-NF-007 Other screens                            Layout works; main tasks still work         System responsive on 1920x1080 desktop,     Pass         public/style.css:L2900-3050
-          Input: Open on a phone and on 2                                                      1024x768 tablet, and 390x844 mobile across
+ST-NF-007 Other screens                            Layout works; main tasks still work         System responsive on 1920x1080 desktop,     Pass         evidence/ST-NF-007_cross_screen.png
+          Input: Open on a phone and on 2                                                      1024x768 tablet, and 390x844 mobile across               [public/style.css:L2900-3050]
           browsers                                                                             Chrome, Edge, and Firefox browsers.
 
-ST-NF-008 Clear errors                             Messages say what to fix                    Submitting empty inputs displays specific   Pass         public/app.js:L1781-1784
-          Input: Leave a form blank, enter a                                                   field error hints (e.g. "Only @bakewise.com
+ST-NF-008 Clear errors                             Messages say what to fix                    Submitting empty inputs displays specific   Pass         evidence/ST-NF-008_form_validation.png
+          Input: Leave a form blank, enter a                                                   field error hints (e.g. "Only @bakewise.com              [public/app.js:L1781-1784]
           wrong value                                                                          email addresses are allowed").
 
-ST-NF-009 HTTP Security Headers & Rate Limiting    Security headers present; excessive         Helmet security headers active; express-    Pass         server.js:L21-32
-          Input: Inspect headers and send rapid    requests throttled                          rate-limit limits login bursts to 10
+ST-NF-009 HTTP Security Headers & Rate Limiting    Security headers present; excessive         Helmet security headers active; express-    Pass         evidence/ST-NF-009_security_headers.png
+          Input: Inspect headers and send rapid    requests throttled                          rate-limit limits login bursts to 10                     [server.js:L21-32]
           requests to /api/login                                                               attempts / 15 mins to block brute-force.
 
 
 ====================================================================================================
 E. PERFORMANCE TESTS
 ====================================================================================================
-ID      Test                       Users / devices  Avg (ms)  p95 (ms)  Slowest (ms)  Error (%)  Target                             Pass / Fail  Evidence file name (System file & code line)
+ID      Test                       Users / devices  Avg (ms)  p95 (ms)  Slowest (ms)  Error (%)  Target                             Pass / Fail  Evidence file name [Code File & Line]
 ------  -------------------------  ---------------  --------  --------  ------------  ---------  ---------------------------------  -----------  --------------------------------------------
-PT-001  Dashboard page load        1 user           210 ms    480 ms    850 ms        0.0 %      Largest Contentful Paint <= 2.5 s  Pass         public/index.html:L1-38
+PT-001  Dashboard page load        1 user           210 ms    480 ms    850 ms        0.0 %      Largest Contentful Paint <= 2.5 s  Pass         evidence/PT-001_dashboard_lcp.png
+                                                                                                                                                [public/index.html:L1-38]
 
-PT-002  Many users open dashboard  50 users         145 ms    380 ms    620 ms        0.0 %      p95 under 2 s; errors under 1%     Pass         server.js:L14-38
+PT-002  Many users open dashboard  50 users         145 ms    380 ms    620 ms        0.0 %      p95 under 2 s; errors under 1%     Pass         evidence/PT-002_multi_user_dash.png
+                                                                                                                                                [server.js:L14-38]
 
-PT-003  Login under load           25 users         195 ms    440 ms    710 ms        0.0 %      p95 under 2 s; no failed logins    Pass         server.js:L41-45
+PT-003  Login under load           25 users         195 ms    440 ms    710 ms        0.0 %      p95 under 2 s; no failed logins    Pass         evidence/PT-003_login_load.png
+                                                                                                                                                [server.js:L41-45]
 
-PT-004  Many devices sending       50 POS checkouts 165 ms    390 ms    640 ms        0.0 %      No lost messages; DB keeps up      Pass         server.js:L1076-1120
+PT-004  Many devices sending       50 POS checkouts 165 ms    390 ms    640 ms        0.0 %      No lost messages; DB keeps up      Pass         evidence/PT-004_pos_concurrency.png
+                                                                                                                                                [server.js:L1076-1120]
 
-PT-005  Sensor-to-screen delay     25 live events   180 ms    340 ms    510 ms        0.0 %      Within promised time (< 2 s)       Pass         public/app.js:L2180-2225
+PT-005  Sensor-to-screen delay     25 live events   180 ms    340 ms    510 ms        0.0 %      Within promised time (< 2 s)       Pass         evidence/PT-005_pos_to_screen.png
+                                                                                                                                                [public/app.js:L2180-2225]
 
-PT-006  AI answer time             10 predictions   420 ms    680 ms    890 ms        0.0 %      Within objective (< 3 s / pred)    Pass         src/ai_forecast.py:L48-82
+PT-006  AI answer time             10 predictions   420 ms    680 ms    890 ms        0.0 %      Within objective (< 3 s / pred)    Pass         evidence/PT-006_ai_execution.png
+                                                                                                                                                [src/ai_forecast.py:L48-82]
 
-PT-007  Steady for 30 minutes      Constant load    135 ms    310 ms    480 ms        0.0 %      No crash; response stays stable    Pass         server.js:L105-140
+PT-007  Steady for 30 minutes      Constant load    135 ms    310 ms    480 ms        0.0 %      No crash; response stays stable    Pass         evidence/PT-007_steady_endurance.png
+                                                                                                                                                [server.js:L105-140]
 
-PT-008  Many alerts at once        20 alert events  110 ms    220 ms    350 ms        0.0 %      All delivered, none duplicated     Pass         public/app.js:L4980-5020
+PT-008  Many alerts at once        20 alert events  110 ms    220 ms    350 ms        0.0 %      All delivered, none duplicated     Pass         evidence/PT-008_batch_alerts.png
+                                                                                                                                                [public/app.js:L4980-5020]
 
-PT-009  POS Receipt & Subtotal     100 items cart   18 ms     35 ms     60 ms         0.0 %      Cart recalculation < 100 ms        Pass         public/app.js:L3300-3375
+PT-009  POS Receipt & Subtotal     100 items cart   18 ms     35 ms     60 ms         0.0 %      Cart recalculation < 100 ms        Pass         evidence/PT-009_pos_cart_speed.png
+                                                                                                                                                [public/app.js:L3300-3375]
 
 Server used for these tests (CPU, RAM, host):
 Local Host: AMD Ryzen 7 / Intel Core i7 (8 Cores), 16 GB RAM, Node.js v22.14.0, Windows 11 Enterprise
@@ -355,37 +364,37 @@ Cloud Host: Railway PaaS Nixpacks Linux Container (2 vCPU, 4GB RAM), Supabase Po
 ====================================================================================================
 F. BUG LIST
 ====================================================================================================
-Bug ID   Found in test  What went wrong                          Severity  Status    Fix plan (who, by when)          Retest build and evidence
+Bug ID   Found in test  What went wrong                          Severity  Status    Fix plan (who, by when)          Retest build and evidence [Code Location]
 -------  -------------  ---------------------------------------  --------  --------  -------------------------------  --------------------------------------------
-BUG-001  UT-014         Create Staff form password was text by   Major     Resolved  Ceilo Morales: Set type to       Build 2026.10.12
-                        default showing plain password123.                 (Retest)  password and add eye toggle.     public/app.js:L1138-1175
+BUG-001  UT-014         Create Staff form password was text by   Major     Resolved  Ceilo Morales: Set type to       Build 2026.10.12: evidence/BUG-001_fix_pass_toggle.png
+                        default showing plain password123.                 (Retest)  password and add eye toggle.     [public/app.js:L1138-1175]
 
-BUG-002  ST-F-001       Login password eye toggle button had     Minor     Resolved  Ruby Grace Oñes: Fixed display   Build 2026.10.12
-                        inverted icons on initial load.                    (Retest)  rules and aria labels.           public/index.html:L143-150
+BUG-002  ST-F-001       Login password eye toggle button had     Minor     Resolved  Ruby Grace Oñes: Fixed display   Build 2026.10.12: evidence/BUG-002_fix_eye_icons.png
+                        inverted icons on initial load.                    (Retest)  rules and aria labels.           [public/index.html:L143-150]
 
-BUG-003  UT-015         User email allowed any domain instead    Major     Resolved  Ruby Grace Oñes: Added regex     Build 2026.10.02
-                        of enforcing @bakewise.com restriction.            (Retest)  pattern to input & validation.   public/app.js:L1781-1784
+BUG-003  UT-015         User email allowed any domain instead    Major     Resolved  Ruby Grace Oñes: Added regex     Build 2026.10.02: evidence/BUG-003_fix_email_regex.png
+                        of enforcing @bakewise.com restriction.            (Retest)  pattern to input & validation.   [public/app.js:L1781-1784]
 
-BUG-004  ST-F-006       Leaflet branch map container threw size  Minor     Resolved  Ceilo Morales: Added invalidate  Build 2026.10.02
-                        calculation warning when hidden in tab.            (Retest)  Size() call on tab switch.       public/app.js:L4350-4375
+BUG-004  ST-F-006       Leaflet branch map container threw size  Minor     Resolved  Ceilo Morales: Added invalidate  Build 2026.10.02: evidence/BUG-004_fix_map_resize.png
+                        calculation warning when hidden in tab.            (Retest)  Size() call on tab switch.       [public/app.js:L4350-4375]
 
-BUG-005  ST-AI-003      AI forecast threw JSON parse error when  Major     Resolved  Ruby Grace Oñes: Added fallback  Build 2026.10.02
-                        sales history had 0 records.                       (Retest)  default prediction logic.        src/ai_forecast.py:L28-30
+BUG-005  ST-AI-003      AI forecast threw JSON parse error when  Major     Resolved  Ruby Grace Oñes: Added fallback  Build 2026.10.02: evidence/BUG-005_fix_ai_empty.png
+                        sales history had 0 records.                       (Retest)  default prediction logic.        [src/ai_forecast.py:L28-30]
 
-BUG-006  IT-011         POS cart quantity decrement allowed      Minor     Resolved  Ceilo Morales: Bound min="1"     Build 2026.10.02
-                        reducing below 1 item in UI view.                  (Retest)  and delete handler on zero.      public/app.js:L3310-3330
+BUG-006  IT-011         POS cart quantity decrement allowed      Minor     Resolved  Ceilo Morales: Bound min="1"     Build 2026.10.02: evidence/BUG-006_fix_cart_zero.png
+                        reducing below 1 item in UI view.                  (Retest)  and delete handler on zero.      [public/app.js:L3310-3330]
 
-BUG-007  ST-NF-002      Browser back button showed cached        Major     Resolved  Ruby Grace Oñes: Added instant   Build 2026.10.02
-                        private pane markup before redirect.               (Retest)  anti-flicker CSS/JS session check. public/index.html:L27-36
+BUG-007  ST-NF-002      Browser back button showed cached        Major     Resolved  Ruby Grace Oñes: Added instant   Build 2026.10.02: evidence/BUG-007_fix_anti_flicker.png
+                        private pane markup before redirect.               (Retest)  anti-flicker CSS/JS session check. [public/index.html:L27-36]
 
-BUG-008  PT-001         Chart.js canvas re-draw caused minor     Minor     Resolved  Ceilo Morales: Added chart.      Build 2026.10.02
-                        memory leak on repeated tab switches.              (Retest)  destroy() before new instance.   public/app.js:L2230-2245
+BUG-008  PT-001         Chart.js canvas re-draw caused minor     Minor     Resolved  Ceilo Morales: Added chart.      Build 2026.10.02: evidence/BUG-008_fix_chart_leak.png
+                        memory leak on repeated tab switches.              (Retest)  destroy() before new instance.   [public/app.js:L2230-2245]
 
-BUG-009  IT-012         PostgreSQL duplicate key notice on       Minor     Resolved  Ruby Grace Oñes: Added ON        Build 2026.10.12
-                        branch seed execution during startup.              (Retest)  CONFLICT DO NOTHING to seed SQL. server.js:L460-475
+BUG-009  IT-012         PostgreSQL duplicate key notice on       Minor     Resolved  Ruby Grace Oñes: Added ON        Build 2026.10.12: evidence/BUG-009_fix_pg_seed.png
+                        branch seed execution during startup.              (Retest)  CONFLICT DO NOTHING to seed SQL. [server.js:L460-475]
 
-BUG-010  ST-F-007       Shelf-life countdown timer did not       Minor     Resolved  Ceilo Morales: Synchronized with Build 2026.10.02
-                        update dynamically without refresh.                (Retest)  setInterval 60s live countdown.  public/app.js:L4900-4925
+BUG-010  ST-F-007       Shelf-life countdown timer did not       Minor     Resolved  Ceilo Morales: Synchronized with Build 2026.10.02: evidence/BUG-010_fix_timer_sync.png
+                        update dynamically without refresh.                (Retest)  setInterval 60s live countdown.  [public/app.js:L4900-4925]
 
 Severity: Critical = crash, data loss, security breach or core feature unusable. 
           Major = wrong result, workaround exists. 
@@ -448,7 +457,7 @@ Submit one ZIP per team: this form, folder of code snippets / test files, tool r
 and a text file with the repository link and the version tested. 
 Name: BakeWiseTeam_BakeWise_Testing.zip
 
-[X] Every Pass or Fail row has a system code reference (file path and line number)
+[X] Every Pass or Fail row has an evidence file, and the file is in the folder
 [X] Every Fail has a bug ID in section F (All resolved in retest)
 [X] All tests were run, or marked N/A with a reason
 [X] AI accuracy report and the system endurance run (30 mins / 1,500 reqs) are attached
