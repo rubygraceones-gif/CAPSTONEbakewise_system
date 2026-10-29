@@ -1,5 +1,6 @@
 const fs = require('fs');
-const html = fs.readFileSync('public/index.html', 'utf8');
+const htmlPath = fs.existsSync('frontend/index.html') ? 'frontend/index.html' : 'public/index.html';
+const html = fs.readFileSync(htmlPath, 'utf8');
 
 const lines = html.split('\n');
 lines.forEach((l, i) => {
