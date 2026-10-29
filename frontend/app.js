@@ -911,6 +911,7 @@ class BakeWiseStore {
 
 // Global Store Instance
 const store = new BakeWiseStore();
+window.store = store;
 
 // --- DOM CONTROLLER ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -2757,13 +2758,15 @@ function switchPosTab(tabName) {
 window.switchPosTab = switchPosTab;
 
 async function refreshSalesPane() {
+  setupPOSModule();
+  switchPosTab(currentPosTab || 'new-sale');
   if (store && store.isBackendOnline) {
     try {
       await store.syncWithBackend();
+      renderPosProducts();
+      updatePosCartUI();
     } catch(e) {}
   }
-  setupPOSModule();
-  switchPosTab(currentPosTab || 'new-sale');
 }
 
 function getPosProductStockInfo(productId) {
@@ -2879,7 +2882,7 @@ function renderPosProducts() {
     }
 
     return `
-      <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${!isOutOfStock ? `onclick="addToPosCart('${p.id}')"` : 'style="opacity: 0.55; cursor: not-allowed;"'}>
+      <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${isOutOfStock ? 'style="opacity: 0.55; cursor: not-allowed;"' : 'style="cursor: pointer;"'}>
         <div class="pos-product-info">
           <span class="pos-product-category">${p.category || 'BAKERY'}</span>
           <h4>${p.name}</h4>
@@ -2889,7 +2892,7 @@ function renderPosProducts() {
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${!isOutOfStock ? `onclick="event.stopPropagation(); addToPosCart('${p.id}')"` : ''} ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
             <span>${stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'))}</span>
           </button>
         </div>
@@ -3047,12 +3050,12 @@ function updatePosCartUI() {
             <div class="cart-item-price-unit">₱${item.price.toFixed(2)} × ${item.qty}</div>
           </div>
           <div class="cart-item-controls">
-            <button type="button" class="qty-btn" onclick="updatePosCartQty('${item.productId}', -1)">-</button>
+            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="-1" >-</button>
             <span class="qty-val">${item.qty}</span>
-            <button type="button" class="qty-btn" onclick="updatePosCartQty('${item.productId}', 1)">+</button>
+            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="1" >+</button>
           </div>
           <div class="cart-item-subtotal">₱${itemSubtotal.toFixed(2)}</div>
-          <button type="button" class="cart-item-remove" onclick="removeFromPosCart('${item.productId}')" title="Remove item">
+          <button type="button" class="cart-item-remove" data-product-id="${item.productId}"  title="Remove item">
             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
           </button>
         </div>
@@ -3583,12 +3586,34 @@ function setupPOSModule() {
   const gridContainer = document.getElementById("pos-products-grid");
   if (gridContainer) {
     gridContainer.addEventListener("click", (e) => {
-      const card = e.target.closest(".pos-product-card, .pos-product-add-btn");
-      if (card) {
+      const card = e.target.closest(".pos-product-card");
+      if (card && !card.classList.contains("disabled-card")) {
         const productId = card.getAttribute("data-product-id");
         if (productId) {
           addToPosCart(productId);
         }
+      }
+    });
+  }
+
+  // Event delegation on cart items list
+  const cartList = document.getElementById("pos-cart-items-list");
+  if (cartList) {
+    cartList.addEventListener("click", (e) => {
+      const qtyBtn = e.target.closest(".qty-btn");
+      if (qtyBtn) {
+        e.preventDefault();
+        const pid = qtyBtn.getAttribute("data-product-id");
+        const delta = parseInt(qtyBtn.getAttribute("data-delta"), 10) || 0;
+        if (pid && delta) updatePosCartQty(pid, delta);
+        return;
+      }
+      const removeBtn = e.target.closest(".cart-item-remove");
+      if (removeBtn) {
+        e.preventDefault();
+        const pid = removeBtn.getAttribute("data-product-id");
+        if (pid) removeFromPosCart(pid);
+        return;
       }
     });
   }

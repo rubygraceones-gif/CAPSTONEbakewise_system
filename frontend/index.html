@@ -877,10 +877,10 @@
                       <div style="display: flex; justify-content: space-between; align-items: center;">
                         <label for="pos-tendered-input" class="form-label" style="font-weight: 600;">Cash Tendered (₱)</label>
                         <div class="preset-cash-buttons">
-                          <button type="button" class="preset-btn" onclick="setPosCashPreset('exact')">Exact</button>
-                          <button type="button" class="preset-btn" onclick="setPosCashPreset(100)">₱100</button>
-                          <button type="button" class="preset-btn" onclick="setPosCashPreset(500)">₱500</button>
-                          <button type="button" class="preset-btn" onclick="setPosCashPreset(1000)">₱1000</button>
+                          <button type="button" class="preset-btn" data-preset="exact" onclick="setPosCashPreset('exact')">Exact</button>
+                          <button type="button" class="preset-btn" data-preset="100" onclick="setPosCashPreset(100)">₱100</button>
+                          <button type="button" class="preset-btn" data-preset="500" onclick="setPosCashPreset(500)">₱500</button>
+                          <button type="button" class="preset-btn" data-preset="1000" onclick="setPosCashPreset(1000)">₱1000</button>
                         </div>
                       </div>
                       <div class="input-container" style="margin-top: 6px;">
@@ -897,11 +897,11 @@
 
                   <!-- Checkout Action Buttons -->
                   <div class="cart-action-buttons" style="display: flex; gap: 10px; margin-top: 16px;">
-                    <button type="button" class="btn-secondary" id="btn-pos-clear-cart" style="flex: 1;" onclick="clearPosCart()">
+                    <button type="button" class="btn-secondary" id="btn-pos-clear-cart" style="flex: 1;">
                       <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                       <span>Clear Cart</span>
                     </button>
-                    <button type="button" class="btn-primary-gold" id="btn-pos-checkout" style="flex: 2; font-size: 1.05rem; padding: 12px;" onclick="handlePosCheckout()">
+                    <button type="button" class="btn-primary-gold" id="btn-pos-checkout" style="flex: 2; font-size: 1.05rem; padding: 12px;">
                       <i data-lucide="check-circle-2" style="width: 20px; height: 20px;"></i>
                       <span id="btn-pos-checkout-text">CHECKOUT (₱0.00)</span>
                     </button>
@@ -1871,8 +1871,8 @@
       <!-- Receipt content injected by JS -->
     </div>
     <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
-      <button type="button" class="btn-secondary" id="btn-pos-receipt-close" style="flex: 1;" onclick="closePosReceiptModal()">Close</button>
-      <button type="button" class="btn-primary-gold" id="btn-pos-receipt-print" style="flex: 1.5;" onclick="printPosReceipt()">
+      <button type="button" class="btn-secondary" id="btn-pos-receipt-close" style="flex: 1;">Close</button>
+      <button type="button" class="btn-primary-gold" id="btn-pos-receipt-print" style="flex: 1.5;">
         <i data-lucide="printer" style="width: 18px; height: 18px;"></i>
         <span>Print Receipt</span>
       </button>

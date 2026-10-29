@@ -34,9 +34,10 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://unpkg.com", "https://*.tile.openstreetmap.org", "https://a.tile.openstreetmap.org", "https://b.tile.openstreetmap.org", "https://c.tile.openstreetmap.org"],
+      imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://unpkg.com", "https://*.tile.openstreetmap.org", "https://a.tile.openstreetmap.org", "https://b.tile.openstreetmap.org", "https://c.tile.openstreetmap.org"],
       connectSrc: ["'self'"],
     },
   },
@@ -1203,9 +1204,19 @@ app.post('/api/pos/checkout', async (req, res) => {
         "SELECT stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
         [String(item.product_id), String(altPid), bId]
       );
-      const currentStock = (invCheck.rows && invCheck.rows.length > 0)
+      let currentStock = (invCheck.rows && invCheck.rows.length > 0)
         ? invCheck.rows.reduce((sum, row) => sum + (parseInt(row.stock_level) || 0), 0)
         : 0;
+
+      if (currentStock < parseInt(item.quantity)) {
+        const netCheck = await queryDb(
+          "SELECT stock_level FROM bw_inventory WHERE product_id = $1 OR product_id = $2",
+          [String(item.product_id), String(altPid)]
+        );
+        currentStock = (netCheck.rows && netCheck.rows.length > 0)
+          ? netCheck.rows.reduce((sum, row) => sum + (parseInt(row.stock_level) || 0), 0)
+          : 0;
+      }
 
       if (currentStock < parseInt(item.quantity)) {
         const pRes = await queryDb("SELECT name FROM bw_products WHERE id = $1 OR id = $2", [String(item.product_id), String(altPid)]);
@@ -1291,10 +1302,16 @@ app.post('/api/pos/checkout', async (req, res) => {
       });
 
       // 2. Deduct Inventory Stock
-      const invRow = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id DESC LIMIT 1",
+      let invRow = await queryDb(
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 AND stock_level > 0 ORDER BY id DESC LIMIT 1",
         [String(item.product_id), String(altPid), bId]
       );
+      if (!invRow.rows || invRow.rows.length === 0) {
+        invRow = await queryDb(
+          "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND stock_level > 0 ORDER BY id DESC LIMIT 1",
+          [String(item.product_id), String(altPid)]
+        );
+      }
       if (invRow.rows && invRow.rows.length > 0) {
         const newStock = Math.max(0, parseInt(invRow.rows[0].stock_level) - parseInt(item.quantity));
         await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newStock, invRow.rows[0].id]);
@@ -1591,24 +1608,22 @@ app.post('/api/forecast', (req, res) => {
   });
 
   child.on('error', err => {
-    console.error(`Subprocess error: ${err.message}`);
+    console.warn(`AI forecast fallback mode: ${err.message}`);
     if (!res.headersSent) {
-      res.status(500).json({ predicted_demand: 30, error: 'AI Prediction Failed' });
+      res.json({ predicted_demand: 35, mode: 'fallback' });
     }
   });
 
   child.on('close', code => {
     if (res.headersSent) return;
     if (code !== 0) {
-      console.error(`AI forecast process exited with code ${code}: ${stderrData}`);
-      return res.status(500).json({ predicted_demand: 30, error: 'AI Prediction Failed' });
+      return res.json({ predicted_demand: 35, mode: 'fallback' });
     }
     try {
       const result = JSON.parse(stdoutData);
       res.json(result);
     } catch (e) {
-      console.error(`JSON Parse Error: ${e} Output: ${stdoutData}`);
-      res.status(500).json({ predicted_demand: 30, error: 'Invalid Output from AI Engine' });
+      res.json({ predicted_demand: 35, mode: 'fallback' });
     }
   });
 
