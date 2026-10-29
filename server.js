@@ -17,6 +17,16 @@ const PORT = process.env.PORT || 3000;
 // Enable 'trust proxy' for reverse proxies (Railway, Heroku, Nginx, Cloudflare)
 app.set('trust proxy', 1);
 
+// Disable Express fingerprinting
+app.disable('x-powered-by');
+
+// Suppress and genericize Server header across all responses (suppresses 'railway-hikari' info disclosure)
+app.use((req, res, next) => {
+  res.removeHeader('X-Powered-By');
+  res.setHeader('Server', 'webserver');
+  next();
+});
+
 // Security and Middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -196,8 +206,15 @@ async function queryDb(sql, params = []) {
         const tableMatch = sql.match(/INSERT INTO\s+([a-zA-Z0-9_]+)/i);
         if (tableMatch) {
           const tableName = tableMatch[1];
-          const [insertedRows] = await mysqlPool.query(`SELECT * FROM ${tableName} WHERE id = ?`, [insertId]);
-          if (insertedRows && insertedRows.length > 0) return { rows: insertedRows };
+          const ALLOWED_TABLES = [
+            'bw_branches', 'bw_users', 'bw_products', 'bw_sales',
+            'bw_inventory', 'bw_production', 'bw_waste',
+            'bw_pos_transactions', 'bw_pos_transaction_items', 'bw_repurpose_logs'
+          ];
+          if (ALLOWED_TABLES.includes(tableName)) {
+            const [insertedRows] = await mysqlPool.query('SELECT * FROM ?? WHERE id = ?', [tableName, insertId]);
+            if (insertedRows && insertedRows.length > 0) return { rows: insertedRows };
+          }
         }
       }
     }
@@ -459,15 +476,19 @@ async function initializeMysqlSchema() {
   `);
 
   const defaultHash = bcrypt.hashSync('password123', 10);
-  await mysqlPool.query(`
-    INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES
-    (1, 'manager@bakewise.com', '${defaultHash}', 'Branch Manager', 'manager', 1),
-    (2, 'sales@bakewise.com', '${defaultHash}', 'Sales Staff', 'sales', 1),
-    (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
-    (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
-    (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
-    ON DUPLICATE KEY UPDATE id = id;
-  `);
+  const defaultSeedUsers = [
+    [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
+    [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
+    [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
+    [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
+    [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
+  ];
+  for (const u of defaultSeedUsers) {
+    await mysqlPool.query(
+      'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
+      u
+    );
+  }
 
   // 3. bw_products
   await mysqlPool.query(`
@@ -742,15 +763,19 @@ async function initializePgSchema() {
   // Seed default user accounts into PostgreSQL
   try {
     const defaultHash = bcrypt.hashSync('password123', 10);
-    await pgPool.query(`
-      INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES
-      (1, 'manager@bakewise.com', '${defaultHash}', 'Branch Manager', 'manager', 1),
-      (2, 'sales@bakewise.com', '${defaultHash}', 'Sales Staff', 'sales', 1),
-      (3, 'inventory@bakewise.com', '${defaultHash}', 'Inventory Specialist', 'inventory', 1),
-      (4, 'production@bakewise.com', '${defaultHash}', 'Baking Specialist', 'production', 1),
-      (5, 'admin@bakewise.com', '${defaultHash}', 'System Administrator', 'admin', NULL)
-      ON CONFLICT (email) DO NOTHING;
-    `);
+    const defaultSeedUsers = [
+      [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
+      [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
+      [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
+      [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
+      [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
+    ];
+    for (const u of defaultSeedUsers) {
+      await pgPool.query(
+        'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING',
+        u
+      );
+    }
   } catch (err) {
     console.warn("⚠️ Postgres user seed notice:", err.message);
   }
@@ -788,9 +813,11 @@ async function initializePgSchema() {
           if (pIdStr === 'p1') stock = 100;
           if (pIdStr === 'p4') stock = 20;
           if (pIdStr === 'p7') stock = 50;
+          const prodDate = new Date().toISOString().split('T')[0];
+          const expDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
           await pgPool.query(
-            "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, CURRENT_DATE, CURRENT_DATE + INTERVAL '3 days', $3)",
-            [pIdStr, stock, b.id]
+            'INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5)',
+            [pIdStr, stock, prodDate, expDate, b.id]
           );
         }
       }
@@ -1545,25 +1572,41 @@ app.get('/api/backup', async (req, res) => {
 
 // 11. AI FORECASTING API (RANDOM FOREST VIA PYTHON)
 app.post('/api/forecast', (req, res) => {
-  const { exec } = require('child_process');
+  const { spawn } = require('child_process');
 
   const payload = JSON.stringify(req.body);
   const scriptPath = path.join(__dirname, 'src', 'ai_forecast.py');
 
-  // Use python.exe or python depending on env. 
-  // In Windows env provided, we verified python is available
-  const command = `python "${scriptPath}"`;
+  const child = spawn('python', [scriptPath]);
+  let stdoutData = '';
+  let stderrData = '';
 
-  const child = exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
+  child.stdout.on('data', chunk => {
+    stdoutData += chunk;
+  });
+
+  child.stderr.on('data', chunk => {
+    stderrData += chunk;
+  });
+
+  child.on('error', err => {
+    console.error(`Subprocess error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(500).json({ predicted_demand: 30, error: 'AI Prediction Failed' });
+    }
+  });
+
+  child.on('close', code => {
+    if (res.headersSent) return;
+    if (code !== 0) {
+      console.error(`AI forecast process exited with code ${code}: ${stderrData}`);
       return res.status(500).json({ predicted_demand: 30, error: 'AI Prediction Failed' });
     }
     try {
-      const result = JSON.parse(stdout);
+      const result = JSON.parse(stdoutData);
       res.json(result);
     } catch (e) {
-      console.error(`JSON Parse Error: ${e} Output: ${stdout}`);
+      console.error(`JSON Parse Error: ${e} Output: ${stdoutData}`);
       res.status(500).json({ predicted_demand: 30, error: 'Invalid Output from AI Engine' });
     }
   });

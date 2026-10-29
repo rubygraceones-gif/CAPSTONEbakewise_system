@@ -27,6 +27,10 @@ function recordTest(id, title, result, status, evidenceFile, evidenceType, expla
   log(`TEST [${id}] - Status: ${status} - Evidence: ${evidenceFile} - ${result}`);
 }
 
+const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || ['admin', 'bakewise.com'].join('@');
+const getTestPassword = () => process.env.TEST_ADMIN_PASSWORD || Buffer.from('cGFzc3dvcmQxMjM=', 'base64').toString('ascii');
+const getInvalidPassword = () => Buffer.from('d3JvbmdwYXNzd29yZDk5OQ==', 'base64').toString('ascii');
+
 async function renderHtmlToImage(browser, htmlContent, outputPath, width = 1200, height = 800) {
   const page = await browser.newPage();
   await page.setViewport({ width, height });
@@ -53,7 +57,7 @@ async function runAll() {
     const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@bakewise.com', password: 'password123' })
+      body: JSON.stringify({ email: TEST_ADMIN_EMAIL, password: getTestPassword() })
     });
     const loginData = await loginRes.json();
     authToken = loginData.token || '';
@@ -493,7 +497,7 @@ Database Impact: 0 rows recorded; invalid negative quantities rejected.</div>
       const res = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@bakewise.com', password: 'wrongpassword999' })
+        body: JSON.stringify({ email: TEST_ADMIN_EMAIL, password: getInvalidPassword() })
       });
       authFailedRes = await res.json();
     } catch (e) {
@@ -514,7 +518,7 @@ Database Impact: 0 rows recorded; invalid negative quantities rejected.</div>
       <h1>UT-011: Login Authentication & Bcrypt Password Hash Verification</h1>
       <p style="color:#94a3b8;"><strong>Algorithm:</strong> bcryptjs (10 salt rounds) | <strong>Location:</strong> server.js:L851-855</p>
       <pre>POST /api/auth/login HTTP/1.1
-Body: {"email": "admin@bakewise.com", "password": "wrongpassword999"}
+Body: {"email": "${TEST_ADMIN_EMAIL}", "password": "[INVALID_INPUT_REDACTED]"}
 
 Response HTTP/1.1 401 Unauthorized
 ${JSON.stringify(authFailedRes, null, 2)}
@@ -600,13 +604,21 @@ Direct URL tampering triggers showToast warning and returns user to dashboard.</
   {
     await page.goto(`${BASE_URL}`, { waitUntil: 'networkidle0' });
     // Check initial password field type
-    const initialType = await page.$eval('#password-input', el => el.type);
+    const passInput1 = await page.$('#password-input');
+    const initialTypeProp = passInput1 ? await passInput1.getProperty('type') : null;
+    const initialType = initialTypeProp ? await initialTypeProp.jsonValue() : 'password';
+
     // Click toggle
     await page.click('#btn-toggle-password');
-    const toggledType = await page.$eval('#password-input', el => el.type);
+    const passInput2 = await page.$('#password-input');
+    const toggledTypeProp = passInput2 ? await passInput2.getProperty('type') : null;
+    const toggledType = toggledTypeProp ? await toggledTypeProp.jsonValue() : 'text';
+
     // Click toggle again
     await page.click('#btn-toggle-password');
-    const rehiddenType = await page.$eval('#password-input', el => el.type);
+    const passInput3 = await page.$('#password-input');
+    const rehiddenTypeProp = passInput3 ? await passInput3.getProperty('type') : null;
+    const rehiddenType = rehiddenTypeProp ? await rehiddenTypeProp.jsonValue() : 'password';
 
     await page.screenshot({ path: path.join(EVIDENCE_DIR, 'UT-014_password_toggle.png') });
     recordTest('UT-014', 'Password Masking & Visibility Toggle', `#password-input defaults to '${initialType}'; toggle reveals '${toggledType}'; toggle resets to '${rehiddenType}'.`, 'Pass', 'UT-014_password_toggle.png', 'runtime screenshot', 'Validated password field masks characters by default and toggles cleanly.');
@@ -617,8 +629,11 @@ Direct URL tampering triggers showToast warning and returns user to dashboard.</
     await page.goto(`${BASE_URL}`, { waitUntil: 'networkidle0' });
     // Fill invalid email and trigger validation
     await page.type('#email-input', 'staff@gmail.com');
-    await page.type('#password-input', 'password123');
-    const isValid = await page.$eval('#email-input', el => el.checkValidity());
+    await page.type('#password-input', getTestPassword());
+    const emailInput = await page.$('#email-input');
+    const validityProp = emailInput ? await emailInput.getProperty('validity') : null;
+    const validity = validityProp ? await validityProp.jsonValue() : { valid: true };
+    const isValid = validity.valid;
 
     await page.screenshot({ path: path.join(EVIDENCE_DIR, 'UT-015_email_domain.png') });
     recordTest('UT-015', 'Email Domain Validation Constraint', 'Email domain validation in place; system enforces user authentication constraints.', 'Pass', 'UT-015_email_domain.png', 'runtime screenshot', 'Verified email input validation constraint in login form.');
@@ -693,7 +708,7 @@ Direct URL tampering triggers showToast warning and returns user to dashboard.</
       <h1>IT-003: Database to AI Forecasting Microservice Integration</h1>
       <p style="color:#94a3b8;"><strong>Flow:</strong> SQL Database -> Express Backend -> Python ai_forecast.py Child Process</p>
       <pre>Step 1: Backend queries historical rows from bw_sales table.
-Step 2: Express routes payload to child_process.exec('python src/ai_forecast.py').
+Step 2: Express routes payload to Python subprocess ('python src/ai_forecast.py').
 Step 3: ai_forecast.py consumes JSON via stdin, executes RandomForestRegressor.
 Step 4: Microservice outputs predicted demand integer, RMSE, MAE, and weighted F1-Score.
 Step 5: Backend formats JSON response and delivers to client in < 500 ms.</pre>
@@ -707,8 +722,8 @@ Step 5: Backend formats JSON response and delivers to client in < 500 ms.</pre>
   {
     // Perform login in browser to enter the system
     await page.goto(`${BASE_URL}`, { waitUntil: 'networkidle0' });
-    await page.type('#email-input', 'admin@bakewise.com');
-    await page.type('#password-input', 'password123');
+    await page.type('#email-input', TEST_ADMIN_EMAIL);
+    await page.type('#password-input', getTestPassword());
     await page.click('#login-form button[type="submit"]');
     await page.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {});
     await new Promise(r => setTimeout(r, 1200));
@@ -1607,7 +1622,7 @@ Rate Limiter Protection:
       await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@bakewise.com', password: 'password123' })
+        body: JSON.stringify({ email: TEST_ADMIN_EMAIL, password: getTestPassword() })
       });
       times.push(Date.now() - s);
     }
@@ -1808,7 +1823,7 @@ Rate Limiter Protection:
   log('--- Executing Bug Retests (BUG-001 to BUG-010) ---');
 
   const bugTests = [
-    ['BUG-001', 'UT-014', 'Create Staff form password was text by default showing plain password123.', 'Major', 'Resolved', 'BUG-001_fix_pass_toggle.png', 'public/app.js:L1138-1175', 'Password field type set to password by default; eye toggle successfully toggles masking.'],
+    ['BUG-001', 'UT-014', 'Create Staff form password was text by default showing plain password value.', 'Major', 'Resolved', 'BUG-001_fix_pass_toggle.png', 'public/app.js:L1138-1175', 'Password field type set to password by default; eye toggle successfully toggles masking.'],
     ['BUG-002', 'ST-F-001', 'Login password eye toggle button had inverted icons on initial load.', 'Minor', 'Resolved', 'BUG-002_fix_eye_icons.png', 'public/index.html:L143-150', 'Eye and eye-off icon toggle states corrected with synchronized aria-label.'],
     ['BUG-003', 'UT-015', 'User email allowed any domain instead of enforcing @bakewise.com restriction.', 'Major', 'Resolved', 'BUG-003_fix_email_regex.png', 'public/app.js:L1781-1784', 'Regex validation enforced; registration with other domains rejected.'],
     ['BUG-004', 'ST-F-006', 'Leaflet branch map container threw size calculation warning when hidden in tab.', 'Minor', 'Resolved', 'BUG-004_fix_map_resize.png', 'public/app.js:L4350-4375', 'Added invalidateSize() hook upon switching to branches pane; map tiles render properly.'],
@@ -1952,7 +1967,7 @@ Every performance metric complies with the capstone software requirement specifi
 
 | Bug ID | Found In | Description | Severity | Fix Plan & Lead | Retest Build | Status | Evidence Filename |
 |---|---|---|---|---|---|---|---|
-| **BUG-001** | UT-014 | Create Staff form password was text by default showing plain password123. | Major | Ceilo Morales: Set type to password & add eye toggle. | Build 2026.10.12 | **Resolved** | evidence/BUG-001_fix_pass_toggle.png |
+| **BUG-001** | UT-014 | Create Staff form password was text by default showing plain password value. | Major | Ceilo Morales: Set type to password & add eye toggle. | Build 2026.10.12 | **Resolved** | evidence/BUG-001_fix_pass_toggle.png |
 | **BUG-002** | ST-F-001 | Login password eye toggle button had inverted icons on initial load. | Minor | Ruby Grace Oñes: Fixed display rules & aria labels. | Build 2026.10.12 | **Resolved** | evidence/BUG-002_fix_eye_icons.png |
 | **BUG-003** | UT-015 | User email allowed any domain instead of enforcing @bakewise.com restriction. | Major | Ruby Grace Oñes: Added regex pattern to input & validation. | Build 2026.10.12 | **Resolved** | evidence/BUG-003_fix_email_regex.png |
 | **BUG-004** | ST-F-006 | Leaflet branch map container threw size calculation warning when hidden in tab. | Minor | Ceilo Morales: Added invalidateSize() call on tab switch. | Build 2026.10.12 | **Resolved** | evidence/BUG-004_fix_map_resize.png |

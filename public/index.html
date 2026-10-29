@@ -27,7 +27,13 @@
   <script>
     (function() {
       try {
-        var s = sessionStorage.getItem('bakewise_v2_session') || localStorage.getItem('bakewise_v2_session');
+        var remember = localStorage.getItem('bakewise_v2_remember_me') === 'true';
+        var s = sessionStorage.getItem('bakewise_v2_session');
+        if (!s && remember) {
+          s = localStorage.getItem('bakewise_v2_session');
+        } else if (!s && !remember) {
+          localStorage.removeItem('bakewise_v2_session');
+        }
         if (s && JSON.parse(s)) {
           document.documentElement.classList.add('user-logged-in');
         }
@@ -127,12 +133,12 @@
           </div>
         </header>
 
-        <form class="login-form" id="login-form" autocomplete="on">
+        <form class="login-form" id="login-form" method="POST" action="/api/auth/login" autocomplete="on">
           <div class="form-group">
             <label for="email-input" class="form-label">Work Email Address</label>
             <div class="input-container">
               <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
-              <input type="email" id="email-input" class="form-input" placeholder="youremail@example.com" required autocomplete="email">
+              <input type="email" id="email-input" name="email" class="form-input" placeholder="youremail@example.com" required autocomplete="email">
             </div>
           </div>
 
@@ -140,7 +146,7 @@
             <label for="password-input" class="form-label">Account Password</label>
             <div class="input-container">
               <i data-lucide="lock" class="input-icon" style="width: 18px; height: 18px;"></i>
-              <input type="password" id="password-input" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+              <input type="password" id="password-input" name="password" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
               <button type="button" class="password-toggle" id="btn-toggle-password"
                 aria-label="Show password" title="Show password" data-visible="false">
                 <i data-lucide="eye" id="icon-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
@@ -545,7 +551,7 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">Add New Branch</h2>
               </div>
-              <form id="admin-branch-form">
+              <form id="admin-branch-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="br-name-input" class="form-label">Branch Name</label>
                   <div class="input-container">
@@ -676,7 +682,7 @@
                   <span>Create New Staff Account</span>
                 </h2>
               </div>
-              <form id="admin-user-form">
+              <form id="admin-user-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="usr-name-input" class="form-label">Full Name / Title</label>
                   <div class="input-container">
@@ -1038,7 +1044,7 @@
               <button class="btn-secondary" id="btn-inventory-modal-close"
                 style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
-            <form id="inventory-add-form">
+            <form id="inventory-add-form" method="POST">
               <div class="form-group" style="margin-bottom: 16px;">
                 <label for="inv-select-branch" class="form-label">Branch</label>
                 <div class="input-container">
@@ -1095,7 +1101,7 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">Record Baking Run</h2>
               </div>
-              <form id="production-entry-form">
+              <form id="production-entry-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="prod-select-product" class="form-label">Product to Bake</label>
                   <select id="prod-select-product" class="form-input" style="padding-left: 14px;" required></select>
@@ -1188,7 +1194,7 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">Log Discarded Bread / Products</h2>
               </div>
-              <form id="waste-entry-form">
+              <form id="waste-entry-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="waste-select-product" class="form-label">Unsold / Spoiled Product</label>
                   <select id="waste-select-product" class="form-input" style="padding-left: 14px;" required></select>
@@ -1652,7 +1658,7 @@
       <h2 class="panel-card-title" id="branch-modal-title">Edit Branch</h2>
       <button class="btn-secondary" id="btn-branch-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
     </div>
-    <form id="branch-edit-form">
+    <form id="branch-edit-form" method="POST">
       <input type="hidden" id="edit-branch-id">
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-br-name" class="form-label">Branch Name</label>
@@ -1693,7 +1699,7 @@
       <h2 class="panel-card-title">Edit Staff Account</h2>
       <button class="btn-secondary" id="btn-user-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
     </div>
-    <form id="user-edit-form">
+    <form id="user-edit-form" method="POST">
       <input type="hidden" id="edit-user-id">
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-name" class="form-label">Full Name / Designation</label>
@@ -1742,7 +1748,7 @@
       <h2 class="panel-card-title" id="product-modal-title">Add Bakery Product</h2>
       <button class="kanban-action-btn" id="btn-product-modal-close"><i data-lucide="x" style="width: 16px; height: 16px;"></i></button>
     </div>
-    <form id="product-form">
+    <form id="product-form" method="POST">
       <input type="hidden" id="product-id-hidden">
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="prod-name-input" class="form-label">Product Name</label>
@@ -1808,7 +1814,7 @@
       <i data-lucide="megaphone" style="width: 24px; height: 24px; margin-right: 12px; color: var(--color-primary);"></i>
       <h2 class="panel-card-title" style="margin: 0; font-size: 1.25rem;">Broadcast Announcement</h2>
     </div>
-    <form id="announcement-form">
+    <form id="announcement-form" method="POST">
       <div class="form-group" style="margin-bottom: 20px;">
         <label class="form-label" for="announcement-message" style="font-weight: 600; color: var(--text-primary);">Announcement Message</label>
         <textarea id="announcement-message" class="form-input" rows="4" placeholder="Enter your announcement here..." required style="resize: vertical; padding: 16px; border-radius: 8px;"></textarea>

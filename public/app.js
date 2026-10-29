@@ -8,7 +8,11 @@ const originalFetch = window.fetch;
 window.fetch = async function () {
   let [resource, config] = arguments;
   if (typeof resource === 'string' && resource.startsWith('/api')) {
-    const sessionStr = sessionStorage.getItem('bakewise_v2_session') || localStorage.getItem('bakewise_v2_session');
+    const isRemembered = localStorage.getItem('bakewise_v2_remember_me') === 'true';
+    let sessionStr = sessionStorage.getItem('bakewise_v2_session');
+    if (!sessionStr && isRemembered) {
+      sessionStr = localStorage.getItem('bakewise_v2_session');
+    }
     if (sessionStr) {
       try {
         const session = JSON.parse(sessionStr);
@@ -25,6 +29,7 @@ window.fetch = async function () {
     const hasToken = config && config.headers && config.headers['Authorization'];
     if (hasToken && (!window.store || window.store.isBackendOnline)) {
       sessionStorage.removeItem('bakewise_v2_session');
+      localStorage.removeItem('bakewise_v2_remember_me');
       localStorage.removeItem('bakewise_v2_session');
       document.documentElement.classList.remove('user-logged-in');
       if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
@@ -34,6 +39,18 @@ window.fetch = async function () {
   }
   return response;
 };
+
+
+// --- SAFE DOM HTML SINK HELPER ---
+function setSafeHtml(target, htmlString) {
+  if (!target) return;
+  target.replaceChildren();
+  if (htmlString === undefined || htmlString === null || htmlString === "") return;
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  const fragment = range.createContextualFragment(String(htmlString));
+  target.appendChild(fragment);
+}
 
 // --- PAGINATION STATE VARIABLES ---
 let usersCurrentPage = 1;
@@ -157,7 +174,13 @@ class BakeWiseStore {
 
     this.isBackendOnline = false;
     // Persist session across refresh within the same tab or reloads
-    const sessionStr = sessionStorage.getItem("bakewise_v2_session") || localStorage.getItem("bakewise_v2_session");
+    const isRemembered = localStorage.getItem("bakewise_v2_remember_me") === "true";
+    let sessionStr = sessionStorage.getItem("bakewise_v2_session");
+    if (!sessionStr && isRemembered) {
+      sessionStr = localStorage.getItem("bakewise_v2_session");
+    } else if (!sessionStr && !isRemembered) {
+      localStorage.removeItem("bakewise_v2_session");
+    }
     if (sessionStr) {
       try {
         this.currentUser = JSON.parse(sessionStr);
@@ -180,18 +203,49 @@ class BakeWiseStore {
             };
             this.currentUser.roleLabel = roleLabels[freshUser.role] || "Staff Member";
             
-            sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
-            localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+            this.saveSession(this.currentUser);
           }
         }
       } catch(e) {
-        this.currentUser = null;
+        this.clearSession();
       }
     } else {
-      this.currentUser = null;
+      this.clearSession();
     }
     this.notifications = this.load("bakewise_v2_notifications", []);
   }
+
+  saveSession(user, rememberMe = null) {
+    this.currentUser = user;
+    if (!user) {
+      sessionStorage.removeItem("bakewise_v2_session");
+      localStorage.removeItem("bakewise_v2_session");
+      localStorage.removeItem("bakewise_v2_remember_me");
+      return;
+    }
+
+    sessionStorage.setItem("bakewise_v2_session", JSON.stringify(user));
+    const isRemembered = rememberMe !== null
+      ? Boolean(rememberMe)
+      : (localStorage.getItem("bakewise_v2_remember_me") === "true");
+
+    if (isRemembered) {
+      localStorage.setItem("bakewise_v2_session", JSON.stringify(user));
+      localStorage.setItem("bakewise_v2_remember_me", "true");
+    } else {
+      localStorage.removeItem("bakewise_v2_session");
+      localStorage.removeItem("bakewise_v2_remember_me");
+    }
+  }
+
+  clearSession() {
+    this.currentUser = null;
+    sessionStorage.removeItem("bakewise_v2_session");
+    localStorage.removeItem("bakewise_v2_session");
+    localStorage.removeItem("bakewise_v2_remember_me");
+    document.documentElement.classList.remove("user-logged-in");
+  }
+
 
   // Branch Filtering Getters
   get sales() {
@@ -409,7 +463,7 @@ class BakeWiseStore {
     if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
   }
 
-  async login(email, password) {
+  async login(email, password, rememberMe = false) {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     try {
@@ -429,8 +483,7 @@ class BakeWiseStore {
           roleLabel: this.getRoleLabel(user.role),
           token: user.token
         };
-        sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
-        localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+        this.saveSession(this.currentUser, rememberMe);
         document.documentElement.classList.add('user-logged-in');
         this.isBackendOnline = true;
         return this.currentUser;
@@ -460,8 +513,7 @@ class BakeWiseStore {
         branch_name: branch ? branch.name : null,
         roleLabel: this.getRoleLabel(matchedUser.role)
       };
-      sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
-      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      this.saveSession(this.currentUser, rememberMe);
       document.documentElement.classList.add('user-logged-in');
       return this.currentUser;
     }
@@ -484,8 +536,7 @@ class BakeWiseStore {
         branch_id: role === 'admin' ? null : 1,
         branch_name: role === 'admin' ? null : "Main Branch (Central)"
       };
-      sessionStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
-      localStorage.setItem("bakewise_v2_session", JSON.stringify(this.currentUser));
+      this.saveSession(this.currentUser, rememberMe);
       document.documentElement.classList.add('user-logged-in');
       return this.currentUser;
     }
@@ -507,10 +558,7 @@ class BakeWiseStore {
   }
 
   logout() {
-    this.currentUser = null;
-    sessionStorage.removeItem("bakewise_v2_session");
-    localStorage.removeItem("bakewise_v2_session");
-    document.documentElement.classList.remove('user-logged-in');
+    this.clearSession();
   }
 
   async addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe) {
@@ -1114,15 +1162,15 @@ async function checkSessionState() {
     if (branchSwitcher && switcherSelect) {
       if (store.currentUser.role === 'admin') {
         branchSwitcher.style.display = 'flex';
-        switcherSelect.innerHTML = '<option value="all">All Network Branches</option>' + 
-          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        setSafeHtml(switcherSelect, '<option value="all">All Network Branches</option>' + 
+          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join(''));
         switcherSelect.disabled = false;
       } else {
         branchSwitcher.style.display = 'none';
         const uBranchId = store.currentUser.branch_id ? parseInt(store.currentUser.branch_id) : 1;
         const userBranch = store.branches.find(b => b.id === uBranchId);
         const branchName = userBranch ? userBranch.name : `Branch ${uBranchId}`;
-        switcherSelect.innerHTML = `<option value="${uBranchId}">${branchName}</option>`;
+        setSafeHtml(switcherSelect, `<option value="${uBranchId}">${branchName}</option>`);
         switcherSelect.disabled = true;
       }
     }
@@ -1199,7 +1247,9 @@ function setupLoginActions() {
       const email = document.getElementById("email-input").value;
       const password = document.getElementById("password-input").value;
 
-      const user = await store.login(email, password);
+      const rememberMe = document.getElementById("remember-me") ? document.getElementById("remember-me").checked : false;
+
+      const user = await store.login(email, password, rememberMe);
       if (user) {
         await checkSessionState();
         showToast("Welcome back! Credentials authenticated.", "success");
@@ -1327,11 +1377,11 @@ class SearchableCombobox {
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'combobox-trigger';
-      trigger.innerHTML = `
+      setSafeHtml(trigger, `
         <i data-lucide="${this.icon}" class="combobox-icon"></i>
         <span class="combobox-label">Select...</span>
         <i data-lucide="chevron-down" class="combobox-arrow"></i>
-      `;
+      `);
       wrapper.appendChild(trigger);
       this.trigger = trigger;
     } else {
@@ -1342,13 +1392,13 @@ class SearchableCombobox {
       const dropdown = document.createElement('div');
       dropdown.className = 'combobox-dropdown';
       dropdown.style.display = 'none';
-      dropdown.innerHTML = `
+      setSafeHtml(dropdown, `
         <div class="combobox-search-box">
           <i data-lucide="search" class="combobox-search-icon"></i>
           <input type="text" class="combobox-search-input" placeholder="${this.placeholder}" autocomplete="off">
         </div>
         <div class="combobox-options-list"></div>
-      `;
+      `);
       wrapper.appendChild(dropdown);
       this.dropdown = dropdown;
     } else {
@@ -1520,11 +1570,11 @@ class SearchableCombobox {
   populateOptions(list) {
     if (!this.optionsList) return;
     if (!list || list.length === 0) {
-      this.optionsList.innerHTML = `<div class="combobox-empty-state">No options found</div>`;
+      setSafeHtml(this.optionsList, `<div class="combobox-empty-state">No options found</div>`);
       return;
     }
 
-    this.optionsList.innerHTML = list.map(item => {
+    setSafeHtml(this.optionsList, list.map(item => {
       const isSelected = String(item.id) === String(this.selectedValue);
       return `
         <div class="combobox-option-item ${isSelected ? 'selected' : ''}" data-id="${item.id}" data-name="${item.name}">
@@ -1532,7 +1582,7 @@ class SearchableCombobox {
           ${isSelected ? '<i data-lucide="check" style="width: 14px; height: 14px;"></i>' : ''}
         </div>
       `;
-    }).join('');
+    }).join(''));
 
     this.optionsList.querySelectorAll('.combobox-option-item').forEach(item => {
       item.addEventListener('click', (e) => {
@@ -2106,7 +2156,7 @@ function showConfirmModal(message, title = "Confirm Action", iconType = "alert-t
     
     if (iconContainer) {
       const color = iconType === "alert-triangle" ? "var(--color-error)" : "var(--primary-color)";
-      iconContainer.innerHTML = `<i data-lucide="${iconType}" style="width: 48px; height: 48px; color: ${color}; margin: 0 auto; display: block;"></i>`;
+      setSafeHtml(iconContainer, `<i data-lucide="${iconType}" style="width: 48px; height: 48px; color: ${color}; margin: 0 auto; display: block;"></i>`);
       if (window.lucide) window.lucide.createIcons({ root: iconContainer });
     }
     
@@ -2147,10 +2197,10 @@ function showToast(message, type = "success") {
   const iconMap = { success: "check-circle", info: "info", warning: "alert-triangle", error: "x-circle" };
   const colorMap = { success: "#16a34a", info: "#0284c7", warning: "#eab308", error: "#dc2626" };
 
-  toast.innerHTML = `
+  setSafeHtml(toast, `
     <i data-lucide="${iconMap[type] || 'info'}" style="width: 20px; height: 20px; color: ${colorMap[type]}; flex-shrink:0;"></i>
     <span class="toast-message">${message}</span>
-  `;
+  `);
 
   container.appendChild(toast);
   lucide.createIcons({ attrs: { class: 'lucide-custom' } });
@@ -2222,36 +2272,36 @@ function refreshDashboard() {
   // Update AI Insights & Trends based on data presence
   if (salesToday === 0 && store.sales.length === 0) {
     document.getElementById("dash-sales-trend").style.visibility = "hidden";
-    document.getElementById("dash-sales-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent sales data to analyze.</span>';
+    setSafeHtml(document.getElementById("dash-sales-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent sales data to analyze.</span>');
   } else {
     document.getElementById("dash-sales-trend").style.visibility = "visible";
-    document.getElementById("dash-sales-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Forecast indicates a steady increase. Ensure adequate staffing during peak hours.</span>';
+    setSafeHtml(document.getElementById("dash-sales-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Forecast indicates a steady increase. Ensure adequate staffing during peak hours.</span>');
   }
 
   if (wasteToday === 0 && store.waste.length === 0) {
     document.getElementById("dash-waste-trend").style.visibility = "hidden";
-    document.getElementById("dash-waste-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent waste data to analyze.</span>';
+    setSafeHtml(document.getElementById("dash-waste-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No recent waste data to analyze.</span>');
   } else {
     document.getElementById("dash-waste-trend").style.visibility = "visible";
-    document.getElementById("dash-waste-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Waste cost is decreasing. Maintain current inventory practices to keep waste low.</span>';
+    setSafeHtml(document.getElementById("dash-waste-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Waste cost is decreasing. Maintain current inventory practices to keep waste low.</span>');
   }
 
   if (expiryCount === 0) {
     document.getElementById("dash-expiry-subtext").style.visibility = "hidden";
-    document.getElementById("dash-expiry-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No items currently nearing expiry.</span>';
+    setSafeHtml(document.getElementById("dash-expiry-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No items currently nearing expiry.</span>');
   } else {
     document.getElementById("dash-expiry-subtext").style.visibility = "visible";
-    document.getElementById("dash-expiry-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Prioritize repurposing or discounting these items immediately.</span>';
+    setSafeHtml(document.getElementById("dash-expiry-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Prioritize repurposing or discounting these items immediately.</span>');
   }
 
   if (totalStock === 0) {
     document.getElementById("dash-stock-subtext").textContent = "Empty";
     document.getElementById("dash-stock-subtext").style.color = "var(--color-danger)";
-    document.getElementById("dash-stock-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Inventory is empty. Immediate restocking required.</span>';
+    setSafeHtml(document.getElementById("dash-stock-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Inventory is empty. Immediate restocking required.</span>');
   } else {
     document.getElementById("dash-stock-subtext").textContent = "Optimal levels";
     document.getElementById("dash-stock-subtext").style.color = "var(--color-success)";
-    document.getElementById("dash-stock-insight").innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are optimal. No immediate restocking required.</span>';
+    setSafeHtml(document.getElementById("dash-stock-insight"), '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are optimal. No immediate restocking required.</span>');
   }
   
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -2357,10 +2407,10 @@ function renderDashboardSalesWasteChart() {
   const salesWasteInsightEl = document.getElementById("insight-sales-waste-chart");
   if (salesWasteInsightEl) {
     if (totalSales === 0 && totalWaste === 0) {
-      salesWasteInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No sales or waste data for the selected period.</span>';
+      setSafeHtml(salesWasteInsightEl, '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No sales or waste data for the selected period.</span>');
     } else {
       const salesExceed = totalSales >= totalWaste;
-      salesWasteInsightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>${salesExceed ? 'Sales are outperforming waste costs.' : 'Warning: Waste costs are high compared to sales.'} Total sales reached ₱${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}.</span>`;
+      setSafeHtml(salesWasteInsightEl, `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>${salesExceed ? 'Sales are outperforming waste costs.' : 'Warning: Waste costs are high compared to sales.'} Total sales reached ₱${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}.</span>`);
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
@@ -2448,7 +2498,7 @@ async function renderDashboardStockPlanTable() {
     `;
   }));
 
-  tbody.innerHTML = rows.join('');
+  setSafeHtml(tbody, rows.join(''));
 
   const insightEl = document.getElementById("insight-stock-plan");
   if (insightEl) {
@@ -2457,9 +2507,9 @@ async function renderDashboardStockPlanTable() {
       return stock < 10;
     }).length;
     if (lowStockCount > 0) {
-      insightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Notice: ${lowStockCount} product(s) are currently at low stock. Prioritize suggested production runs.</span>`;
+      setSafeHtml(insightEl, `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Notice: ${lowStockCount} product(s) are currently at low stock. Prioritize suggested production runs.</span>`);
     } else {
-      insightEl.innerHTML = `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are healthy across products. Production recommendations updated based on forecast.</span>`;
+      setSafeHtml(insightEl, `<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>Stock levels are healthy across products. Production recommendations updated based on forecast.</span>`);
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
@@ -2553,7 +2603,7 @@ function renderDashboardBranchesChart() {
     const totalWasteGlobal = allBranchPerformance.reduce((a, b) => a + b.waste, 0);
     
     if (totalSalesGlobal === 0 && totalWasteGlobal === 0) {
-      branchInsightEl.innerHTML = '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No branch data available for comparison.</span>';
+      setSafeHtml(branchInsightEl, '<i data-lucide="sparkles" style="width: 14px; height: 14px;"></i><span>No branch data available for comparison.</span>');
     } else {
       const sortedBySales = [...allBranchPerformance].sort((a, b) => b.sales - a.sales);
       const sortedByWaste = [...allBranchPerformance].sort((a, b) => b.waste - a.waste);
@@ -2588,7 +2638,7 @@ function renderDashboardBranchesChart() {
       }
       insightHtml += `</div>`;
       
-      branchInsightEl.innerHTML = insightHtml;
+      setSafeHtml(branchInsightEl, insightHtml);
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
@@ -2597,7 +2647,7 @@ function renderDashboardBranchesChart() {
 function renderRealtimeAlerts() {
   const tbody = document.getElementById("dashboard-action-alerts-tbody");
   if (!tbody) return;
-  tbody.innerHTML = "";
+  tbody.replaceChildren();
 
   const branchIdStr = store.getSelectedBranchId();
   const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
@@ -2633,19 +2683,19 @@ function renderRealtimeAlerts() {
   });
 
   if (alertItems.length === 0) {
-    tbody.innerHTML = `
+    setSafeHtml(tbody, `
       <tr>
         <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
           <i data-lucide="check-circle" style="width: 24px; height: 24px; color: var(--color-success); vertical-align: middle; margin-right: 6px;"></i>
           <strong>Systems Nominal</strong> — No active expiration hazards or critical alerts.
         </td>
       </tr>
-    `;
+    `);
     if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
-  tbody.innerHTML = alertItems.map(a => {
+  setSafeHtml(tbody, alertItems.map(a => {
     const expFormatted = formatDateTimeDisplay(a.item.expiryDate);
     const cost = a.product.cost || 10;
     
@@ -2669,7 +2719,7 @@ function renderRealtimeAlerts() {
         <td>${actionBtnHtml}</td>
       </tr>
     `;
-  }).join('');
+  }).join(''));
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
@@ -2792,17 +2842,17 @@ function renderPosProducts() {
   });
 
   if (filtered.length === 0) {
-    grid.innerHTML = `
+    setSafeHtml(grid, `
       <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
         <i data-lucide="package-x" style="width: 36px; height: 36px; opacity: 0.5; margin-bottom: 8px;"></i>
         <p style="font-weight: 600;">No bakery products found matching your search</p>
       </div>
-    `;
+    `);
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     return;
   }
 
-  grid.innerHTML = filtered.map(p => {
+  setSafeHtml(grid, filtered.map(p => {
     const stockInfo = getPosProductStockInfo(p.id);
     const stockAvailable = stockInfo.stock;
     const scopeLabelStr = stockInfo.scopeLabel ? ` ${stockInfo.scopeLabel}` : "";
@@ -2845,7 +2895,7 @@ function renderPosProducts() {
         </div>
       </div>
     `;
-  }).join('');
+  }).join(''));
 
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 }
@@ -2971,13 +3021,13 @@ function updatePosCartUI() {
 
   if (!posCart.length) {
     if (listElem) {
-      listElem.innerHTML = `
+      setSafeHtml(listElem, `
         <div class="cart-empty-state">
           <i data-lucide="shopping-cart" style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.5;"></i>
           <p style="margin-top: 10px; font-weight: 600; color: var(--text-secondary);">Cart is empty</p>
           <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
         </div>
-      `;
+      `);
       if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     }
     if (subtotalElem) subtotalElem.textContent = "₱0.00";
@@ -2988,7 +3038,7 @@ function updatePosCartUI() {
   }
 
   if (listElem) {
-    listElem.innerHTML = posCart.map(item => {
+    setSafeHtml(listElem, posCart.map(item => {
       const itemSubtotal = item.qty * item.price;
       return `
         <div class="cart-item-row">
@@ -3007,7 +3057,7 @@ function updatePosCartUI() {
           </button>
         </div>
       `;
-    }).join('');
+    }).join(''));
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   }
 
@@ -3160,7 +3210,7 @@ function showPosReceiptModal(tx) {
 
   const dateFormatted = new Date(tx.transaction_date || Date.now()).toLocaleString();
 
-  container.innerHTML = `
+  setSafeHtml(container, `
     <div class="receipt-logo-header">
       <h2>ROSE BAKESHOP</h2>
       <p style="color: #666; font-size: 0.75rem;">BakeWise POS Receipt</p>
@@ -3218,7 +3268,7 @@ function showPosReceiptModal(tx) {
       <p style="margin: 0; font-weight: bold;">Thank You for Choosing Rose Bakeshop!</p>
       <p style="margin: 2px 0 0 0; color: #666;">Please come again!</p>
     </div>
-  `;
+  `);
 
   if (overlay) overlay.style.display = 'block';
   modal.style.display = 'block';
@@ -3252,13 +3302,13 @@ async function refreshPosHistory() {
     if (isAdmin) {
       branchSelect.disabled = false;
       if (branchSelect.options.length <= 1) {
-        branchSelect.innerHTML = '<option value="all">All Branches</option>' + 
-          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        setSafeHtml(branchSelect, '<option value="all">All Branches</option>' + 
+          store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join(''));
       }
     } else {
       const userBranchObj = store.branches.find(b => parseInt(b.id) === userBranchId);
       const bName = userBranchObj ? userBranchObj.name : `Branch ${userBranchId}`;
-      branchSelect.innerHTML = `<option value="${userBranchId}">${bName}</option>`;
+      setSafeHtml(branchSelect, `<option value="${userBranchId}">${bName}</option>`);
       branchSelect.value = String(userBranchId);
       branchSelect.disabled = true;
     }
@@ -3298,17 +3348,17 @@ async function refreshPosHistory() {
     });
 
     if (transactions.length === 0) {
-      tbody.innerHTML = `
+      setSafeHtml(tbody, `
         <tr>
           <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
             No POS transactions found matching the selected filters.
           </td>
         </tr>
-      `;
+      `);
       return;
     }
 
-    tbody.innerHTML = transactions.map(tx => {
+    setSafeHtml(tbody, transactions.map(tx => {
       const dateVal = tx.created_at || tx.transaction_date || tx.date;
       const dateFormatted = formatDateTimeDisplay(dateVal);
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
@@ -3335,7 +3385,7 @@ async function refreshPosHistory() {
           </td>
         </tr>
       `;
-    }).join('');
+    }).join(''));
 
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   } catch (err) {
@@ -3375,7 +3425,7 @@ async function viewPosTransactionDetails(txId) {
     const cashierName = tx.cashier_name || tx.cashier || 'System Administrator';
     const itemsList = tx.items || [];
 
-    body.innerHTML = `
+    setSafeHtml(body, `
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-secondary); padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem;">
         <div><strong>Transaction ID:</strong> <span style="color: var(--primary-color); font-weight: 700;">${tx.transaction_number}</span></div>
         <div><strong>Exact Timestamp:</strong> ${dateFormatted}</div>
@@ -3433,7 +3483,7 @@ async function viewPosTransactionDetails(txId) {
           <span>Change:</span> <strong>₱${parseFloat(tx.change_amount || 0).toFixed(2)}</strong>
         </div>
       </div>
-    `;
+    `);
 
     if (voidBtn) {
       if (tx.status === 'Completed') {
@@ -3657,7 +3707,7 @@ function refreshInventoryPane() {
   const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
   const pagedInventory = filteredInventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedInventory.map(item => {
+  setSafeHtml(tbody, pagedInventory.map(item => {
     const p = store.products.find(x => x.id === item.productId);
     if (!p) return '';
 
@@ -3699,7 +3749,7 @@ function refreshInventoryPane() {
         <td><span class="badge ${statusClass}">${statusText}</span></td>
       </tr>
     `;
-  }).join('');
+  }).join(''));
 
   const prevBtn = document.getElementById("inventory-prev-page");
   const nextBtn = document.getElementById("inventory-next-page");
@@ -3762,7 +3812,7 @@ function refreshProductionPane() {
   const startIndex = (prodHistCurrentPage - 1) * ITEMS_PER_PAGE;
   const pagedProd = sortedProd.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedProd.map(pr => {
+  setSafeHtml(tbody, pagedProd.map(pr => {
     const p = store.products.find(x => x.id === pr.productId) || { name: "Unknown" };
     const b = store.branches.find(x => x.id === pr.branchId) || { name: "Unknown Branch" };
     const efficiency = pr.planned > 0 ? Math.round((pr.actual / pr.planned) * 100) : 100;
@@ -3778,7 +3828,7 @@ function refreshProductionPane() {
         <td><span class="badge success">${pr.status}</span></td>
       </tr>
     `;
-  }).join('');
+  }).join(''));
 
   const prevBtn = document.getElementById("prod-hist-prev-page");
   const nextBtn = document.getElementById("prod-hist-next-page");
@@ -3839,7 +3889,7 @@ function refreshWastePane() {
   const startIndex = (wasteHistCurrentPage - 1) * ITEMS_PER_PAGE;
   const pagedWaste = sortedWaste.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedWaste.map(w => {
+  setSafeHtml(tbody, pagedWaste.map(w => {
     const p = store.products.find(x => x.id === w.productId) || { name: "Unknown" };
     const b = store.branches.find(x => x.id === w.branchId) || { name: "Unknown Branch" };
     const totalCost = w.qty * w.cost;
@@ -3855,7 +3905,7 @@ function refreshWastePane() {
         <td>${dateObj.toLocaleDateString()}</td>
       </tr>
     `;
-  }).join('');
+  }).join(''));
 
   const prevBtn = document.getElementById("waste-hist-prev-page");
   const nextBtn = document.getElementById("waste-hist-next-page");
@@ -4021,7 +4071,7 @@ async function renderDailyPredictionTable() {
     `;
   }));
 
-  tbody.innerHTML = predictions.join('');
+  setSafeHtml(tbody, predictions.join(''));
 }
 
 async function render7DayProjectionTable() {
@@ -4038,7 +4088,7 @@ async function render7DayProjectionTable() {
       ths += `<th>Day ${d}<br><span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary);">${dateFormatted}</span></th>`;
     }
     ths += `<th style="background: rgba(217, 119, 6, 0.1); color: var(--primary-color);">7-Day Total</th>`;
-    trHead.innerHTML = ths;
+    setSafeHtml(trHead, ths);
   }
 
   const rows = await Promise.all(store.products.map(async p => {
@@ -4071,13 +4121,13 @@ async function render7DayProjectionTable() {
     `;
   }));
 
-  tbody.innerHTML = rows.join('');
+  setSafeHtml(tbody, rows.join(''));
 }
 
 async function renderBakeRecommendations() {
   const container = document.getElementById("ai-recs-container");
   if (!container) return;
-  container.innerHTML = "";
+  container.replaceChildren();
 
   const recsPromises = store.products.map(async p => {
     const currentStock = store.inventory
@@ -4099,7 +4149,7 @@ async function renderBakeRecommendations() {
 
   const recs = await Promise.all(recsPromises);
 
-  container.innerHTML = recs.map(r => `
+  setSafeHtml(container, recs.map(r => `
     <div class="ai-recommendation-card" style="border-left-color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'}">
       <div class="rec-details">
         <span class="rec-title">${r.product}</span>
@@ -4109,13 +4159,13 @@ async function renderBakeRecommendations() {
         ${r.recommended} pcs
       </div>
     </div>
-  `).join('');
+  `).join(''));
 }
 
 function renderRepurposingAlerts() {
   const container = document.getElementById("ai-repurpose-container");
   if (!container) return;
-  container.innerHTML = "";
+  container.replaceChildren();
 
   const itemsToRepurposeMap = new Map();
   store.inventory.forEach(item => {
@@ -4135,17 +4185,17 @@ function renderRepurposingAlerts() {
   const itemsToRepurpose = Array.from(itemsToRepurposeMap.values());
 
   if (itemsToRepurpose.length === 0) {
-    container.innerHTML = `
+    setSafeHtml(container, `
       <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-secondary);">
         <i data-lucide="sparkles" style="width: 32px; height: 32px; color: var(--accent-color); margin-bottom: 8px;"></i>
         <p>No products are currently approaching shelf-life expiration limits. Repurposing is not required.</p>
       </div>
-    `;
+    `);
     if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
-  container.innerHTML = itemsToRepurpose.map(item => `
+  setSafeHtml(container, itemsToRepurpose.map(item => `
     <div class="repurpose-card" id="repurpose-card-${item.productId}">
       <div class="repurpose-badge-top">
         <span class="repurpose-item-name">${item.name}</span>
@@ -4157,7 +4207,7 @@ function renderRepurposingAlerts() {
         <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed
       </button>
     </div>
-  `).join('');
+  `).join(''));
 
   document.querySelectorAll(".btn-repurpose-action").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -4280,7 +4330,7 @@ function refreshProductsPane() {
   const startIndex = (productsCurrentPage - 1) * ITEMS_PER_PAGE;
   const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedProducts.map(p => `
+  setSafeHtml(tbody, pagedProducts.map(p => `
     <tr>
       <td><code>${p.id}</code></td>
       <td style="font-weight: 700;">${p.name}</td>
@@ -4296,7 +4346,7 @@ function refreshProductsPane() {
         </div>
       </td>
     </tr>
-  `).join('');
+  `).join(''));
 
   const prevBtn = document.getElementById("products-prev-page");
   const nextBtn = document.getElementById("products-next-page");
@@ -4382,7 +4432,7 @@ function refreshReportsPane() {
     const startIndex = (repSalesCurrentPage - 1) * ITEMS_PER_PAGE;
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    reportSalesTbody.innerHTML = pagedProducts.map(p => {
+    setSafeHtml(reportSalesTbody, pagedProducts.map(p => {
       const pSales = store.sales.filter(s => s.productId === p.id && s.date >= startDateStr && s.date <= endDateStr && (branchId === 'all' || s.branchId === branchId));
       const unitsSold = pSales.reduce((sum, s) => sum + s.qty, 0);
       const totalIncome = unitsSold * p.price;
@@ -4395,7 +4445,7 @@ function refreshReportsPane() {
           <td style="font-weight: 700; color: var(--color-success)">₱${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         </tr>
       `;
-    }).join('');
+    }).join(''));
 
     const prevBtn = document.getElementById("rep-sales-prev-page");
     const nextBtn = document.getElementById("rep-sales-next-page");
@@ -4431,7 +4481,7 @@ function refreshReportsPane() {
     const startIndex = (repWasteCurrentPage - 1) * ITEMS_PER_PAGE;
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    reportWasteTbody.innerHTML = pagedProducts.map(p => {
+    setSafeHtml(reportWasteTbody, pagedProducts.map(p => {
       const pWaste = store.waste.filter(w => w.productId === p.id && w.date >= startDateStr && w.date <= endDateStr && (branchId === 'all' || w.branchId === branchId));
       const totalWaste = pWaste.reduce((sum, w) => sum + w.qty, 0);
       const costLost = totalWaste * p.cost;
@@ -4446,7 +4496,7 @@ function refreshReportsPane() {
           <td style="font-weight: 700; color: var(--color-error)">₱${costLost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         </tr>
       `;
-    }).join('');
+    }).join(''));
 
     const prevBtn = document.getElementById("rep-waste-prev-page");
     const nextBtn = document.getElementById("rep-waste-next-page");
@@ -4482,7 +4532,7 @@ function refreshReportsPane() {
     const startIndex = (repEffCurrentPage - 1) * ITEMS_PER_PAGE;
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    reportEffTbody.innerHTML = pagedProducts.map(p => {
+    setSafeHtml(reportEffTbody, pagedProducts.map(p => {
       const pRuns = store.production.filter(pr => pr.productId === p.id && (branchId === 'all' || pr.branchId === branchId));
       const plannedSum = pRuns.reduce((sum, r) => sum + r.planned, 0);
       const actualSum = pRuns.reduce((sum, r) => sum + r.actual, 0);
@@ -4500,7 +4550,7 @@ function refreshReportsPane() {
           <td style="font-weight: 700; color: ${efficiency >= 100 ? 'var(--color-success)' : 'var(--color-warning)'}">${efficiency}%</td>
         </tr>
       `;
-    }).join('');
+    }).join(''));
 
     const prevBtn = document.getElementById("rep-eff-prev-page");
     const nextBtn = document.getElementById("rep-eff-next-page");
@@ -4559,7 +4609,7 @@ async function refreshAdminUsersPane() {
   const startIndex = (usersCurrentPage - 1) * ITEMS_PER_PAGE;
   const pagedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  tbody.innerHTML = pagedUsers.map(u => {
+  setSafeHtml(tbody, pagedUsers.map(u => {
     const branch = store.branches.find(b => b.id === u.branch_id);
     const branchName = branch ? branch.name : (u.role === 'admin' ? 'Global Network' : 'Main Branch (Central)');
 
@@ -4581,7 +4631,7 @@ async function refreshAdminUsersPane() {
         </td>
       </tr>
     `;
-  }).join('');
+  }).join(''));
   lucide.createIcons();
 
   if (searchInput && !searchInput.dataset.listening) {
@@ -4639,7 +4689,7 @@ async function refreshAdminUsersPane() {
 
         const branchSelect = document.getElementById("edit-usr-branch");
         if (branchSelect) {
-          branchSelect.innerHTML = store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+          setSafeHtml(branchSelect, store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join(''));
           branchSelect.value = user.branch_id || (store.branches[0] ? store.branches[0].id : '');
         }
 
@@ -4719,7 +4769,7 @@ async function refreshAdminBranchesPane() {
   const pagedBranches = filteredBranches.slice(startIndex, startIndex + BRANCHES_PER_PAGE);
 
   if (tbody) {
-    tbody.innerHTML = pagedBranches.map(b => `
+    setSafeHtml(tbody, pagedBranches.map(b => `
       <tr>
         <td><code>#${b.id}</code></td>
         <td style="font-weight: 700;">${b.name}</td>
@@ -4738,7 +4788,7 @@ async function refreshAdminBranchesPane() {
           </div>
         </td>
       </tr>
-    `).join('');
+    `).join(''));
     lucide.createIcons();
 
     if (searchInput && !searchInput.dataset.listening) {
@@ -5109,9 +5159,9 @@ function setupNotifications() {
       dropdown.style.display = "none";
       
       if (announcementTarget) {
-        announcementTarget.innerHTML = '<option value="all">All Branches (Entire Business)</option>';
+        setSafeHtml(announcementTarget, '<option value="all">All Branches (Entire Business)</option>');
         store.branches.forEach(b => {
-          announcementTarget.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+          setSafeHtml(announcementTarget, `<option value="${b.id}">${b.name}</option>`);
         });
       }
 
@@ -5139,7 +5189,7 @@ function setupNotifications() {
 
   function renderNotificationsList() {
     if (!listContainer) return;
-    listContainer.innerHTML = "";
+    listContainer.replaceChildren();
     
     const user = store.currentUser;
     if (!user) return;
@@ -5157,7 +5207,7 @@ function setupNotifications() {
     });
     
     if (relevantNotifs.length === 0) {
-      listContainer.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">No new notifications.</div>`;
+      setSafeHtml(listContainer, `<div style="padding: 20px; text-align: center; color: var(--text-muted);">No new notifications.</div>`);
       return;
     }
 
@@ -5169,10 +5219,10 @@ function setupNotifications() {
       const timeStr = formatRelativeTime(notif.timestamp);
       const typeBadge = notif.type === 'announcement' ? '<span style="background:var(--accent-color);color:white;padding:2px 4px;border-radius:4px;font-size:0.6rem;margin-right:5px;">ANNOUNCEMENT</span> ' : '';
       
-      item.innerHTML = `
+      setSafeHtml(item, `
         <span class="notification-message">${typeBadge}${notif.message}</span>
         <span class="notification-time">${timeStr}</span>
-      `;
+      `);
 
       item.addEventListener("click", () => {
         if (!notif.readBy) notif.readBy = [];
