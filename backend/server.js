@@ -975,11 +975,14 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
   const { name, email, password, role, branch_id } = req.body;
-  const hashedPassword = bcrypt.hashSync(password || 'password123', 10);
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ error: 'Name, email, password, and role are required.' });
+  }
+  const hashedPassword = bcrypt.hashSync(password, 10);
   try {
     const bId = branch_id ? parseInt(branch_id) : null;
     const result = await queryDb(
-      "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, branch_id",
       [name, email, hashedPassword, role, bId]
     );
     res.status(201).json(result.rows[0] || { name, email, role, branch_id: bId });

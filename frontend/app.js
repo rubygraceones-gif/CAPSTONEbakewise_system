@@ -165,11 +165,11 @@ class BakeWiseStore {
     ]);
 
     this.users = this.load("bakewise_v2_users", [
-      { id: 1, email: "manager@bakewise.com", password: "password123", name: "Branch Manager", role: "manager", branch_id: 1 },
-      { id: 2, email: "sales@bakewise.com", password: "password123", name: "Sales Staff", role: "sales", branch_id: 1 },
-      { id: 3, email: "inventory@bakewise.com", password: "password123", name: "Inventory Specialist", role: "inventory", branch_id: 1 },
-      { id: 4, email: "production@bakewise.com", password: "password123", name: "Baking Specialist", role: "production", branch_id: 1 },
-      { id: 5, email: "admin@bakewise.com", password: "password123", name: "System Administrator", role: "admin", branch_id: null }
+      { id: 1, email: "manager@bakewise.com", name: "Branch Manager", role: "manager", branch_id: 1 },
+      { id: 2, email: "sales@bakewise.com", name: "Sales Staff", role: "sales", branch_id: 1 },
+      { id: 3, email: "inventory@bakewise.com", name: "Inventory Specialist", role: "inventory", branch_id: 1 },
+      { id: 4, email: "production@bakewise.com", name: "Baking Specialist", role: "production", branch_id: 1 },
+      { id: 5, email: "admin@bakewise.com", name: "System Administrator", role: "admin", branch_id: null }
     ]);
 
     this.isBackendOnline = false;
@@ -464,7 +464,8 @@ class BakeWiseStore {
   }
 
   async login(email, password, rememberMe = false) {
-    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) return null;
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -488,63 +489,18 @@ class BakeWiseStore {
         this.isBackendOnline = true;
         return this.currentUser;
       } else if (res.status === 429) {
-        if (typeof showToast !== 'undefined') showToast("API Rate limited. Falling back to local authentication.", "info");
+        if (typeof showToast !== 'undefined') showToast("Too many login attempts. Please wait before trying again.", "error");
+        return null;
       } else {
-        console.warn("API authentication failed. Falling back to local authentication.");
+        return null;
       }
     } catch (e) {
-      console.error("Auth login network failed, attempting offline fallback", e);
+      console.warn("Auth network error:", e);
+      return null;
     }
-
-    const matchedUser = this.users.find(u => 
-      u.email.toLowerCase() === cleanEmail ||
-      u.email.toLowerCase().replace('@rosebakeshop.com', '@bakewise.com') === cleanEmail ||
-      u.email.toLowerCase().replace('@bakewise.com', '@rosebakeshop.com') === cleanEmail ||
-      u.email.toLowerCase().replace('@gmail.com', '@bakewise.com') === cleanEmail
-    );
-
-    if (matchedUser && matchedUser.password === password) {
-      const branch = this.branches.find(b => b.id === matchedUser.branch_id);
-      this.currentUser = {
-        email: matchedUser.email,
-        role: matchedUser.role,
-        name: matchedUser.name,
-        branch_id: matchedUser.branch_id,
-        branch_name: branch ? branch.name : null,
-        roleLabel: this.getRoleLabel(matchedUser.role)
-      };
-      this.saveSession(this.currentUser, rememberMe);
-      document.documentElement.classList.add('user-logged-in');
-      return this.currentUser;
-    }
-
-    // Role-based keyword fallback matching
-    const nameMap = { "manager": "Branch Manager", "sales": "Sales Staff", "inventory": "Inventory Specialist", "production": "Baking Specialist", "admin": "System Administrator" };
-    let role = null;
-    if (cleanEmail.includes("manager")) role = "manager";
-    else if (cleanEmail.includes("sales")) role = "sales";
-    else if (cleanEmail.includes("inventory")) role = "inventory";
-    else if (cleanEmail.includes("production")) role = "production";
-    else if (cleanEmail.includes("admin")) role = "admin";
-
-    if (role && (password === "password123" || password === "password")) {
-      this.currentUser = {
-        email: cleanEmail,
-        role: role,
-        name: nameMap[role] || "Staff Member",
-        roleLabel: this.getRoleLabel(role),
-        branch_id: role === 'admin' ? null : 1,
-        branch_name: role === 'admin' ? null : "Main Branch (Central)"
-      };
-      this.saveSession(this.currentUser, rememberMe);
-      document.documentElement.classList.add('user-logged-in');
-      return this.currentUser;
-    }
-
-    return null;
   }
 
-  getRoleLabel(role) {
+    getRoleLabel(role) {
     const roleLabels = {
       "admin": "System Administrator",
       "manager": "Branch Manager",
