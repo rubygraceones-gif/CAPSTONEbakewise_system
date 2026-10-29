@@ -1,0 +1,1271 @@
+{
+  "bw_branches": [
+    {
+      "id": 1,
+      "name": "Main Branch",
+      "latitude": 100,
+      "longitude": 200,
+      "status": "Maintenance",
+      "address": "Ruby St, Agdao, Davao City",
+      "store_hours": "24 HOURS",
+      "contact_no": "(082) 222-5071",
+      "created_at": "2026-10-01T07:43:34.144Z"
+    },
+    {
+      "id": 6,
+      "name": "Lasang",
+      "latitude": 14.5995,
+      "longitude": 120.9842,
+      "status": "Active",
+      "address": "Purok Leo, Lasang",
+      "store_hours": "24 HOURS",
+      "contact_no": "09935981766",
+      "created_at": "2026-09-29T06:42:00.930Z"
+    },
+    {
+      "id": 7,
+      "name": "Buhangin",
+      "latitude": 14.5995,
+      "longitude": 120.9842,
+      "status": "Inactive",
+      "address": "Buhangin Public Market",
+      "store_hours": "24 HOURS",
+      "contact_no": "(082) 286-2546",
+      "created_at": "2026-09-29T08:53:21.781Z"
+    },
+    {
+      "id": 8,
+      "name": "Agdao",
+      "latitude": 14.5995,
+      "longitude": 120.9842,
+      "status": "Active",
+      "address": "Agdao",
+      "store_hours": "5AM-10AM",
+      "contact_no": "997737333",
+      "created_at": "2026-10-01T12:03:41.568Z"
+    }
+  ],
+  "bw_users": [
+    {
+      "id": 1,
+      "email": "manager@bakewise.com",
+      "password": "$2b$10$fdpqLS3p/KdQYAYw/F1nX.3G4b5XSboC43i01JjyeeSJqljtBNZX2",
+      "name": "Branch Manager",
+      "role": "manager",
+      "branch_id": 6,
+      "created_at": "2026-09-29T04:45:59.896Z"
+    },
+    {
+      "id": 2,
+      "email": "sales@bakewise.com",
+      "password": "$2b$10$fdpqLS3p/KdQYAYw/F1nX.3G4b5XSboC43i01JjyeeSJqljtBNZX2",
+      "name": "Sales Staff",
+      "role": "sales",
+      "branch_id": 6,
+      "created_at": "2026-09-29T04:45:59.896Z"
+    },
+    {
+      "id": 3,
+      "email": "inventory@bakewise.com",
+      "password": "$2b$10$fdpqLS3p/KdQYAYw/F1nX.3G4b5XSboC43i01JjyeeSJqljtBNZX2",
+      "name": "Inventory Specialist",
+      "role": "inventory",
+      "branch_id": 6,
+      "created_at": "2026-09-29T04:45:59.896Z"
+    },
+    {
+      "id": 4,
+      "email": "production@bakewise.com",
+      "password": "$2b$10$fdpqLS3p/KdQYAYw/F1nX.3G4b5XSboC43i01JjyeeSJqljtBNZX2",
+      "name": "Baking Specialist",
+      "role": "production",
+      "branch_id": 6,
+      "created_at": "2026-09-29T04:45:59.896Z"
+    },
+    {
+      "id": 5,
+      "email": "admin@bakewise.com",
+      "password": "$2b$10$fdpqLS3p/KdQYAYw/F1nX.3G4b5XSboC43i01JjyeeSJqljtBNZX2",
+      "name": "System Administrator",
+      "role": "admin",
+      "branch_id": null,
+      "created_at": "2026-09-29T04:45:59.896Z"
+    },
+    {
+      "id": 6,
+      "email": "try@bakewise.com",
+      "password": "$2b$10$XZL1VmvjwAXLhSuF6Lnq2ue2uRDrqaFURc088BT1XCsJd71kQMxgK",
+      "name": "Try ",
+      "role": "manager",
+      "branch_id": 1,
+      "created_at": "2026-10-12T08:42:32.814Z"
+    }
+  ],
+  "bw_products": [
+    {
+      "id": "p1",
+      "name": "Pandesal ",
+      "category": "BREAD",
+      "price": "45.00",
+      "cost": "18.00",
+      "shelf_life_days": 1,
+      "repurpose_recipe": "Garlic Croutons or Fine Breadcrumbs",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p10",
+      "name": "Muffin",
+      "category": "PASTRIES",
+      "price": "12.00",
+      "cost": "2.00",
+      "shelf_life_days": 3,
+      "repurpose_recipe": "N/A",
+      "created_at": "2026-10-01T09:15:19.347Z"
+    },
+    {
+      "id": "p2",
+      "name": "Special Ensaymada",
+      "category": "PASTRIES",
+      "price": "30.00",
+      "cost": "12.00",
+      "shelf_life_days": 3,
+      "repurpose_recipe": "Baked Ensaymada Pudding",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p3",
+      "name": "Classic Sliced Bread",
+      "category": "Bread",
+      "price": "65.00",
+      "cost": "28.00",
+      "shelf_life_days": 4,
+      "repurpose_recipe": "Cinnamon Bread Pudding or French Toast Sliders",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p4",
+      "name": "Premium Chocolate Cake",
+      "category": "Cakes",
+      "price": "380.00",
+      "cost": "160.00",
+      "shelf_life_days": 5,
+      "repurpose_recipe": "Chocolate Truffle Cake Pops",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p5",
+      "name": "Spanish Bread",
+      "category": "Bread",
+      "price": "10.00",
+      "cost": "4.00",
+      "shelf_life_days": 2,
+      "repurpose_recipe": "Bread Pudding Base",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p6",
+      "name": "Butter Croissant",
+      "category": "Pastries",
+      "price": "50.00",
+      "cost": "22.00",
+      "shelf_life_days": 2,
+      "repurpose_recipe": "Double Baked Almond Croissants",
+      "created_at": "2026-09-29T04:45:59.951Z"
+    },
+    {
+      "id": "p7",
+      "name": "Coke",
+      "category": "DRINKS",
+      "price": "25.00",
+      "cost": "20.00",
+      "shelf_life_days": 30,
+      "repurpose_recipe": "N/A",
+      "created_at": "2026-09-29T06:54:33.129Z"
+    },
+    {
+      "id": "p8",
+      "name": "Chiffon Cake",
+      "category": "CAKES",
+      "price": "180.00",
+      "cost": "80.00",
+      "shelf_life_days": 2,
+      "repurpose_recipe": "Pudding",
+      "created_at": "2026-09-29T08:56:48.849Z"
+    }
+  ],
+  "bw_inventory": [
+    {
+      "id": 1,
+      "product_id": "p7",
+      "stock_level": 2,
+      "production_date": "2026-09-28T16:00:00.000Z",
+      "expiry_date": "2026-10-28T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-09-29T06:54:57.002Z"
+    },
+    {
+      "id": 2,
+      "product_id": "p4",
+      "stock_level": 0,
+      "production_date": "2026-09-28T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-09-29T06:58:44.167Z"
+    },
+    {
+      "id": 5,
+      "product_id": "p1",
+      "stock_level": 0,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-01T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-09-30T17:31:46.424Z"
+    },
+    {
+      "id": 6,
+      "product_id": "p9",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:47.356Z"
+    },
+    {
+      "id": 7,
+      "product_id": "p2",
+      "stock_level": 30,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:47.546Z"
+    },
+    {
+      "id": 8,
+      "product_id": "p3",
+      "stock_level": 0,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:48.028Z"
+    },
+    {
+      "id": 9,
+      "product_id": "p8",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:48.301Z"
+    },
+    {
+      "id": 10,
+      "product_id": "p5",
+      "stock_level": 0,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:48.481Z"
+    },
+    {
+      "id": 11,
+      "product_id": "p6",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:09:48.663Z"
+    },
+    {
+      "id": 12,
+      "product_id": "p7",
+      "stock_level": 50,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:49.226Z"
+    },
+    {
+      "id": 13,
+      "product_id": "p9",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:49.406Z"
+    },
+    {
+      "id": 14,
+      "product_id": "p2",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:49.581Z"
+    },
+    {
+      "id": 15,
+      "product_id": "p3",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:49.763Z"
+    },
+    {
+      "id": 16,
+      "product_id": "p4",
+      "stock_level": 20,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:50.002Z"
+    },
+    {
+      "id": 17,
+      "product_id": "p8",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:50.232Z"
+    },
+    {
+      "id": 18,
+      "product_id": "p5",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:50.411Z"
+    },
+    {
+      "id": 19,
+      "product_id": "p6",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:50.585Z"
+    },
+    {
+      "id": 20,
+      "product_id": "p1",
+      "stock_level": 100,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T07:09:50.766Z"
+    },
+    {
+      "id": 21,
+      "product_id": "p7",
+      "stock_level": 50,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:35.688Z"
+    },
+    {
+      "id": 22,
+      "product_id": "p9",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:35.872Z"
+    },
+    {
+      "id": 23,
+      "product_id": "p2",
+      "stock_level": 33,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.057Z"
+    },
+    {
+      "id": 24,
+      "product_id": "p3",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.242Z"
+    },
+    {
+      "id": 25,
+      "product_id": "p4",
+      "stock_level": 20,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.422Z"
+    },
+    {
+      "id": 26,
+      "product_id": "p8",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.592Z"
+    },
+    {
+      "id": 27,
+      "product_id": "p5",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.767Z"
+    },
+    {
+      "id": 28,
+      "product_id": "p6",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:36.947Z"
+    },
+    {
+      "id": 29,
+      "product_id": "p1",
+      "stock_level": 133,
+      "production_date": "2026-10-01T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:43:37.127Z"
+    },
+    {
+      "id": 30,
+      "product_id": "p10",
+      "stock_level": 0,
+      "production_date": "2026-10-01T16:00:00.000Z",
+      "expiry_date": "2026-10-04T16:00:00.000Z",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:15:52.522Z"
+    },
+    {
+      "id": 31,
+      "product_id": "p10",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:17:41.216Z"
+    },
+    {
+      "id": 32,
+      "product_id": "p10",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 7,
+      "created_at": "2026-10-01T09:17:41.293Z"
+    },
+    {
+      "id": 33,
+      "product_id": "p7",
+      "stock_level": 50,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.934Z"
+    },
+    {
+      "id": 34,
+      "product_id": "p2",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.948Z"
+    },
+    {
+      "id": 35,
+      "product_id": "p3",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.957Z"
+    },
+    {
+      "id": 36,
+      "product_id": "p4",
+      "stock_level": 20,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.965Z"
+    },
+    {
+      "id": 37,
+      "product_id": "p8",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.973Z"
+    },
+    {
+      "id": 38,
+      "product_id": "p5",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.981Z"
+    },
+    {
+      "id": 39,
+      "product_id": "p6",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.990Z"
+    },
+    {
+      "id": 40,
+      "product_id": "p1",
+      "stock_level": 100,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:13.998Z"
+    },
+    {
+      "id": 41,
+      "product_id": "p10",
+      "stock_level": 35,
+      "production_date": "2026-09-30T16:00:00.000Z",
+      "expiry_date": "2026-10-03T16:00:00.000Z",
+      "branch_id": 8,
+      "created_at": "2026-10-01T12:05:14.008Z"
+    }
+  ],
+  "bw_sales": [
+    {
+      "id": 1,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-28T16:00:00.000Z",
+      "cashier": "Sales Staff",
+      "branch_id": 6,
+      "created_at": "2026-09-29T06:58:01.417Z"
+    },
+    {
+      "id": 2,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-29T16:00:00.000Z",
+      "cashier": "Branch Manager",
+      "branch_id": 6,
+      "created_at": "2026-09-29T09:34:07.104Z"
+    },
+    {
+      "id": 3,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Test",
+      "branch_id": 6,
+      "created_at": "2026-09-30T17:47:23.780Z"
+    },
+    {
+      "id": 4,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Test",
+      "branch_id": 6,
+      "created_at": "2026-09-30T17:49:08.159Z"
+    },
+    {
+      "id": 5,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T06:38:59.744Z"
+    },
+    {
+      "id": 6,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T06:39:00.104Z"
+    },
+    {
+      "id": 7,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T06:39:00.466Z"
+    },
+    {
+      "id": 8,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T06:51:53.344Z"
+    },
+    {
+      "id": 9,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T06:52:09.006Z"
+    },
+    {
+      "id": 10,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T06:52:09.456Z"
+    },
+    {
+      "id": 11,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T06:52:09.926Z"
+    },
+    {
+      "id": 12,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:11:46.561Z"
+    },
+    {
+      "id": 13,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:11:47.181Z"
+    },
+    {
+      "id": 14,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:11:47.746Z"
+    },
+    {
+      "id": 15,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:20:58.490Z"
+    },
+    {
+      "id": 16,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:20:58.960Z"
+    },
+    {
+      "id": 17,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:20:59.435Z"
+    },
+    {
+      "id": 18,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:29:04.817Z"
+    },
+    {
+      "id": 19,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:29:05.297Z"
+    },
+    {
+      "id": 20,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:29:05.795Z"
+    },
+    {
+      "id": 21,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:36:28.426Z"
+    },
+    {
+      "id": 22,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:36:28.868Z"
+    },
+    {
+      "id": 23,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:36:29.338Z"
+    },
+    {
+      "id": 24,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:44:35.282Z"
+    },
+    {
+      "id": 25,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:44:35.735Z"
+    },
+    {
+      "id": 26,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:44:36.207Z"
+    },
+    {
+      "id": 27,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:52:08.507Z"
+    },
+    {
+      "id": 28,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:52:08.957Z"
+    },
+    {
+      "id": 29,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T07:52:09.407Z"
+    },
+    {
+      "id": 30,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:59:09.327Z"
+    },
+    {
+      "id": 31,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:59:09.872Z"
+    },
+    {
+      "id": 32,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T07:59:10.326Z"
+    },
+    {
+      "id": 33,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T08:20:06.414Z"
+    },
+    {
+      "id": 34,
+      "product_id": "p4",
+      "qty": 1,
+      "price": "380.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T08:20:06.891Z"
+    },
+    {
+      "id": 35,
+      "product_id": "p7",
+      "qty": 2,
+      "price": "25.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T08:20:07.346Z"
+    },
+    {
+      "id": 36,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:25:21.299Z"
+    },
+    {
+      "id": 37,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:28:14.739Z"
+    },
+    {
+      "id": 38,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:35:09.558Z"
+    },
+    {
+      "id": 39,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T08:38:13.230Z"
+    },
+    {
+      "id": 40,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T08:44:54.484Z"
+    },
+    {
+      "id": 41,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:54:50.040Z"
+    },
+    {
+      "id": 42,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:56:46.177Z"
+    },
+    {
+      "id": 43,
+      "product_id": "p2",
+      "qty": 1,
+      "price": "30.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:56:46.198Z"
+    },
+    {
+      "id": 44,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T08:59:00.126Z"
+    },
+    {
+      "id": 45,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:01:04.297Z"
+    },
+    {
+      "id": 46,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:02:40.606Z"
+    },
+    {
+      "id": 47,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:04:30.916Z"
+    },
+    {
+      "id": 48,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:06:48.356Z"
+    },
+    {
+      "id": 49,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:07:56.734Z"
+    },
+    {
+      "id": 50,
+      "product_id": "p2",
+      "qty": 1,
+      "price": "30.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:07:57.195Z"
+    },
+    {
+      "id": 51,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:09:14.665Z"
+    },
+    {
+      "id": 52,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:09:45.875Z"
+    },
+    {
+      "id": 53,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:10:17.217Z"
+    },
+    {
+      "id": 54,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:10:40.350Z"
+    },
+    {
+      "id": 55,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:10:57.777Z"
+    },
+    {
+      "id": 56,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:11:45.275Z"
+    },
+    {
+      "id": 57,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:15:30.819Z"
+    },
+    {
+      "id": 58,
+      "product_id": "p10",
+      "qty": 2,
+      "price": "12.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:16:16.270Z"
+    },
+    {
+      "id": 59,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:21:00.534Z"
+    },
+    {
+      "id": 60,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:24:53.413Z"
+    },
+    {
+      "id": 61,
+      "product_id": "p2",
+      "qty": 3,
+      "price": "30.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:26:16.810Z"
+    },
+    {
+      "id": 62,
+      "product_id": "p2",
+      "qty": 1,
+      "price": "30.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:27:08.624Z"
+    },
+    {
+      "id": 63,
+      "product_id": "p2",
+      "qty": 1,
+      "price": "30.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:27:32.009Z"
+    },
+    {
+      "id": 64,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T09:32:59.065Z"
+    },
+    {
+      "id": 65,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 6,
+      "created_at": "2026-10-01T09:56:42.859Z"
+    },
+    {
+      "id": 66,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T11:20:17.822Z"
+    },
+    {
+      "id": 67,
+      "product_id": "p1",
+      "qty": 2,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T11:21:08.917Z"
+    },
+    {
+      "id": 68,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-09-30T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-01T11:36:39.373Z"
+    },
+    {
+      "id": 69,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-10-11T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-12T08:22:10.366Z"
+    },
+    {
+      "id": 70,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-10-11T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-12T08:22:37.955Z"
+    },
+    {
+      "id": 71,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-10-11T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-12T08:22:49.000Z"
+    },
+    {
+      "id": 72,
+      "product_id": "p1",
+      "qty": 1,
+      "price": "45.00",
+      "date": "2026-10-11T16:00:00.000Z",
+      "cashier": "Cashier Staff",
+      "branch_id": 1,
+      "created_at": "2026-10-12T08:43:33.337Z"
+    }
+  ]
+}
