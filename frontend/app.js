@@ -793,12 +793,46 @@ class BakeWiseStore {
   }
 
   async deleteBranch(id) {
+    const branchIdStr = id.toString();
+
     if (this.isBackendOnline) {
-      try { await fetch(`/api/branches/${id}`, { method: 'DELETE' }); } catch (e) { console.error(e); }
+      try {
+        await fetch(`/api/branches/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error("Backend branch delete failed:", e);
+      }
     }
-    this.branches = this.branches.filter(b => b.id.toString() !== id.toString());
+
+    // 1. Remove branch itself
+    this.branches = this.branches.filter(b => b.id.toString() !== branchIdStr);
     this.save("bakewise_v2_branches", this.branches);
-    this.logActivity(`Deleted branch ID: ${id}`);
+
+    // 2. Cascade delete all users associated with this branch (protect global admins)
+    this.users = this.users.filter(u => u.role === 'admin' || (u.branch_id !== null && u.branch_id !== undefined && u.branch_id.toString() !== branchIdStr));
+    this.save("bakewise_v2_users", this.users);
+
+    // 3. Cascade delete sales records for this branch
+    this._sales = this._sales.filter(s => s.branch_id?.toString() !== branchIdStr);
+    this.save("bakewise_v2_sales", this._sales);
+
+    // 4. Cascade delete inventory records for this branch
+    this._inventory = this._inventory.filter(i => i.branch_id?.toString() !== branchIdStr);
+    this.save("bakewise_v2_inventory", this._inventory);
+
+    // 5. Cascade delete production batches for this branch
+    this._production = this._production.filter(p => p.branch_id?.toString() !== branchIdStr);
+    this.save("bakewise_v2_production", this._production);
+
+    // 6. Cascade delete waste records for this branch
+    this._waste = this._waste.filter(w => w.branch_id?.toString() !== branchIdStr);
+    this.save("bakewise_v2_waste", this._waste);
+
+    // Re-sync from backend to refresh client tables with clean database state
+    if (this.isBackendOnline) {
+      await this.syncFromBackend();
+    }
+
+    this.logActivity(`Deleted branch ID ${id} and all associated data (users, sales, inventory, production, waste)`);
     return true;
   }
 
@@ -4838,11 +4872,15 @@ async function refreshAdminBranchesPane() {
     document.querySelectorAll(".delete-branch-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-id");
-        if (await showConfirmModal("Are you sure you want to remove this branch?")) {
+        if (await showConfirmModal("Are you sure you want to permanently delete this branch? ALL associated branch data including staff user accounts, sales records, inventory stock, and production batches will also be deleted from the system.")) {
           await store.deleteBranch(id);
           populateSelectDropdowns();
           await refreshAdminBranchesPane();
-          showToast("Branch removed.", "info");
+          if (typeof refreshAdminUsersPane === 'function') await refreshAdminUsersPane();
+          if (typeof refreshInventoryPane === 'function') await refreshInventoryPane();
+          if (typeof refreshSalesPane === 'function') await refreshSalesPane();
+          if (typeof refreshDashboardPane === 'function') await refreshDashboardPane();
+          showToast("Branch and all associated records deleted.", "info");
         }
       });
     });
