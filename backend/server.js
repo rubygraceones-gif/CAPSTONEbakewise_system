@@ -113,15 +113,117 @@ const isCloudEnv = !!(
   process.env.PORT
 );
 
-// Initialize Database Connection (Supports XAMPP MySQL locally & Supabase PostgreSQL on Railway)
+// Initialize Database Connection (MySQL as Primary Engine with Railway / Local XAMPP Support)
 async function setupDatabaseConnection() {
   console.log("--------------------------------------------------");
-  console.log("Initializing BakeWise Database Engine...");
+  console.log("Initializing BakeWise Database Engine (MySQL Priority)...");
   console.log(`Environment mode: ${isCloudEnv ? 'Cloud / Railway Production' : 'Local Development'}`);
 
-  // Connection candidates to try for PostgreSQL
+  // 1. Gather all potential MySQL connection candidates
+  const mysqlUrlCandidates = [];
+
+  if (process.env.MYSQL_URL && process.env.MYSQL_URL.trim()) {
+    mysqlUrlCandidates.push(process.env.MYSQL_URL.trim());
+  }
+  if (process.env.MYSQL_PUBLIC_URL && process.env.MYSQL_PUBLIC_URL.trim()) {
+    mysqlUrlCandidates.push(process.env.MYSQL_PUBLIC_URL.trim());
+  }
+  if (process.env.MYSQL_PRIVATE_URL && process.env.MYSQL_PRIVATE_URL.trim()) {
+    mysqlUrlCandidates.push(process.env.MYSQL_PRIVATE_URL.trim());
+  }
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() && (
+      process.env.DATABASE_URL.startsWith('mysql://') ||
+      process.env.DATABASE_URL.includes('mysql') ||
+      !process.env.DATABASE_URL.startsWith('postgres')
+  )) {
+    mysqlUrlCandidates.push(process.env.DATABASE_URL.trim());
+  }
+
+  // 1A. Attempt MySQL via Connection URL (Railway MySQL)
+  for (const connUrl of mysqlUrlCandidates) {
+    try {
+      const sanitized = connUrl.replace(/:[^:@]+@/, ':***@');
+      console.log(`Attempting Railway MySQL connection to: ${sanitized}`);
+      mysqlPool = mysql.createPool({
+        uri: connUrl,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      });
+      await mysqlPool.query("SELECT 1");
+      activeDbDriver = 'mysql';
+      console.log("🟢 CONNECTED TO RAILWAY MYSQL DATABASE SUCCESSFULLY!");
+      console.log("--------------------------------------------------");
+      await initializeMysqlSchema();
+      return;
+    } catch (err) {
+      console.error("❌ Railway MySQL connection attempt failed:", err.message);
+      if (mysqlPool) {
+        try { await mysqlPool.end(); } catch (e) {}
+        mysqlPool = null;
+      }
+    }
+  }
+
+  // 1B. Attempt MySQL via host/port/user/password configuration (Railway discrete env vars or XAMPP)
+  const mysqlHost = process.env.MYSQLHOST || process.env.MYSQL_HOST || (isCloudEnv ? null : '127.0.0.1');
+  if (mysqlHost) {
+    const mysqlPort = parseInt(process.env.MYSQLPORT || process.env.MYSQL_PORT || '3306');
+    const mysqlUser = process.env.MYSQLUSER || process.env.MYSQL_USER || 'root';
+    const mysqlPassword = process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || '';
+    const mysqlDatabase = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || (isCloudEnv ? 'railway' : 'bakewise_db');
+
+    try {
+      console.log(`Checking MySQL server at ${mysqlHost}:${mysqlPort} (DB: ${mysqlDatabase})...`);
+
+      // On local dev, create database if it doesn't exist
+      if (!isCloudEnv) {
+        try {
+          const rootConn = await mysql.createConnection({
+            host: mysqlHost,
+            port: mysqlPort,
+            user: mysqlUser,
+            password: mysqlPassword
+          });
+          await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${mysqlDatabase}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+          await rootConn.end();
+        } catch (e) {
+          // Ignore if cannot connect as root
+        }
+      }
+
+      mysqlPool = mysql.createPool({
+        host: mysqlHost,
+        port: mysqlPort,
+        user: mysqlUser,
+        password: mysqlPassword,
+        database: mysqlDatabase,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      });
+
+      await mysqlPool.query("SELECT 1");
+      activeDbDriver = 'mysql';
+      console.log(`🟢 CONNECTED TO MYSQL DATABASE ('${mysqlDatabase}') SUCCESSFULLY!`);
+      if (!isCloudEnv) {
+        console.log("XAMPP phpMyAdmin URL: http://localhost/phpmyadmin");
+      }
+      console.log("--------------------------------------------------");
+      await initializeMysqlSchema();
+      return;
+    } catch (err) {
+      console.log("ℹ️ MySQL configuration attempt failed:", err.message);
+      if (mysqlPool) {
+        try { await mysqlPool.end(); } catch (e) {}
+        mysqlPool = null;
+      }
+    }
+  }
+
+  // 2. Fallback to PostgreSQL only if MySQL is not available
   const pgCandidates = [];
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) {
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim().startsWith('postgres')) {
     pgCandidates.push(process.env.DATABASE_URL.trim());
   }
   if (process.env.SUPABASE_DB_URL && process.env.SUPABASE_DB_URL.trim()) {
@@ -131,12 +233,10 @@ async function setupDatabaseConnection() {
     pgCandidates.push(DEFAULT_SUPABASE_URL);
   }
 
-  // 1. Attempt PostgreSQL / Supabase connection candidates
   for (const connStr of pgCandidates) {
     try {
       const sanitized = connStr.replace(/:[^:@]+@/, ':***@');
-      console.log(`Attempting PostgreSQL / Supabase connection to: ${sanitized}`);
-      
+      console.log(`Attempting PostgreSQL fallback connection to: ${sanitized}`);
       pgPool = new Pool({
         connectionString: connStr,
         ssl: { rejectUnauthorized: false },
@@ -144,12 +244,12 @@ async function setupDatabaseConnection() {
       });
       await pgPool.query("SELECT 1");
       activeDbDriver = 'pg';
-      console.log("🟢 CONNECTED TO SUPABASE / POSTGRESQL DATABASE SUCCESSFULLY!");
+      console.log("🟢 CONNECTED TO POSTGRESQL DATABASE FALLBACK SUCCESSFULLY!");
       console.log("--------------------------------------------------");
       await initializePgSchema();
       return;
     } catch (pgErr) {
-      console.error("❌ PostgreSQL connection attempt failed:", pgErr.message);
+      console.error("❌ PostgreSQL connection fallback failed:", pgErr.message);
       if (pgPool) {
         try { await pgPool.end(); } catch (e) {}
         pgPool = null;
@@ -157,40 +257,7 @@ async function setupDatabaseConnection() {
     }
   }
 
-  // 2. Try Connecting to Local XAMPP MySQL Server ONLY if running locally
-  if (!isCloudEnv) {
-    try {
-      console.log("Checking XAMPP MySQL database connection on localhost:3306...");
-      const rootConn = await mysql.createConnection({
-        host: MYSQL_CONFIG.host,
-        port: MYSQL_CONFIG.port,
-        user: MYSQL_CONFIG.user,
-        password: MYSQL_CONFIG.password
-      });
-
-      await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${MYSQL_CONFIG.database}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
-      await rootConn.end();
-
-      mysqlPool = mysql.createPool({
-        ...MYSQL_CONFIG,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
-      });
-
-      await mysqlPool.query("SELECT 1");
-      activeDbDriver = 'mysql';
-      console.log("🟢 CONNECTED TO XAMPP MYSQL DATABASE ('bakewise_db') SUCCESSFULLY!");
-      console.log("XAMPP phpMyAdmin URL: http://localhost/phpmyadmin");
-      console.log("--------------------------------------------------");
-      await initializeMysqlSchema();
-      return;
-    } catch (err) {
-      console.log("ℹ️ Local XAMPP MySQL connection unavailable:", err.message);
-    }
-  }
-
-  console.error("❌ CRITICAL ERROR: Unable to connect to PostgreSQL / Supabase database engine!");
+  console.error("❌ CRITICAL ERROR: Unable to connect to MySQL or fallback database engine!");
   process.exit(1);
 }
 
@@ -198,7 +265,8 @@ async function setupDatabaseConnection() {
 async function queryDb(sql, params = []) {
   if (activeDbDriver === 'mysql' && mysqlPool) {
     // Convert PostgreSQL $1, $2 placeholders to MySQL ? placeholders
-    const mysqlSql = sql.replace(/\$\d+/g, '?').replace(/RETURNING \*/gi, '');
+    // And remove any RETURNING ... clause which is unsupported in MySQL
+    const mysqlSql = sql.replace(/\$\d+/g, '?').replace(/RETURNING\s+[^;]+/gi, '');
     const [rows] = await mysqlPool.query(mysqlSql, params);
 
     // Normalize INSERT RETURNING behavior for MySQL
@@ -214,7 +282,8 @@ async function queryDb(sql, params = []) {
             'bw_pos_transactions', 'bw_pos_transaction_items', 'bw_repurpose_logs'
           ];
           if (ALLOWED_TABLES.includes(tableName)) {
-            const [insertedRows] = await mysqlPool.query('SELECT * FROM ?? WHERE id = ?', [tableName, insertId]);
+            const selectCols = (tableName === 'bw_users') ? 'id, name, email, role, branch_id' : '*';
+            const [insertedRows] = await mysqlPool.query(`SELECT ${selectCols} FROM ?? WHERE id = ?`, [tableName, insertId]);
             if (insertedRows && insertedRows.length > 0) return { rows: insertedRows };
           }
         }
@@ -508,12 +577,15 @@ async function initializeMysqlSchema() {
 
   await mysqlPool.query(`
     INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES
-    ('p1', 'Pandesal (10pcs/pack)', 'Bread', 45.00, 18.00, 2, 'Garlic Croutons or Fine Breadcrumbs'),
+    ('p1', 'Pandesal', 'Bread', 45.00, 18.00, 2, 'Garlic Croutons or Fine Breadcrumbs'),
     ('p2', 'Special Ensaymada', 'Pastries', 30.00, 12.00, 3, 'Baked Ensaymada Pudding'),
     ('p3', 'Classic Sliced Bread', 'Bread', 65.00, 28.00, 4, 'Cinnamon Bread Pudding or French Toast Sliders'),
     ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
     ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
-    ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants')
+    ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants'),
+    ('p7', 'Coke', 'Drinks', 25.00, 12.00, 90, 'N/A'),
+    ('p8', 'Chiffon Cake', 'Cakes', 180.00, 80.00, 2, 'Pudding'),
+    ('p10', 'Muffin', 'Pastries', 12.00, 4.00, 3, 'N/A')
     ON DUPLICATE KEY UPDATE id = id;
   `);
 
@@ -623,7 +695,38 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  console.log("XAMPP MySQL database schema & seed initialization complete!");
+  // Seed initial stock levels into bw_inventory for products across active branches
+  try {
+    const [prods] = await mysqlPool.query('SELECT id FROM bw_products');
+    const [branches] = await mysqlPool.query('SELECT id FROM bw_branches LIMIT 10');
+    for (const b of (branches || [])) {
+      for (const p of (prods || [])) {
+        const pIdStr = String(p.id).trim();
+        const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+        const [check] = await mysqlPool.query(
+          'SELECT id FROM bw_inventory WHERE (product_id = ? OR product_id = ?) AND branch_id = ?',
+          [pIdStr, altPid, b.id]
+        );
+        if (!check || check.length === 0) {
+          let stock = 35;
+          if (pIdStr === 'p1') stock = 100;
+          if (pIdStr === 'p4') stock = 20;
+          if (pIdStr === 'p7') stock = 50;
+          if (pIdStr === 'p10') stock = 35;
+          const prodDate = new Date().toISOString().split('T')[0];
+          const expDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          await mysqlPool.query(
+            'INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES (?, ?, ?, ?, ?)',
+            [pIdStr, stock, prodDate, expDate, b.id]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ MySQL inventory auto-seed notice:", err.message);
+  }
+
+  console.log("MySQL database schema & seed initialization complete!");
 }
 
 // --- INITIALIZE POSTGRESQL SCHEMA & SEED DATA ---
@@ -850,7 +953,7 @@ app.get('/api/status', (req, res) => {
     system: 'BakeWise Bakery Management Enterprise',
     database_driver: activeDbDriver,
     dbConnection: activeDbDriver !== 'none' ? 'healthy' : 'disconnected',
-    connectionStringUsed: activeDbDriver === 'mysql' ? 'XAMPP MySQL' : 'Supabase PostgreSQL',
+    connectionStringUsed: activeDbDriver === 'mysql' ? 'MySQL Database (Railway / Local)' : 'PostgreSQL Database',
     timestamp: new Date().toISOString()
   });
 });
