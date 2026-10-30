@@ -47,7 +47,28 @@ app.use(cors());
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
-const cache = apicache.middleware;
+// High-Performance In-Memory API Cache Engine
+const cache = apicache.options({
+  statusCodes: {
+    include: [200]
+  },
+  appendKey: (req, res) => {
+    // Isolate cache by user role and authorization to prevent cross-account cache leakage
+    return req.headers['authorization'] || req.user?.role || 'public';
+  },
+  headers: {
+    'X-Cache-Provider': 'BakeWise-MemoryCache',
+    'Cache-Control': 'public, max-age=15, stale-while-revalidate=60'
+  }
+}).middleware;
+
+const clearApiCache = () => {
+  try {
+    apicache.clear();
+  } catch (e) {
+    console.warn('Cache clear notice:', e.message);
+  }
+};
 
 // Rate Limiters
 const loginLimiter = rateLimit({
@@ -1020,7 +1041,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 });
 
 // 3. BRANCH NETWORK API
-app.get('/api/branches', async (req, res) => {
+app.get('/api/branches', cache('5 minutes'), async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_branches ORDER BY id ASC");
     res.json(result.rows);
@@ -1036,6 +1057,7 @@ app.post('/api/branches', async (req, res) => {
       "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *",
       [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, contact_no]
     );
+    clearApiCache();
     res.status(201).json(result.rows[0] || { name, latitude, longitude, address, store_hours, contact_no, status: 'Active' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1050,6 +1072,7 @@ app.put('/api/branches/:id', async (req, res) => {
       "UPDATE bw_branches SET name = $1, latitude = $2, longitude = $3, address = $4, store_hours = $5, contact_no = $6, status = $7 WHERE id = $8",
       [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, contact_no, status || 'Active', parseInt(id)]
     );
+    clearApiCache();
     res.json({ success: true, id, name, latitude, longitude, address, store_hours, contact_no, status });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1060,6 +1083,7 @@ app.delete('/api/branches/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await queryDb("DELETE FROM bw_branches WHERE id = $1", [parseInt(id)]);
+    clearApiCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1067,7 +1091,7 @@ app.delete('/api/branches/:id', async (req, res) => {
 });
 
 // 4. USER ACCOUNTS MANAGEMENT API
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', cache('2 minutes'), async (req, res) => {
   try {
     const result = await queryDb("SELECT id, email, name, role, branch_id FROM bw_users ORDER BY id ASC");
     res.json(result.rows);
@@ -1088,6 +1112,7 @@ app.post('/api/users', async (req, res) => {
       "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, branch_id",
       [name, email, hashedPassword, role, bId]
     );
+    clearApiCache();
     res.status(201).json(result.rows[0] || { name, email, role, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1110,6 +1135,7 @@ app.put('/api/users/:id', async (req, res) => {
       params.push(parseInt(id));
     }
     await queryDb(query, params);
+    clearApiCache();
     res.json({ success: true, id, name, email, role, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1120,6 +1146,7 @@ app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await queryDb("DELETE FROM bw_users WHERE id = $1", [parseInt(id)]);
+    clearApiCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1127,7 +1154,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // 5. PRODUCTS API
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', cache('5 minutes'), async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_products ORDER BY id ASC");
     res.json(result.rows);
@@ -1144,6 +1171,7 @@ app.post('/api/products', async (req, res) => {
       "INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES ($1, $2, $3, $4, $5, $6, $7)",
       [prodId, name, category, parseFloat(price), parseFloat(cost), parseInt(shelf_life_days), repurpose_recipe]
     );
+    clearApiCache();
     res.status(201).json({ id: prodId, name, category, price, cost, shelf_life_days, repurpose_recipe });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1158,6 +1186,7 @@ app.put('/api/products/:id', async (req, res) => {
       "UPDATE bw_products SET name = $1, category = $2, price = $3, cost = $4, shelf_life_days = $5, repurpose_recipe = $6 WHERE id = $7",
       [name, category, parseFloat(price), parseFloat(cost), parseInt(shelf_life_days), repurpose_recipe, id]
     );
+    clearApiCache();
     res.json({ id, name, category, price, cost, shelf_life_days, repurpose_recipe });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1168,6 +1197,7 @@ app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await queryDb("DELETE FROM bw_products WHERE id = $1", [id]);
+    clearApiCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1175,7 +1205,7 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // 6. SALES API
-app.get('/api/sales', async (req, res) => {
+app.get('/api/sales', cache('30 seconds'), async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_sales";
@@ -1200,6 +1230,7 @@ app.post('/api/sales', async (req, res) => {
       "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
       [product_id, parseInt(qty), parseFloat(price), date, cashier, bId]
     );
+    clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, qty, price, date, cashier, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1209,7 +1240,7 @@ app.post('/api/sales', async (req, res) => {
 // --- REAL-TIME POINT OF SALE (POS) API ENDPOINTS ---
 
 // 1. GET ALL POS TRANSACTIONS (WITH ITEMIZED PRODUCTS)
-app.get('/api/pos/transactions', async (req, res) => {
+app.get('/api/pos/transactions', cache('30 seconds'), async (req, res) => {
   const { branch_id, date, payment_method, status, search } = req.query;
   try {
     let query = "SELECT * FROM bw_pos_transactions";
@@ -1436,6 +1467,7 @@ app.post('/api/pos/checkout', async (req, res) => {
 
     createdTx.items = createdItems;
 
+    clearApiCache();
     res.status(201).json({
       success: true,
       transaction: createdTx,
@@ -1551,7 +1583,7 @@ app.post('/api/repurpose', async (req, res) => {
   }
 });
 
-app.get('/api/repurpose/logs', async (req, res) => {
+app.get('/api/repurpose/logs', cache('1 minute'), async (req, res) => {
   const { branch_id } = req.query;
   const bId = branch_id && branch_id !== 'all' ? parseInt(branch_id) : null;
   try {
@@ -1570,7 +1602,7 @@ app.get('/api/repurpose/logs', async (req, res) => {
 });
 
 // 7. INVENTORY API
-app.get('/api/inventory', async (req, res) => {
+app.get('/api/inventory', cache('30 seconds'), async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_inventory";
@@ -1607,6 +1639,7 @@ app.post('/api/inventory', async (req, res) => {
         [product_id, parseInt(stock_level), production_date, expiry_date, bId]
       );
     }
+    clearApiCache();
     res.json(result.rows[0] || { product_id, stock_level, production_date, expiry_date, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1614,7 +1647,7 @@ app.post('/api/inventory', async (req, res) => {
 });
 
 // 8. PRODUCTION API
-app.get('/api/production', async (req, res) => {
+app.get('/api/production', cache('30 seconds'), async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_production";
@@ -1639,6 +1672,7 @@ app.post('/api/production', async (req, res) => {
       "INSERT INTO bw_production (product_id, planned, actual, date, baker, status, code, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
       [product_id, parseInt(planned), parseInt(actual), date, baker, status, code, bId]
     );
+    clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, planned, actual, date, baker, status, code, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1646,7 +1680,7 @@ app.post('/api/production', async (req, res) => {
 });
 
 // 9. WASTE API
-app.get('/api/waste', async (req, res) => {
+app.get('/api/waste', cache('30 seconds'), async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_waste";
@@ -1671,6 +1705,7 @@ app.post('/api/waste', async (req, res) => {
       "INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
       [product_id, parseInt(qty), parseFloat(cost), reason, date, bId]
     );
+    clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, qty, cost, reason, date, branch_id: bId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1742,7 +1777,16 @@ app.post('/api/forecast', (req, res) => {
 // --- SERVE FRONTEND STATIC FILES ---
 const ROOT_DIR = path.resolve(__dirname, '..');
 const frontendDir = fs.existsSync(path.join(ROOT_DIR, 'frontend')) ? path.join(ROOT_DIR, 'frontend') : path.join(ROOT_DIR, 'public');
-app.use(express.static(frontendDir));
+app.use(express.static(frontendDir, {
+  maxAge: '1d',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else if (filePath.match(/\.(css|js|png|jpg|jpeg|svg|woff2?|ico)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    }
+  }
+}));
 if (fs.existsSync(path.join(ROOT_DIR, 'public')) && frontendDir !== path.join(ROOT_DIR, 'public')) {
   app.use(express.static(path.join(ROOT_DIR, 'public')));
 }
