@@ -90,8 +90,8 @@ function authenticateToken(req, res, next) {
   // Allow OPTIONS preflight requests
   if (req.method === 'OPTIONS') return next();
 
-  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, and /api/branches without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose')) return next();
+  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, /api/branches, and /api/users without strict JWT header check
+  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/users')) return next();
 
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -339,8 +339,11 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT INTO bw_branches (id, name, address, store_hours, contact_no, latitude, longitude, status) VALUES
+  const [bRows] = await mysqlPool.query("SELECT COUNT(*) as count FROM bw_branches");
+  if (bRows && bRows[0] && bRows[0].count === 0) {
+    console.log("Seeding initial 210 branches into empty bw_branches table...");
+    await mysqlPool.query(`
+      INSERT INTO bw_branches (id, name, address, store_hours, contact_no, latitude, longitude, status) VALUES
     (1, 'Agdao 1', 'Aquino St., Brgy. T. Monteverd...', '24 HOURS', '(082) 286-2546', 110, 210, 'Active'),
     (2, 'Agdao 2', 'Door 2, Uy King Bldg, Lapu- La...', '24 HOURS', '(082) 300-7675', 120, 220, 'Active'),
     (3, 'Agusan Bus Terminal', 'Bus Terminal, Brgy.2, San Fran...', '5 AM to 7 PM', '0916-454-2735', 130, 230, 'Active'),
@@ -553,6 +556,9 @@ async function initializeMysqlSchema() {
     (210, 'Villarica', 'Miranda, Babak District, IGACO...', '5 AM to 8 PM', '0945-708-7429', 100, 200, 'Active')
     ON DUPLICATE KEY UPDATE id = id;
   `);
+  } else {
+    console.log(`Skipping branch seeding: bw_branches table already contains ${bRows[0].count} records.`);
+  }
 
   // 2. bw_users
   await mysqlPool.query(`
@@ -567,19 +573,25 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  const defaultHash = bcrypt.hashSync('password123', 10);
-  const defaultSeedUsers = [
-    [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
-    [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
-    [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
-    [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
-    [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
-  ];
-  for (const u of defaultSeedUsers) {
-    await mysqlPool.query(
-      'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
-      u
-    );
+  const [uRows] = await mysqlPool.query("SELECT COUNT(*) as count FROM bw_users");
+  if (uRows && uRows[0] && uRows[0].count === 0) {
+    console.log("Seeding default administrative users into empty bw_users table...");
+    const defaultHash = bcrypt.hashSync('password123', 10);
+    const defaultSeedUsers = [
+      [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
+      [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
+      [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
+      [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
+      [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
+    ];
+    for (const u of defaultSeedUsers) {
+      await mysqlPool.query(
+        'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
+        u
+      );
+    }
+  } else {
+    console.log(`Skipping user seeding: bw_users table already contains ${uRows[0].count} accounts.`);
   }
 
   // 3. bw_products
@@ -596,19 +608,25 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  await mysqlPool.query(`
-    INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES
-    ('p1', 'Pandesal', 'Bread', 45.00, 18.00, 2, 'Garlic Croutons or Fine Breadcrumbs'),
-    ('p2', 'Special Ensaymada', 'Pastries', 30.00, 12.00, 3, 'Baked Ensaymada Pudding'),
-    ('p3', 'Classic Sliced Bread', 'Bread', 65.00, 28.00, 4, 'Cinnamon Bread Pudding or French Toast Sliders'),
-    ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
-    ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
-    ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants'),
-    ('p7', 'Coke', 'Drinks', 25.00, 12.00, 90, 'N/A'),
-    ('p8', 'Chiffon Cake', 'Cakes', 180.00, 80.00, 2, 'Pudding'),
-    ('p10', 'Muffin', 'Pastries', 12.00, 4.00, 3, 'N/A')
-    ON DUPLICATE KEY UPDATE id = id;
-  `);
+  const [pRows] = await mysqlPool.query("SELECT COUNT(*) as count FROM bw_products");
+  if (pRows && pRows[0] && pRows[0].count === 0) {
+    console.log("Seeding default bakery products into empty bw_products table...");
+    await mysqlPool.query(`
+      INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES
+      ('p1', 'Pandesal', 'Bread', 45.00, 18.00, 2, 'Garlic Croutons or Fine Breadcrumbs'),
+      ('p2', 'Special Ensaymada', 'Pastries', 30.00, 12.00, 3, 'Baked Ensaymada Pudding'),
+      ('p3', 'Classic Sliced Bread', 'Bread', 65.00, 28.00, 4, 'Cinnamon Bread Pudding or French Toast Sliders'),
+      ('p4', 'Premium Chocolate Cake', 'Cakes', 380.00, 160.00, 5, 'Chocolate Truffle Cake Pops'),
+      ('p5', 'Spanish Bread', 'Bread', 10.00, 4.00, 2, 'Bread Pudding Base'),
+      ('p6', 'Butter Croissant', 'Pastries', 50.00, 22.00, 2, 'Double Baked Almond Croissants'),
+      ('p7', 'Coke', 'Drinks', 25.00, 12.00, 90, 'N/A'),
+      ('p8', 'Chiffon Cake', 'Cakes', 180.00, 80.00, 2, 'Pudding'),
+      ('p10', 'Muffin', 'Pastries', 12.00, 4.00, 3, 'N/A')
+      ON DUPLICATE KEY UPDATE id = id;
+    `);
+  } else {
+    console.log(`Skipping product seeding: bw_products table already contains ${pRows[0].count} items.`);
+  }
 
   // 4. bw_sales
   await mysqlPool.query(`
@@ -716,19 +734,16 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
-  // Seed initial stock levels into bw_inventory for products across active branches
+  // Seed initial stock levels into bw_inventory ONLY on empty database
   try {
-    const [prods] = await mysqlPool.query('SELECT id FROM bw_products');
-    const [branches] = await mysqlPool.query('SELECT id FROM bw_branches LIMIT 10');
-    for (const b of (branches || [])) {
-      for (const p of (prods || [])) {
-        const pIdStr = String(p.id).trim();
-        const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
-        const [check] = await mysqlPool.query(
-          'SELECT id FROM bw_inventory WHERE (product_id = ? OR product_id = ?) AND branch_id = ?',
-          [pIdStr, altPid, b.id]
-        );
-        if (!check || check.length === 0) {
+    const [invRows] = await mysqlPool.query("SELECT COUNT(*) as count FROM bw_inventory");
+    if (invRows && invRows[0] && invRows[0].count === 0) {
+      console.log("Seeding initial stock levels into empty bw_inventory table...");
+      const [prods] = await mysqlPool.query('SELECT id FROM bw_products');
+      const [branches] = await mysqlPool.query('SELECT id FROM bw_branches LIMIT 10');
+      for (const b of (branches || [])) {
+        for (const p of (prods || [])) {
+          const pIdStr = String(p.id).trim();
           let stock = 35;
           if (pIdStr === 'p1') stock = 100;
           if (pIdStr === 'p4') stock = 20;
@@ -742,6 +757,8 @@ async function initializeMysqlSchema() {
           );
         }
       }
+    } else {
+      console.log(`Skipping inventory seeding: bw_inventory already contains ${invRows[0].count} records.`);
     }
   } catch (err) {
     console.warn("⚠️ MySQL inventory auto-seed notice:", err.message);
@@ -1143,43 +1160,50 @@ app.get('/api/users', cache('2 minutes'), async (req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-  const { name, email, password, role, branch_id } = req.body;
+  let { name, email, password, role, branch_id } = req.body;
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'Name, email, password, and role are required.' });
   }
-  const hashedPassword = bcrypt.hashSync(password, 10);
   try {
-    const bId = branch_id ? parseInt(branch_id) : null;
+    const cleanEmail = email.trim().toLowerCase();
+    const hashedPassword = bcrypt.hashSync(password.trim(), 10);
+    const bId = (role === 'admin' || !branch_id) ? null : parseInt(branch_id);
     const result = await queryDb(
       "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, branch_id",
-      [name, email, hashedPassword, role, bId]
+      [name.trim(), cleanEmail, hashedPassword, role, bId]
     );
     clearApiCache();
-    res.status(201).json(result.rows[0] || { name, email, role, branch_id: bId });
+    console.log(`[USER CREATED] Registered new user account: ${cleanEmail} (Role: ${role}, Branch: ${bId})`);
+    res.status(201).json(result.rows[0] || { name, email: cleanEmail, role, branch_id: bId });
   } catch (err) {
+    console.error("[USER CREATION ERROR]", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.put('/api/users/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, email, password, role, branch_id } = req.body;
+  let { name, email, password, role, branch_id } = req.body;
   try {
-    const bId = branch_id ? parseInt(branch_id) : null;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const bId = (role === 'admin' || !branch_id) ? null : parseInt(branch_id);
     let query = "UPDATE bw_users SET name = $1, email = $2, role = $3, branch_id = $4";
-    let params = [name, email, role, bId];
+    let params = [name ? name.trim() : '', cleanEmail, role, bId];
     if (password && password.trim() !== "") {
-      const hashedPassword = bcrypt.hashSync(password, 10);
+      const hashedPassword = bcrypt.hashSync(password.trim(), 10);
       query += ", password = $5 WHERE id = $6";
       params.push(hashedPassword, parseInt(id));
+      console.log(`[USER UPDATE] Successfully updated password and profile for user ID: ${id} (${cleanEmail})`);
     } else {
       query += " WHERE id = $5";
       params.push(parseInt(id));
+      console.log(`[USER UPDATE] Successfully updated profile (password preserved) for user ID: ${id} (${cleanEmail})`);
     }
     await queryDb(query, params);
     clearApiCache();
-    res.json({ success: true, id, name, email, role, branch_id: bId });
+    res.json({ success: true, id, name, email: cleanEmail, role, branch_id: bId });
   } catch (err) {
+    console.error("[USER UPDATE ERROR]", err);
     res.status(500).json({ error: err.message });
   }
 });

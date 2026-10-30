@@ -141,6 +141,29 @@ const DEFAULT_PRODUCTION = [];
 const DEFAULT_WASTE = [];
 
 // --- APP STATE CONTROLLER ---
+
+// --- Secure Logout & Credential Cleanup Helper ---
+function clearLoginCredentials() {
+  const emailInput = document.getElementById('email-input');
+  const passwordInput = document.getElementById('password-input');
+  if (emailInput) emailInput.value = '';
+  if (passwordInput) {
+    passwordInput.value = '';
+    passwordInput.setAttribute('type', 'password');
+  }
+  const togglePassBtn = document.getElementById('btn-toggle-password');
+  if (togglePassBtn) {
+    togglePassBtn.setAttribute('data-visible', 'false');
+    togglePassBtn.setAttribute('aria-label', 'Show password');
+    togglePassBtn.setAttribute('title', 'Show password');
+  }
+  const rememberCheckbox = document.getElementById('remember-me');
+  if (rememberCheckbox) rememberCheckbox.checked = false;
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) loginForm.reset();
+}
+window.clearLoginCredentials = clearLoginCredentials;
+
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
@@ -244,6 +267,9 @@ class BakeWiseStore {
     localStorage.removeItem("bakewise_v2_session");
     localStorage.removeItem("bakewise_v2_remember_me");
     document.documentElement.classList.remove("user-logged-in");
+    if (typeof clearLoginCredentials === "function") {
+      clearLoginCredentials();
+    }
   }
 
 
@@ -837,24 +863,36 @@ class BakeWiseStore {
   }
 
   async addUser(name, email, password, role, branchId) {
-    const bId = branchId ? parseInt(branchId) : null;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const bId = (role === 'admin' || !branchId) ? null : parseInt(branchId);
+
     if (this.isBackendOnline) {
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.currentUser && this.currentUser.token) {
+          headers['Authorization'] = `Bearer ${this.currentUser.token}`;
+        }
         const res = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, role, branch_id: bId })
+          headers,
+          body: JSON.stringify({ name: name.trim(), email: cleanEmail, password: (password || '').trim(), role, branch_id: bId })
         });
         if (res.ok) {
           const newUser = await res.json();
           this.users.push(newUser);
           this.save("bakewise_v2_users", this.users);
           return true;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server creation failed (${res.status})`);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error("Add user failed:", e);
+        throw e;
+      }
     }
 
-    const newUser = { id: this.users.length + 1, name, email, password, role, branch_id: bId };
+    const newUser = { id: this.users.length + 1, name: name.trim(), email: cleanEmail, password: (password || '').trim(), role, branch_id: bId };
     this.users.push(newUser);
     this.save("bakewise_v2_users", this.users);
     this.logActivity(`Added new user: ${name}`);
@@ -863,27 +901,47 @@ class BakeWiseStore {
 
   async updateUser(id, name, email, password, role, branchId) {
     const uId = parseInt(id);
-    const bId = branchId ? parseInt(branchId) : null;
+    const bId = (role === 'admin' || !branchId) ? null : parseInt(branchId);
+    const cleanEmail = (email || '').trim().toLowerCase();
 
     if (this.isBackendOnline) {
       try {
-        await fetch(`/api/users/${uId}`, {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.currentUser && this.currentUser.token) {
+          headers['Authorization'] = `Bearer ${this.currentUser.token}`;
+        }
+        const res = await fetch(`/api/users/${uId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, role, branch_id: bId })
+          headers,
+          body: JSON.stringify({ name: name.trim(), email: cleanEmail, password: (password || '').trim(), role, branch_id: bId })
         });
-      } catch (e) { console.error(e); }
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server update failed (${res.status})`);
+        }
+      } catch (e) {
+        console.error("Update user failed:", e);
+        throw e;
+      }
     }
 
     const usr = this.users.find(u => u.id === uId);
     if (usr) {
-      usr.name = name;
-      usr.email = email;
-      if (password) usr.password = password;
+      usr.name = name.trim();
+      usr.email = cleanEmail;
+      if (password && password.trim() !== "") usr.password = password.trim();
       usr.role = role;
       usr.branch_id = bId;
       this.save("bakewise_v2_users", this.users);
       this.logActivity(`Updated user: ${name}`);
+    }
+
+    if (this.currentUser && (this.currentUser.id === uId || (this.currentUser.email && this.currentUser.email.toLowerCase() === cleanEmail))) {
+      this.currentUser.name = name.trim();
+      this.currentUser.role = role;
+      this.currentUser.roleLabel = this.getRoleLabel(role);
+      this.currentUser.branch_id = bId;
+      this.saveSession(this.currentUser);
     }
     return true;
   }
@@ -1173,6 +1231,9 @@ async function checkSessionState() {
     document.documentElement.classList.remove('user-logged-in');
     loginView.style.display = "grid";
     appView.style.display = "none";
+    if (typeof clearLoginCredentials === "function") {
+      clearLoginCredentials();
+    }
   }
 }
 
@@ -1253,6 +1314,9 @@ function setupLoginActions() {
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       store.logout();
+      if (typeof clearLoginCredentials === "function") {
+        clearLoginCredentials();
+      }
       await checkSessionState();
       showToast("Session disconnected. Goodbye!", "info");
     });
@@ -1542,9 +1606,13 @@ class SearchableCombobox {
       }
     }
 
+    if (this.disabled) {
+      this.trigger.disabled = true;
+    }
+
     this.currentItemsList = list;
 
-    if (list.length > 0 && !list.some(x => String(x.id) === String(this.selectedValue))) {
+    if (!this.disabled && list.length > 0 && !list.some(x => String(x.id) === String(this.selectedValue))) {
       this.selectedValue = String(list[0].id);
       const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
       if (desc && desc.set) desc.set.call(this.hiddenInput, this.selectedValue);
@@ -1620,14 +1688,50 @@ class SearchableCombobox {
     const label = this.trigger.querySelector('.combobox-label');
     if (!label) return;
 
+    if (this.disabled && this.customDisabledLabel) {
+      label.textContent = this.customDisabledLabel;
+      return;
+    }
+
     const list = this.currentItemsList || this.items || [];
     const item = list.find(x => String(x.id) === String(this.selectedValue));
     if (item) {
       label.textContent = item.name;
     } else if (this.selectedValue === 'all') {
       label.textContent = 'All Branches';
+    } else if (!this.selectedValue) {
+      label.textContent = this.placeholder || 'Select...';
     } else {
-      label.textContent = this.selectedValue || 'Select...';
+      label.textContent = this.selectedValue;
+    }
+  }
+
+  
+  setDisabled(disabled, customLabel = null) {
+    this.disabled = !!disabled;
+    this.customDisabledLabel = customLabel;
+    if (this.trigger) {
+      this.trigger.disabled = this.disabled;
+      if (this.disabled) {
+        this.trigger.classList.add('disabled');
+        this.trigger.style.opacity = '0.55';
+        this.trigger.style.cursor = 'not-allowed';
+        this.trigger.style.pointerEvents = 'none';
+        this.trigger.style.backgroundColor = 'var(--bg-secondary, #f1f5f9)';
+        if (this.wrapper) this.wrapper.classList.remove('open');
+        if (this.dropdown) this.dropdown.style.display = 'none';
+        if (customLabel) {
+          const label = this.trigger.querySelector('.combobox-label');
+          if (label) label.textContent = customLabel;
+        }
+      } else {
+        this.trigger.classList.remove('disabled');
+        this.trigger.style.opacity = '1';
+        this.trigger.style.cursor = 'pointer';
+        this.trigger.style.pointerEvents = 'auto';
+        this.trigger.style.backgroundColor = '';
+        this.updateTriggerText();
+      }
     }
   }
 
@@ -1653,6 +1757,38 @@ class SearchableCombobox {
 
 window.SearchableCombobox = SearchableCombobox;
 window.SearchableBranchCombobox = SearchableCombobox;
+
+
+function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
+  const isSysAdmin = roleVal === 'admin';
+  const branchCb = window.customComboboxes ? window.customComboboxes[branchComboboxId] : null;
+  const branchEl = document.getElementById(branchSelectId);
+
+  if (isSysAdmin) {
+    if (branchCb) {
+      branchCb.setDisabled(true, 'All Branches (Global Admin)');
+      branchCb.selectValue('');
+    }
+    if (branchEl && branchEl.tagName === 'SELECT') {
+      branchEl.disabled = true;
+      branchEl.value = '';
+    }
+  } else {
+    if (branchCb) {
+      branchCb.setDisabled(false);
+      if (!branchCb.selectedValue && store.branches && store.branches.length > 0) {
+        branchCb.selectValue(String(store.branches[0].id));
+      }
+    }
+    if (branchEl && branchEl.tagName === 'SELECT') {
+      branchEl.disabled = false;
+      if (!branchEl.value && store.branches && store.branches.length > 0) {
+        branchEl.value = store.branches[0].id;
+      }
+    }
+  }
+}
+window.syncRoleBranchField = syncRoleBranchField;
 
 function populateSelectDropdowns() {
   window.customComboboxes = window.customComboboxes || {};
@@ -1741,13 +1877,15 @@ function populateSelectDropdowns() {
   initCombobox("usr-role-select", {
     icon: "shield",
     placeholder: "Search role...",
-    items: userRoleItems
+    items: userRoleItems,
+    onChange: (val) => syncRoleBranchField(val, "usr-branch-select", "usr-branch-select")
   });
 
   initCombobox("edit-usr-role", {
     icon: "shield",
     placeholder: "Search role...",
-    items: userRoleItems
+    items: userRoleItems,
+    onChange: (val) => syncRoleBranchField(val, "edit-usr-branch", "edit-usr-branch")
   });
 
   initCombobox("waste-reason-select", {
@@ -1860,13 +1998,34 @@ function setupFormSubmissions() {
       const role = document.getElementById("usr-role-select").value;
       const branchId = document.getElementById("usr-branch-select").value;
 
-      const success = await store.addUser(name, email, password, role, branchId);
-      if (success) {
-        showToast("Staff account registered.", "success");
-        userForm.reset();
-        if (usrPassController) usrPassController.setVisibility(false);
-        refreshAdminUsersPane();
-      } else showToast("Error creating user account.", "error");
+      if (!role) {
+        showToast("Please select a system role.", "error");
+        return;
+      }
+      if (role !== "admin" && !branchId) {
+        showToast("Please assign a branch to this staff member.", "error");
+        return;
+      }
+
+      const assignedBranch = role === "admin" ? null : branchId;
+      try {
+        const success = await store.addUser(name, email, password, role, assignedBranch);
+        if (success) {
+          showToast("Staff account registered.", "success");
+          userForm.reset();
+          if (usrPassController) usrPassController.setVisibility(false);
+          const usrRoleCb = window.customComboboxes ? window.customComboboxes["usr-role-select"] : null;
+          if (usrRoleCb) usrRoleCb.selectValue("");
+          const usrBranchCb = window.customComboboxes ? window.customComboboxes["usr-branch-select"] : null;
+          if (usrBranchCb) {
+            usrBranchCb.setDisabled(false);
+            if (store.branches && store.branches[0]) usrBranchCb.selectValue(String(store.branches[0].id));
+          }
+          refreshAdminUsersPane();
+        }
+      } catch (err) {
+        showToast(err.message || "Error creating user account.", "error");
+      }
     });
   }
 
@@ -1937,13 +2096,21 @@ function setupFormSubmissions() {
       const password = document.getElementById("edit-usr-password").value;
       const role = document.getElementById("edit-usr-role").value;
       const branchId = document.getElementById("edit-usr-branch").value;
+      const assignedBranch = role === "admin" ? null : branchId;
 
-      await store.updateUser(id, name, email, password, role, branchId);
-      if (editPassController) editPassController.setVisibility(false);
-      document.getElementById("user-edit-modal").style.display = "none";
-      document.getElementById("modal-overlay").classList.remove("visible");
-      await refreshAdminUsersPane();
-      showToast("Staff account updated successfully.", "success");
+      try {
+        const success = await store.updateUser(id, name, email, password, role, assignedBranch);
+        if (success) {
+          if (editPassController) editPassController.setVisibility(false);
+          document.getElementById("edit-usr-password").value = "";
+          document.getElementById("user-edit-modal").style.display = "none";
+          document.getElementById("modal-overlay").classList.remove("visible");
+          await refreshAdminUsersPane();
+          showToast("Staff account updated successfully.", "success");
+        }
+      } catch (err) {
+        showToast(err.message || "Failed to update staff account.", "error");
+      }
     });
   }
 
@@ -4700,12 +4867,36 @@ async function refreshAdminUsersPane() {
         document.getElementById("edit-usr-email").value = user.email;
         document.getElementById("edit-usr-password").value = "";
         setupPasswordToggle("edit-usr-password", "btn-toggle-edit-usr-password");
-        document.getElementById("edit-usr-role").value = user.role;
+        const roleCb = window.customComboboxes ? window.customComboboxes["edit-usr-role"] : null;
+        if (roleCb) {
+          roleCb.selectValue(user.role);
+        } else {
+          document.getElementById("edit-usr-role").value = user.role;
+        }
 
-        const branchSelect = document.getElementById("edit-usr-branch");
-        if (branchSelect) {
-          setSafeHtml(branchSelect, store.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join(''));
-          branchSelect.value = user.branch_id || (store.branches[0] ? store.branches[0].id : '');
+        const editBranchCb = window.customComboboxes ? window.customComboboxes["edit-usr-branch"] : null;
+        if (user.role === 'admin') {
+          if (editBranchCb) {
+            editBranchCb.setDisabled(true, 'All Branches (Global Admin)');
+            editBranchCb.selectValue('');
+          } else {
+            const bSelect = document.getElementById("edit-usr-branch");
+            if (bSelect) {
+              bSelect.value = '';
+              bSelect.disabled = true;
+            }
+          }
+        } else {
+          if (editBranchCb) {
+            editBranchCb.setDisabled(false);
+            editBranchCb.selectValue(String(user.branch_id || (store.branches[0] ? store.branches[0].id : '')));
+          } else {
+            const bSelect = document.getElementById("edit-usr-branch");
+            if (bSelect) {
+              bSelect.disabled = false;
+              bSelect.value = user.branch_id || (store.branches[0] ? store.branches[0].id : '');
+            }
+          }
         }
 
         document.getElementById("user-edit-modal").style.display = "block";
