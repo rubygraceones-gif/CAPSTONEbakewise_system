@@ -3138,6 +3138,50 @@ function findPosProduct(productId) {
   });
 }
 
+function updateProductCardCartState(productId) {
+  if (!productId) return;
+  const pStr = String(productId).trim();
+  const altStr = pStr.startsWith('p') ? pStr.substring(1) : ('p' + pStr);
+  const card = document.querySelector(`.pos-product-card[data-product-id="${pStr}"], .pos-product-card[data-product-id="${altStr}"]`);
+  if (!card) return;
+
+  const p = findPosProduct(productId);
+  if (!p) return;
+
+  const stockInfo = getPosProductStockInfo(p.id);
+  const stockAvailable = stockInfo.stock;
+  const cartItem = posCart.find(c => {
+    const cStr = String(c.productId).trim();
+    return cStr === pStr || cStr === altStr;
+  });
+  const inCartQty = cartItem ? cartItem.qty : 0;
+  const remainingStock = Math.max(0, stockAvailable - inCartQty);
+  const isOutOfStock = stockAvailable <= 0 || remainingStock <= 0;
+
+  const btn = card.querySelector('.pos-product-add-btn');
+  if (btn) {
+    btn.disabled = isOutOfStock;
+    const labelSpan = btn.querySelector('span');
+    const labelText = stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? ('Add (' + inCartQty + ' in cart)') : 'Add to Cart'));
+    if (labelSpan) {
+      labelSpan.textContent = labelText;
+    } else {
+      btn.textContent = labelText;
+    }
+  }
+
+  if (isOutOfStock) {
+    card.classList.add('disabled-card');
+    card.style.opacity = '0.55';
+    card.style.cursor = 'not-allowed';
+  } else {
+    card.classList.remove('disabled-card');
+    card.style.opacity = '';
+    card.style.cursor = 'pointer';
+  }
+}
+window.updateProductCardCartState = updateProductCardCartState;
+
 function renderPosProducts() {
   const grid = document.getElementById("pos-products-grid");
   if (!grid) return;
@@ -3157,7 +3201,7 @@ function renderPosProducts() {
         <p style="font-weight: 600;">No bakery products found matching your search</p>
       </div>
     `);
-    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons({ root: grid });
     return;
   }
 
@@ -3206,7 +3250,7 @@ function renderPosProducts() {
     `;
   }).join(''));
 
-  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons({ root: grid });
 }
 
 function addToPosCart(productId) {
@@ -3247,7 +3291,7 @@ function addToPosCart(productId) {
   }
 
   updatePosCartUI();
-  renderPosProducts();
+  updateProductCardCartState(p.id);
 }
 window.addToPosCart = addToPosCart;
 
@@ -3278,7 +3322,7 @@ function updatePosCartQty(productId, delta) {
   }
 
   updatePosCartUI();
-  renderPosProducts();
+  updateProductCardCartState(productId);
 }
 window.updatePosCartQty = updatePosCartQty;
 
@@ -3291,7 +3335,7 @@ function removeFromPosCart(productId) {
     return cStr !== pStr && cStr !== altStr;
   });
   updatePosCartUI();
-  renderPosProducts();
+  updateProductCardCartState(productId);
 }
 window.removeFromPosCart = removeFromPosCart;
 
@@ -3337,7 +3381,7 @@ function updatePosCartUI() {
           <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
         </div>
       `);
-      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons({ root: listElem });
     }
     if (subtotalElem) subtotalElem.textContent = "₱0.00";
     if (totalElem) totalElem.textContent = "₱0.00";
@@ -3367,7 +3411,7 @@ function updatePosCartUI() {
         </div>
       `;
     }).join(''));
-    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons({ root: listElem });
   }
 
   const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
@@ -3839,29 +3883,44 @@ function printPosReceiptFromDetails() {
 window.printPosReceiptFromDetails = printPosReceiptFromDetails;
 
 async function voidPosTransaction(txId) {
-  showConfirmModal(
-    "Void POS Transaction",
+  const confirmed = await showConfirmModal(
     "Are you sure you want to void this transaction? The deducted inventory will be automatically restored back to stock.",
-    async () => {
-      try {
-        const res = await fetch(`/api/pos/void/${txId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ voided_by: store.currentUser ? store.currentUser.name : "System Administrator" })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.message || "Failed to void transaction");
-
-        showToast("Transaction voided successfully and inventory restored!", "success");
-        await store.syncWithBackend();
-        closePosDetailsModal();
-        refreshPosHistory();
-        refreshInventoryPane();
-      } catch (err) {
-        showToast(err.message, "danger");
-      }
-    }
+    "Void POS Transaction",
+    "alert-triangle"
   );
+  if (!confirmed) return;
+
+  const voidBtn = document.getElementById("btn-pos-void-tx");
+  if (voidBtn) {
+    voidBtn.disabled = true;
+    voidBtn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 16px; height: 16px;"></i> Voiding...';
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: voidBtn });
+  }
+
+  try {
+    const res = await fetch(`/api/pos/void/${txId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ voided_by: store.currentUser ? store.currentUser.name : "System Administrator" })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to void transaction");
+
+    showToast("Transaction voided successfully and inventory restored!", "success");
+    await store.syncWithBackend();
+    closePosDetailsModal();
+    refreshPosHistory();
+    refreshInventoryPane();
+    renderPosProducts();
+  } catch (err) {
+    showToast(err.message, "danger");
+  } finally {
+    if (voidBtn) {
+      voidBtn.disabled = false;
+      voidBtn.innerHTML = '<i data-lucide="slash" style="width: 16px; height: 16px;"></i> Void Transaction';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: voidBtn });
+    }
+  }
 }
 window.voidPosTransaction = voidPosTransaction;
 
@@ -3888,16 +3947,21 @@ function setupPOSModule() {
     searchInput.addEventListener("input", renderPosProducts);
   }
 
-  // Event delegation on product grid
+  // Event delegation on product grid with anti-jitter debounce
   const gridContainer = document.getElementById("pos-products-grid");
+  let lastAddToCartTime = 0;
   if (gridContainer) {
     gridContainer.addEventListener("click", (e) => {
       const card = e.target.closest(".pos-product-card");
-      if (card && !card.classList.contains("disabled-card")) {
-        const productId = card.getAttribute("data-product-id");
-        if (productId) {
-          addToPosCart(productId);
-        }
+      if (!card || card.classList.contains("disabled-card")) return;
+
+      const now = Date.now();
+      if (now - lastAddToCartTime < 180) return; // Prevent double/rapid-click bouncing
+
+      const productId = card.getAttribute("data-product-id");
+      if (productId) {
+        lastAddToCartTime = now;
+        addToPosCart(productId);
       }
     });
   }

@@ -3138,14 +3138,34 @@ body.dark-mode .dashboard-ai-insight {
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   position: relative;
 }
 
-.pos-product-card:hover {
-  transform: translateY(-3px);
+.pos-product-card:hover:not(.disabled-card) {
   border-color: var(--primary-color);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(224, 138, 59, 0.16);
+}
+
+.pos-product-card.disabled-card {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+}
+
+.pos-product-card.disabled-card:hover {
+  transform: none !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+.pos-product-card.disabled-card .pos-product-add-btn,
+.pos-product-card.disabled-card:hover .pos-product-add-btn {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  background-color: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
 }
 
 .pos-product-icon {
@@ -3213,7 +3233,7 @@ body.dark-mode .dashboard-ai-insight {
   transition: all 0.2s ease;
 }
 
-.pos-product-card:hover .pos-product-add-btn {
+.pos-product-card:not(.disabled-card):hover .pos-product-add-btn:not(:disabled) {
   background-color: var(--primary-color);
   color: #ffffff;
 }
