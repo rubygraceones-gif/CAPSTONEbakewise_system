@@ -4760,6 +4760,52 @@ function printPosReceipt() {
 }
 window.printPosReceipt = printPosReceipt;
 
+function getTxDateString(tx) {
+  if (!tx) return '';
+  // 1. Transaction number timestamp POS-B3-20261014-001 or SIM-POS-B3-20261101-001
+  if (tx.transaction_number) {
+    const m = String(tx.transaction_number).match(/2026(\d{2})(\d{2})/);
+    if (m) {
+      return `2026-${m[1]}-${m[2]}`;
+    }
+  }
+  // 2. Direct date column
+  const rawDate = tx.transaction_date || tx.date;
+  if (rawDate) {
+    if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())) {
+      return rawDate.trim();
+    }
+    if (typeof rawDate === 'string' && rawDate.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(rawDate.trim())) {
+      return rawDate.trim().substring(0, 10);
+    }
+    try {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    } catch (e) {}
+  }
+  // 3. Fallback created_at
+  if (tx.created_at) {
+    if (typeof tx.created_at === 'string' && tx.created_at.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(tx.created_at.trim())) {
+      return tx.created_at.trim().substring(0, 10);
+    }
+    try {
+      const d = new Date(tx.created_at);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    } catch (e) {}
+  }
+  return '';
+}
+
 async function refreshPosHistory() {
   const tbody = document.getElementById("pos-history-tbody");
   if (!tbody) return;
@@ -4796,7 +4842,14 @@ async function refreshPosHistory() {
   const selectedDate = document.getElementById("pos-history-date")?.value || '';
 
   try {
-    const res = await fetch(`/api/pos/transactions?branch_id=${effectiveBranchId}`);
+    const qParams = new URLSearchParams();
+    if (effectiveBranchId && effectiveBranchId !== 'all') qParams.set('branch_id', effectiveBranchId);
+    if (selectedDate) qParams.set('date', selectedDate);
+    if (selectedPayment && selectedPayment !== 'all') qParams.set('payment_method', selectedPayment);
+    if (selectedStatus && selectedStatus !== 'all') qParams.set('status', selectedStatus);
+
+    const queryUrl = `/api/pos/transactions?${qParams.toString()}`;
+    const res = await fetch(queryUrl);
     const data = await res.json();
     let transactions = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.transactions) ? data.transactions : []);
 
@@ -4808,14 +4861,15 @@ async function refreshPosHistory() {
         : (txBranchId === userBranchId);
 
       const cashierStr = tx.cashier_name || tx.cashier || "";
-      const dateStr = tx.transaction_date || tx.date || "";
       const matchSearch = !searchInput || 
-        tx.transaction_number.toLowerCase().includes(searchInput) ||
+        (tx.transaction_number && tx.transaction_number.toLowerCase().includes(searchInput)) ||
         cashierStr.toLowerCase().includes(searchInput) ||
         (tx.items && tx.items.some(i => (i.product_name || i.product_id || "").toLowerCase().includes(searchInput)));
       const matchPayment = selectedPayment === 'all' || tx.payment_method === selectedPayment;
       const matchStatus = selectedStatus === 'all' || tx.status === selectedStatus;
-      const matchDate = !selectedDate || dateStr.startsWith(selectedDate);
+      
+      const txDateStr = getTxDateString(tx);
+      const matchDate = !selectedDate || (txDateStr === selectedDate || txDateStr.startsWith(selectedDate));
       return matchBranch && matchSearch && matchPayment && matchStatus && matchDate;
     });
 
@@ -4831,8 +4885,17 @@ async function refreshPosHistory() {
     }
 
     setSafeHtml(tbody, transactions.map(tx => {
-      const dateVal = tx.created_at || tx.transaction_date || tx.date;
-      const dateFormatted = formatDateTimeDisplay(dateVal);
+      const txDateStr = getTxDateString(tx);
+      let dateVal = tx.created_at || tx.transaction_date || tx.date;
+      let dateFormatted = formatDateTimeDisplay(dateVal);
+      if (txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
+        const parts = txDateStr.split('-');
+        const expectedDatePrefix = `${parts[1]}/${parts[2]}/${parts[0]}`;
+        if (!dateFormatted.startsWith(expectedDatePrefix)) {
+          const timeMatch = dateFormatted.match(/\d{1,2}:\d{2}\s*(?:AM|PM)/i);
+          dateFormatted = `${expectedDatePrefix} ${timeMatch ? timeMatch[0] : '08:00 AM'}`;
+        }
+      }
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
       const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';
       const cashierName = tx.cashier_name || tx.cashier || 'Staff';

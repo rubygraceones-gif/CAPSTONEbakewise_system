@@ -2,7 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+// Configure node-postgres type parsers to prevent timezone shift on DATE and TIMESTAMP columns
+if (types && typeof types.setTypeParser === 'function') {
+  types.setTypeParser(1082, str => str); // DATE (e.g. '2026-10-14')
+  types.setTypeParser(1114, str => str); // TIMESTAMP without timezone (e.g. '2026-10-14 05:32:01')
+}
 const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
@@ -136,6 +141,8 @@ const isCloudEnv = !!(
   process.env.NODE_ENV === 'production' ||
   process.env.PORT
 );
+
+let dbReadyPromise = null;
 
 // Initialize Database Connection (MySQL as Primary Engine with Railway / Local XAMPP Support)
 async function setupDatabaseConnection() {
@@ -293,6 +300,13 @@ async function setupDatabaseConnection() {
 
 // Global Database Query Helper
 async function queryDb(sql, params = []) {
+  if (!activeDbDriver && dbReadyPromise) {
+    try {
+      await dbReadyPromise;
+    } catch (e) {
+      console.error("queryDb error waiting for dbReadyPromise:", e.message);
+    }
+  }
   if (activeDbDriver === 'mysql' && mysqlPool) {
     // Convert PostgreSQL $1, $2 placeholders to MySQL ? placeholders
     // And remove any RETURNING ... clause which is unsupported in MySQL
@@ -954,7 +968,7 @@ async function healOrphanedBranchRecords() {
   }
 }
 
-setupDatabaseConnection();
+dbReadyPromise = setupDatabaseConnection();
 
 // --- REST API ENDPOINTS ---
 
@@ -1716,7 +1730,7 @@ app.post('/api/sales', async (req, res) => {
 
 // 1. GET ALL POS TRANSACTIONS (WITH ITEMIZED PRODUCTS)
 app.get('/api/pos/transactions', async (req, res) => {
-  const { branch_id, date, payment_method, status, search } = req.query;
+  const { branch_id, date, payment_method, status, search, limit } = req.query;
   try {
     let query = "SELECT * FROM bw_pos_transactions";
     let params = [];
@@ -1744,24 +1758,41 @@ app.get('/api/pos/transactions', async (req, res) => {
     }
     query += " ORDER BY date DESC, id DESC";
 
+    const maxLimit = limit === 'all' ? null : (parseInt(limit) || 1000);
+    if (maxLimit) {
+      params.push(maxLimit);
+      query += ` LIMIT $${params.length}`;
+    }
+
     const txResult = await queryDb(query, params);
     const transactions = txResult.rows || [];
 
     if (transactions.length > 0) {
       const txIds = transactions.map(t => t.id);
-      const placeholders = txIds.map((_, idx) => `$${idx + 1}`).join(',');
-      const itemsResult = await queryDb(
-        `SELECT ti.*, p.name as product_name, p.category as product_category 
-         FROM bw_pos_transaction_items ti 
-         LEFT JOIN bw_products p ON ti.product_id = p.id 
-         WHERE ti.transaction_id IN (${placeholders})`,
-        txIds
-      );
-      const items = itemsResult.rows || [];
+      let items = [];
+      const chunkSize = 500;
+      for (let i = 0; i < txIds.length; i += chunkSize) {
+        const chunk = txIds.slice(i, i + chunkSize);
+        const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(',');
+        const itemsResult = await queryDb(
+          `SELECT ti.*, p.name as product_name, p.category as product_category 
+           FROM bw_pos_transaction_items ti 
+           LEFT JOIN bw_products p ON ti.product_id = p.id 
+           WHERE ti.transaction_id IN (${placeholders})`,
+          chunk
+        );
+        items.push(...(itemsResult.rows || []));
+      }
+
+      const itemsByTx = new Map();
+      items.forEach(item => {
+        if (!itemsByTx.has(item.transaction_id)) itemsByTx.set(item.transaction_id, []);
+        itemsByTx.get(item.transaction_id).push(item);
+      });
 
       transactions.forEach(t => {
-        t.items = items.filter(i => i.transaction_id === t.id);
-        t.items_count = t.items.reduce((acc, curr) => acc + curr.quantity, 0);
+        t.items = itemsByTx.get(t.id) || [];
+        t.items_count = t.items.reduce((acc, curr) => acc + (parseInt(curr.quantity) || 0), 0);
       });
     }
 
