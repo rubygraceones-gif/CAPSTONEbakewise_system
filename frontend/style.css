@@ -3547,13 +3547,13 @@ body.dark-mode .dashboard-ai-insight {
   font-size: 0.95rem;
 }
 
-/* Print thermal receipt settings (Single Page 80mm Format) */
+/* ==========================================================================
+   PRINT STYLES FOR POS RECEIPTS & EXECUTIVE REPORTS
+   ========================================================================== */
+
+/* 1. POS THERMAL RECEIPT PRINT (Single Page 80mm Format) - Scoped ONLY to receipt printing */
 @media print {
-  @page {
-    size: auto;
-    margin: 2mm;
-  }
-  html, body {
+  body.printing-pos-receipt {
     background: white !important;
     color: black !important;
     height: auto !important;
@@ -3561,13 +3561,14 @@ body.dark-mode .dashboard-ai-insight {
     padding: 0 !important;
     overflow: visible !important;
   }
-  body * {
+  body.printing-pos-receipt * {
     visibility: hidden !important;
   }
-  #pos-receipt-printable, #pos-receipt-printable * {
+  body.printing-pos-receipt #pos-receipt-printable,
+  body.printing-pos-receipt #pos-receipt-printable * {
     visibility: visible !important;
   }
-  #pos-receipt-printable {
+  body.printing-pos-receipt #pos-receipt-printable {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -3581,13 +3582,152 @@ body.dark-mode .dashboard-ai-insight {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  .modal-overlay, .modal-dialog, .modal-actions {
+  body.printing-pos-receipt .modal-overlay,
+  body.printing-pos-receipt .modal-dialog,
+  body.printing-pos-receipt .modal-actions {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
-  }
-  .modal-actions {
     display: none !important;
+  }
+}
+
+/* 2. CUSTOM REPORTS & MANAGEMENT PRINT TEMPLATE (Letter / A4 Branded Layout) */
+@media print {
+  body:not(.printing-pos-receipt) {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide app chrome, sidebars, topbars, buttons, filters, pagination, toasts */
+  body:not(.printing-pos-receipt) .app-sidebar,
+  body:not(.printing-pos-receipt) .app-topbar,
+  body:not(.printing-pos-receipt) .report-actions,
+  body:not(.printing-pos-receipt) .dev-role-switcher,
+  body:not(.printing-pos-receipt) .theme-toggle-header,
+  body:not(.printing-pos-receipt) .theme-toggle-btn,
+  body:not(.printing-pos-receipt) #toast-container,
+  body:not(.printing-pos-receipt) .modal-overlay,
+  body:not(.printing-pos-receipt) #report-sales-pagination,
+  body:not(.printing-pos-receipt) #report-waste-pagination,
+  body:not(.printing-pos-receipt) #report-eff-pagination,
+  body:not(.printing-pos-receipt) .view-pane:not(#pane-reports) {
+    display: none !important;
+  }
+
+  body:not(.printing-pos-receipt) .app-layout {
+    display: block !important;
+  }
+
+  body:not(.printing-pos-receipt) .main-panel {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  body:not(.printing-pos-receipt) #pane-reports {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: 100% !important;
+  }
+
+  /* Printable Report Header with Rose Bakeshop & BakeWise Branding */
+  body:not(.printing-pos-receipt) .print-header {
+    display: block !important;
+    visibility: visible !important;
+    text-align: center !important;
+    margin-bottom: 24px !important;
+    padding-bottom: 14px !important;
+    border-bottom: 3px double #d97706 !important;
+  }
+
+  body:not(.printing-pos-receipt) .print-header img {
+    height: 60px !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+  }
+
+  body:not(.printing-pos-receipt) .print-header h1 {
+    font-size: 18pt !important;
+    font-weight: 800 !important;
+    color: #92400e !important;
+    margin: 8px 0 4px 0 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  body:not(.printing-pos-receipt) .print-header p {
+    font-size: 10pt !important;
+    color: #4b5563 !important;
+    margin: 2px 0 !important;
+  }
+
+  body:not(.printing-pos-receipt) #print-report-timestamp {
+    font-size: 9pt !important;
+    color: #6b7280 !important;
+    margin-top: 6px !important;
+    font-style: italic !important;
+    font-weight: 500 !important;
+  }
+
+  /* Report Panel Cards & Tables */
+  body:not(.printing-pos-receipt) .panel-card {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    padding: 16px !important;
+    margin-bottom: 25px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body:not(.printing-pos-receipt) .panel-card-header {
+    border-bottom: 2px solid #f3f4f6 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  body:not(.printing-pos-receipt) .panel-card-title {
+    font-size: 12pt !important;
+    font-weight: 700 !important;
+    color: #1f2937 !important;
+  }
+
+  body:not(.printing-pos-receipt) .table-responsive {
+    overflow: visible !important;
+  }
+
+  body:not(.printing-pos-receipt) .data-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9.5pt !important;
+  }
+
+  body:not(.printing-pos-receipt) .data-table th {
+    background-color: #fef3c7 !important;
+    color: #78350f !important;
+    font-weight: 700 !important;
+    padding: 8px 10px !important;
+    border: 1px solid #fcd34d !important;
+    text-align: left !important;
+  }
+
+  body:not(.printing-pos-receipt) .data-table td {
+    padding: 8px 10px !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+  }
+
+  body:not(.printing-pos-receipt) .data-table tbody tr:nth-child(even) {
+    background-color: #f9fafb !important;
   }
 }
 
@@ -3764,4 +3904,12 @@ body.dark-mode .dashboard-ai-insight {
   font-size: 0.8rem;
   color: var(--text-secondary);
   text-align: center;
+}
+/* Disabled form group styling */
+.disabled-field-group {
+  opacity: 0.55 !important;
+  pointer-events: none !important;
+}
+.disabled-field-group label {
+  color: var(--text-muted, #9ca3af) !important;
 }

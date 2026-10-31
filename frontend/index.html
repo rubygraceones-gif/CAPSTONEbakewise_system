@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" href="assets/rose_logo.png">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
 
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1517,7 +1517,7 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Product ID</th>
+                    
                     <th>Product Name</th>
                     <th>Category</th>
                     <th>Selling Price</th>
@@ -1554,10 +1554,16 @@
               <input type="date" id="rep-filter-end" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;">
               <button id="btn-rep-filter-apply" class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
             </div>
-            <button class="btn-print" id="btn-print-report" style="margin-left: auto;">
-              <i data-lucide="download" style="width: 18px; height: 18px;"></i>
-              <span>Download</span>
-            </button>
+            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+              <button class="btn-primary" id="btn-export-report-csv" style="padding: 7px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; background-color: #059669; border-color: #059669; color: white;">
+                <i data-lucide="file-spreadsheet" style="width: 16px; height: 16px;"></i>
+                <span>Export CSV</span>
+              </button>
+              <button class="btn-print" id="btn-print-report" style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="printer" style="width: 18px; height: 18px;"></i>
+                <span>Print / PDF Report</span>
+              </button>
+            </div>
           </div>
 
           <div class="panel-card">
@@ -1905,7 +1911,7 @@
   <div id="toast-container"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 
 </html>

@@ -752,7 +752,8 @@ class BakeWiseStore {
   async addInventory(productId, stockQty, prodDate, expDate, targetBranchId) {
     const parsedQty = parseInt(stockQty);
     if (isNaN(parsedQty) || parsedQty <= 0) return false;
-    const branchId = targetBranchId ? parseInt(targetBranchId) : (this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId()));
+    const defaultBranchId = (this.branches && this.branches.length > 0) ? parseInt(this.branches[0].id) : 1;
+    const branchId = (targetBranchId && targetBranchId !== 'all') ? parseInt(targetBranchId) : (this.getSelectedBranchId() && this.getSelectedBranchId() !== 'all' ? parseInt(this.getSelectedBranchId()) : defaultBranchId);
 
     if (this.isBackendOnline) {
       try {
@@ -1819,16 +1820,28 @@ class SearchableCombobox {
   selectValue(val) {
     this.selectedValue = String(val);
     if (this.hiddenInput) {
-      const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-      if (desc && desc.set) desc.set.call(this.hiddenInput, String(val));
-      this.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-      this.hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      try {
+        this.hiddenInput.value = String(val);
+        const proto = (this.hiddenInput.tagName === 'SELECT') ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (desc && desc.set) desc.set.call(this.hiddenInput, String(val));
+      } catch (e) {
+        try { this.hiddenInput.value = String(val); } catch (_) {}
+      }
+      try {
+        this.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        this.hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      } catch (e) {}
     }
     this.updateTriggerText();
     this.updateOptionHighlights();
 
     if (typeof this.onChange === 'function') {
-      this.onChange(val);
+      try {
+        this.onChange(val);
+      } catch (e) {
+        console.error("Combobox onChange error:", e);
+      }
     }
   }
 
@@ -1882,6 +1895,12 @@ class SearchableCombobox {
         this.updateTriggerText();
       }
     }
+    if (this.hiddenInput) {
+      this.hiddenInput.disabled = this.disabled;
+      if (this.disabled) {
+        this.hiddenInput.removeAttribute('required');
+      }
+    }
   }
 
   updateOptionHighlights() {
@@ -1912,15 +1931,22 @@ function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
   const isSysAdmin = roleVal === 'admin';
   const branchCb = window.customComboboxes ? window.customComboboxes[branchComboboxId] : null;
   const branchEl = document.getElementById(branchSelectId);
+  const branchGroup = branchEl ? (branchEl.closest('.form-group') || branchEl.parentElement) : null;
 
   if (isSysAdmin) {
     if (branchCb) {
-      branchCb.setDisabled(true, 'All Branches (Global Admin)');
+      branchCb.setDisabled(true, 'Disabled (System Administrator has Global Access)');
       branchCb.selectValue('');
     }
-    if (branchEl && branchEl.tagName === 'SELECT') {
+    if (branchEl) {
       branchEl.disabled = true;
+      branchEl.required = false;
       branchEl.value = '';
+    }
+    if (branchGroup) {
+      branchGroup.classList.add('disabled-field-group');
+      branchGroup.style.opacity = '0.55';
+      branchGroup.style.pointerEvents = 'none';
     }
   } else {
     if (branchCb) {
@@ -1929,11 +1955,17 @@ function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
         branchCb.selectValue(String(store.branches[0].id));
       }
     }
-    if (branchEl && branchEl.tagName === 'SELECT') {
+    if (branchEl) {
       branchEl.disabled = false;
+      branchEl.required = true;
       if (!branchEl.value && store.branches && store.branches.length > 0) {
         branchEl.value = store.branches[0].id;
       }
+    }
+    if (branchGroup) {
+      branchGroup.classList.remove('disabled-field-group');
+      branchGroup.style.opacity = '1';
+      branchGroup.style.pointerEvents = 'auto';
     }
   }
 }
@@ -2029,6 +2061,14 @@ function populateSelectDropdowns() {
     items: userRoleItems,
     onChange: (val) => syncRoleBranchField(val, "usr-branch-select", "usr-branch-select")
   });
+
+  const nativeUsrRoleSelect = document.getElementById("usr-role-select");
+  if (nativeUsrRoleSelect && !nativeUsrRoleSelect.dataset.syncBound) {
+    nativeUsrRoleSelect.dataset.syncBound = "true";
+    nativeUsrRoleSelect.addEventListener("change", (e) => {
+      syncRoleBranchField(e.target.value, "usr-branch-select", "usr-branch-select");
+    });
+  }
 
   initCombobox("edit-usr-role", {
     icon: "shield",
@@ -2282,8 +2322,23 @@ function setupFormSubmissions() {
   const printBtn = document.getElementById("btn-print-report");
   if (printBtn) {
     printBtn.addEventListener("click", () => {
-      document.getElementById("print-report-timestamp").textContent = "Generated: " + new Date().toLocaleString();
+      document.body.classList.remove('printing-pos-receipt');
+      const activeBranchName = store.getCurrentBranchName ? store.getCurrentBranchName() : 'Network Wide';
+      const nowStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const tsElem = document.getElementById("print-report-timestamp");
+      if (tsElem) {
+        tsElem.textContent = `Generated: ${nowStr} | Location: ${activeBranchName} | Rose Bakeshop x BakeWise Enterprise`;
+      }
       window.print();
+    });
+  }
+
+  // Export Custom Reports to CSV
+  const csvExportBtn = document.getElementById("btn-export-report-csv");
+  if (csvExportBtn && !csvExportBtn.dataset.bound) {
+    csvExportBtn.dataset.bound = "true";
+    csvExportBtn.addEventListener("click", () => {
+      exportCustomReportToCsv();
     });
   }
 
@@ -3640,7 +3695,11 @@ function closePosReceiptModal() {
 window.closePosReceiptModal = closePosReceiptModal;
 
 function printPosReceipt() {
+  document.body.classList.add('printing-pos-receipt');
   window.print();
+  setTimeout(() => {
+    document.body.classList.remove('printing-pos-receipt');
+  }, 1000);
 }
 window.printPosReceipt = printPosReceipt;
 
@@ -4126,7 +4185,7 @@ function refreshInventoryPane() {
 
     const prodFormatted = formatDateTimeDisplay(item.productionDate);
     const expFormatted = formatDateTimeDisplay(item.expiryDate);
-    const b = store.branches.find(x => x.id === item.branchId) || { name: "Unknown Branch" };
+    const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(item.branchId || item.branch_id)) || (store.branches.length > 0 ? store.branches[0] : { name: "Main Branch" });
 
     return `
       <tr>
@@ -4212,7 +4271,7 @@ function refreshProductionPane() {
 
   setSafeHtml(tbody, pagedProd.map(pr => {
     const p = store.products.find(x => x.id === pr.productId) || { name: "Unknown" };
-    const b = store.branches.find(x => x.id === pr.branchId) || { name: "Unknown Branch" };
+    const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(pr.branchId || pr.branch_id)) || (store.branches.length > 0 ? store.branches[0] : { name: "Main Branch" });
     const efficiency = pr.planned > 0 ? Math.round((pr.actual / pr.planned) * 100) : 100;
 
     return `
@@ -4289,7 +4348,7 @@ function refreshWastePane() {
 
   setSafeHtml(tbody, pagedWaste.map(w => {
     const p = store.products.find(x => x.id === w.productId) || { name: "Unknown" };
-    const b = store.branches.find(x => x.id === w.branchId) || { name: "Unknown Branch" };
+    const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(w.branchId || w.branch_id)) || (store.branches.length > 0 ? store.branches[0] : { name: "Main Branch" });
     const totalCost = w.qty * w.cost;
     const dateObj = parseLocalDate(w.date);
 
@@ -4730,7 +4789,6 @@ function refreshProductsPane() {
 
   setSafeHtml(tbody, pagedProducts.map(p => `
     <tr>
-      <td><code>${p.id}</code></td>
       <td style="font-weight: 700;">${p.name}</td>
       <td><span class="badge info">${p.category}</span></td>
       <td style="font-weight: 700; color: var(--primary-color);">₱${p.price.toFixed(2)}</td>
@@ -5861,3 +5919,68 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPOSModule();
   setTimeout(setupFilters, 500);
 });
+
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('printing-pos-receipt');
+});
+
+function exportCustomReportToCsv() {
+  const activeBranchName = store.getCurrentBranchName ? store.getCurrentBranchName() : 'Network Wide';
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+
+  let csvContent = "";
+  csvContent += "ROSE BAKESHOP x BAKEWISE ENTERPRISE MANAGEMENT REPORT\r\n";
+  csvContent += `Generated Date: ${now.toLocaleString()}\r\n`;
+  csvContent += `Branch Scope: ${activeBranchName}\r\n\r\n`;
+
+  // 1. Sales Performance Report
+  csvContent += "=== SALES PERFORMANCE REPORT SUMMARY ===\r\n";
+  csvContent += "Product,Category,Total Units Sold,Average Price (PHP),Gross Income Generated (PHP)\r\n";
+  const salesTable = document.getElementById("report-sales-table");
+  if (salesTable) {
+    const rows = salesTable.querySelectorAll("tbody tr");
+    rows.forEach(r => {
+      const cols = Array.from(r.querySelectorAll("td")).map(c => '"' + (c.innerText || '').replace(/"/g, '""').trim() + '"');
+      if (cols.length > 0) csvContent += cols.join(",") + "\r\n";
+    });
+  }
+  csvContent += "\r\n";
+
+  // 2. Waste & Loss Analytics
+  csvContent += "=== WASTE & LOSS ANALYTICS SUMMARY ===\r\n";
+  csvContent += "Product,Total Discarded,Primary Discard Reason,Total Cost Lost (PHP)\r\n";
+  const wasteTable = document.getElementById("report-waste-table");
+  if (wasteTable) {
+    const rows = wasteTable.querySelectorAll("tbody tr");
+    rows.forEach(r => {
+      const cols = Array.from(r.querySelectorAll("td")).map(c => '"' + (c.innerText || '').replace(/"/g, '""').trim() + '"');
+      if (cols.length > 0) csvContent += cols.join(",") + "\r\n";
+    });
+  }
+  csvContent += "\r\n";
+
+  // 3. Baking Efficiency Report
+  csvContent += "=== BAKING EFFICIENCY REPORT ===\r\n";
+  csvContent += "Product Name,Planned Bake Run,Actual Bake Output,Deviation Rate,Bake Efficiency\r\n";
+  const effTable = document.getElementById("report-efficiency-table");
+  if (effTable) {
+    const rows = effTable.querySelectorAll("tbody tr");
+    rows.forEach(r => {
+      const cols = Array.from(r.querySelectorAll("td")).map(c => '"' + (c.innerText || '').replace(/"/g, '""').trim() + '"');
+      if (cols.length > 0) csvContent += cols.join(",") + "\r\n";
+    });
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.setAttribute("href", url);
+  a.setAttribute("download", `RoseBakeshop_Report_${dateStr}.csv`);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Report exported successfully as CSV.", "success");
+}
+window.exportCustomReportToCsv = exportCustomReportToCsv;

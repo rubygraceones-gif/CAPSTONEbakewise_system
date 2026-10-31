@@ -753,6 +753,7 @@ async function initializeMysqlSchema() {
   }
 
   console.log("MySQL database schema & seed initialization complete!");
+  await healOrphanedBranchRecords();
 }
 
 // --- INITIALIZE POSTGRESQL SCHEMA & SEED DATA ---
@@ -966,6 +967,30 @@ async function initializePgSchema() {
   }
 
   console.log("Supabase / PostgreSQL database schema & seed initialization complete!");
+  await healOrphanedBranchRecords();
+}
+
+
+// Auto-heal orphaned branch IDs pointing to deleted branches
+async function healOrphanedBranchRecords() {
+  try {
+    const brRes = await queryDb("SELECT id FROM bw_branches ORDER BY id ASC LIMIT 1");
+    if (!brRes || !brRes.rows || brRes.rows.length === 0) return;
+    const fallbackBranchId = brRes.rows[0].id;
+
+    const allBr = await queryDb("SELECT id FROM bw_branches");
+    const validBranchIds = (allBr.rows || []).map(r => r.id);
+    if (validBranchIds.length === 0) return;
+
+    const idList = validBranchIds.join(',');
+
+    await queryDb(`UPDATE bw_inventory SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+    await queryDb(`UPDATE bw_production SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+    await queryDb(`UPDATE bw_waste SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+    await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+  } catch (err) {
+    console.warn("Notice: branch record alignment:", err.message);
+  }
 }
 
 setupDatabaseConnection();
@@ -1048,6 +1073,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
 // --- UNIFIED HIGH-SPEED BATCH SYNC API ---
 app.get('/api/sync', async (req, res) => {
+  await healOrphanedBranchRecords();
   const { branch_id } = req.query;
   const bId = (branch_id && branch_id !== 'all') ? parseInt(branch_id) : null;
 
