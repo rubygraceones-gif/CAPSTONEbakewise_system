@@ -2367,7 +2367,165 @@ app.post('/api/pos/void/:id', async (req, res) => {
   }
 });
 
-// 4. REPURPOSE BATCH ENDPOINTS
+// 4. REPURPOSE BATCH ENDPOINTS & APPROVED RECIPES CATALOG
+const APPROVED_REPURPOSING_RECIPES = [
+  {
+    id: 'cinnamon-bread-pudding',
+    name: 'Cinnamon Bread Pudding or French Toast Sliders',
+    base_products: ['Classic Sliced Bread', 'Loaf Bread', 'White Bread'],
+    category: 'Bread',
+    shelf_life_extension: '+2 Days (Refrigerated at 4°C)',
+    optimal_window: '24-48 hours before expiry (unexpired, firm texture)',
+    required_ingredients: [
+      'Fresh whole milk (500ml)',
+      'Large eggs (4 pcs)',
+      'Brown sugar (150g)',
+      'Ground cinnamon (1 tbsp)',
+      'Unsalted butter (50g)',
+      'Pure vanilla extract (1 tsp)'
+    ],
+    instructions: [
+      'Slice bread into uniform 1-inch cubes and place into mixing bowl.',
+      'Whisk eggs, milk, sugar, melted butter, and cinnamon into a rich custard slurry.',
+      'Pour custard over bread cubes and soak for 20 minutes until thoroughly saturated.',
+      'Transfer into buttered aluminum baking pans.',
+      'Bake at 175°C (350°F) for 35-40 minutes until golden brown and custard is set.'
+    ],
+    food_safety_controls: [
+      'Minimum internal core temperature must reach 74°C (165°F).',
+      'Inspect all bread cubes for surface mold or sour discoloration prior to soaking.',
+      'Strictly reject and dispose of any bread showing visible mold spore colonies.'
+    ]
+  },
+  {
+    id: 'double-baked-almond-croissants',
+    name: 'Double Baked Almond Croissants',
+    base_products: ['Butter Croissant'],
+    category: 'Pastries',
+    shelf_life_extension: '+24 to +48 Hours',
+    optimal_window: '24-48 hours after bake / before expiry (dry flaky pastry)',
+    required_ingredients: [
+      'Simple syrup (100ml water + 100g sugar + vanilla)',
+      'Almond frangipane cream (butter, sugar, egg, almond flour)',
+      'Flaked sliced almonds (60g)',
+      'Confectioners powdered sugar for dusting'
+    ],
+    instructions: [
+      'Slice day-old croissants horizontally in half.',
+      'Generously brush inner cut sides and top surface with sugar syrup.',
+      'Pipe almond frangipane cream inside and replace top half.',
+      'Spread a thin layer of frangipane on top and coat with sliced flaked almonds.',
+      'Double bake at 170°C (340°F) for 15-18 minutes until frangipane is set and almonds are toasted golden.',
+      'Dust lightly with powdered sugar once cooled.'
+    ],
+    food_safety_controls: [
+      'Thermal kill step: Almond frangipane contains raw egg, ensuring internal temperature exceeds 75°C.',
+      'Croissants must be dry and free of excessive moisture or mold.'
+    ]
+  },
+  {
+    id: 'toasted-bread-crumbs',
+    name: 'Toasted Bread Crumbs',
+    base_products: ['Pandesal', 'Ube Cheese Pandesal', 'Classic Sliced Bread'],
+    category: 'Bread',
+    shelf_life_extension: '+14 to +30 Days (Airtight dry storage)',
+    optimal_window: '12-36 hours before expiry (unexpired, firm or dry crumb)',
+    required_ingredients: [
+      'Unsold unexpired bread batches',
+      'Optional: dried herbs, garlic powder, sea salt'
+    ],
+    instructions: [
+      'Break or slice unsold bread into uniform small pieces.',
+      'Dehydrate in low convection oven at 120°C (250°F) for 45 minutes until crisp and moisture is evaporated.',
+      'Cool completely to room temperature.',
+      'Process through commercial breadcrumb mill or food processor to desired grain size.',
+      'Sift through wire mesh for consistent texture.',
+      'Seal in airtight food-grade poly bags with silica desiccants.'
+    ],
+    food_safety_controls: [
+      'Moisture content must be reduced below 10% to prevent water-activity spore growth.',
+      'Must be 100% free from mold, fillings, or perishable meats.'
+    ]
+  },
+  {
+    id: 'baked-ensaymada-pudding',
+    name: 'Baked Ensaymada Pudding',
+    base_products: ['Special Ensaymada'],
+    category: 'Pastries',
+    shelf_life_extension: '+2 Days (Refrigerated)',
+    optimal_window: '24-36 hours before expiry',
+    required_ingredients: [
+      'Sweet custard base (condensed milk, evaporated milk, whole eggs)',
+      'Golden raisins (50g)',
+      'Extra cheddar cheese shreds (60g)'
+    ],
+    instructions: [
+      'Cut unsold ensaymada into bite-sized quarters.',
+      'Layer cut pieces in a baking dish, scattering golden raisins between layers.',
+      'Pour creamy milk custard over the bread pieces and let rest for 15 minutes.',
+      'Top with shredded cheddar cheese.',
+      'Bake at 165°C (330°F) for 30 minutes in a water bath until custard is gently set.'
+    ],
+    food_safety_controls: [
+      'Ensure cheese topping is fresh and unfermented before baking.',
+      'Must maintain internal temperature of 74°C during water-bath baking.'
+    ]
+  },
+  {
+    id: 'bread-pudding-base',
+    name: 'Bread Pudding Base',
+    base_products: ['Spanish Bread'],
+    category: 'Bread',
+    shelf_life_extension: '+2 Days (Refrigerated)',
+    optimal_window: '24-36 hours before expiry',
+    required_ingredients: [
+      'Whole milk (400ml)',
+      'Fresh egg wash (3 eggs)',
+      'Brown sugar (100g)',
+      'Melted butter (40g)',
+      'Cinnamon spice (1/2 tsp)'
+    ],
+    instructions: [
+      'Dice Spanish bread into cubes (incorporating sweet filling into the pudding matrix).',
+      'Blend milk, egg wash, and cinnamon spice.',
+      'Fold bread cubes into custard mixture and let rest 15 minutes.',
+      'Bake at 170°C for 35 minutes until browned and fragrant.'
+    ],
+    food_safety_controls: [
+      'Thorough internal bake to core temperature of 74°C.',
+      'Immediate cooling and packaging within 1 hour post-bake.'
+    ]
+  },
+  {
+    id: 'chocolate-truffle-cake-pops',
+    name: 'Chocolate Truffle Cake Pops',
+    base_products: ['Premium Chocolate Cake'],
+    category: 'Cakes',
+    shelf_life_extension: '+3 Days (Chilled at 4°C)',
+    optimal_window: '24-48 hours before expiry (unfrosted trimmings or unexpired sponge base only)',
+    required_ingredients: [
+      'Dark chocolate ganache (150g)',
+      'Chocolate sprinkles / crushed nuts',
+      'Lollipop sticks'
+    ],
+    instructions: [
+      'Crumble safe, unexpired chocolate sponge cake finely into a mixing bowl.',
+      'Blend with dark chocolate ganache until dough forms pliable balls.',
+      'Scoop and shape into 30g round spheres and chill for 20 minutes.',
+      'Dip lollipop stick into melted dark chocolate and insert into cake ball.',
+      'Dip entire cake pop into tempered dark chocolate coating and decorate.'
+    ],
+    food_safety_controls: [
+      'Strict cold chain storage at 4°C or below.',
+      'Perishable cream/custard-filled cakes are strictly excluded from repurposing.'
+    ]
+  }
+];
+
+app.get('/api/repurpose/recipes', (req, res) => {
+  res.json(APPROVED_REPURPOSING_RECIPES);
+});
+
 app.post('/api/repurpose', async (req, res) => {
   const { product_id, product_name, quantity, target_recipe, branch_id, batch_id } = req.body;
 
@@ -2375,16 +2533,37 @@ app.post('/api/repurpose', async (req, res) => {
     return res.status(400).json({ error: "Product ID and quantity are required." });
   }
 
-  const bId = branch_id ? parseInt(branch_id) : 1;
+  const bId = branch_id ? parseInt(branch_id) : 212;
   const qtyNum = parseInt(quantity);
   const pName = product_name || product_id;
   const recipe = target_recipe || "Repurposed Recipe";
   const bIdStr = String(batch_id || `batch_${Date.now()}`);
 
   try {
+    const phNow = getPhilippineNow();
+
+    // 1. Food safety validation: verify batch is not expired
+    if (batch_id) {
+      const batchCheck = await queryDb(
+        "SELECT id, expiry_date, expiry_time, status, stock_level FROM bw_inventory WHERE (batch_id = $1 OR id = $2) LIMIT 1",
+        [String(batch_id), parseInt(batch_id) || 0]
+      );
+      if (batchCheck.rows && batchCheck.rows.length > 0) {
+        const bRow = batchCheck.rows[0];
+        const expDate = bRow.expiry_date ? String(bRow.expiry_date).split('T')[0] : '';
+        const expTime = bRow.expiry_time || '18:00:00';
+        if (expDate && new Date(`${expDate}T${expTime}`) <= new Date(phNow.datetime)) {
+          return res.status(400).json({ error: "Food Safety Violation: Expired batches cannot be repurposed under bakery food-safety regulations." });
+        }
+        if (bRow.status === 'Expired' || bRow.status === 'Spoiled' || bRow.status === 'Damaged') {
+          return res.status(400).json({ error: `Food Safety Violation: Batch marked as ${bRow.status} cannot be repurposed.` });
+        }
+      }
+    }
+
     const altPid = String(product_id).startsWith('p') ? String(product_id).substring(1) : `p${product_id}`;
     
-    // Deduct stock from near-expiry or matching inventory items for this product
+    // Deduct stock from matching inventory items for this product
     const invRes = await queryDb(
       "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 AND stock_level > 0 ORDER BY expiry_date ASC, id ASC",
       [String(product_id), String(altPid), bId]
@@ -2407,7 +2586,6 @@ app.post('/api/repurpose', async (req, res) => {
     }
 
     // Insert Repurpose Log with accurate timestamp
-    const phNow = getPhilippineNow();
     const repTimestamp = req.body.timestamp || req.body.created_at || phNow.datetime;
     const logRes = await queryDb(
       `INSERT INTO bw_repurpose_logs (batch_id, product_id, product_name, quantity, target_recipe, branch_id, timestamp)
@@ -2433,6 +2611,18 @@ app.post('/api/repurpose', async (req, res) => {
       VALUES ('Repurposed', $1, $2, $3, $4, $5, 'pcs', $6, $7, $8, 'Completed', $9)
     `, [bId, String(product_id), qtyNum, prevStock, Math.max(0, prevStock - qtyNum), bIdStr, `Repurposed into ${recipe}`, req.user ? req.user.name : 'Baker / Staff', repTimestamp]).catch(e => console.warn("movement log notice:", e.message));
 
+    // Create production record with designated "Repurposed" status in Production Management
+    const prodCode = `REP-B${bId}-${product_id}-${phNow.date.replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
+    await queryDb(
+      "INSERT INTO bw_production (product_id, planned, actual, date, baker, status, code, branch_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [String(product_id), qtyNum, qtyNum, phNow.date, req.user ? req.user.name : 'Baker / Staff', 'In Progress', prodCode, bId, repTimestamp]
+    ).catch(e => console.warn("production repurpose notice:", e.message));
+
+    // Calculate prevented waste savings value
+    const prodPriceRes = await queryDb("SELECT cost_price, price FROM bw_products WHERE id = $1 LIMIT 1", [String(product_id)]).catch(() => ({ rows: [] }));
+    const unitCost = prodPriceRes.rows && prodPriceRes.rows[0] ? parseFloat(prodPriceRes.rows[0].cost_price || 0) : 15;
+    const wastePreventedCost = parseFloat((qtyNum * unitCost).toFixed(2));
+
     const createdLog = (logRes.rows && logRes.rows[0]) ? logRes.rows[0] : {
       batch_id: bIdStr,
       product_id: String(product_id),
@@ -2440,17 +2630,45 @@ app.post('/api/repurpose', async (req, res) => {
       quantity: qtyNum,
       target_recipe: recipe,
       branch_id: bId,
-      timestamp: new Date().toISOString()
+      timestamp: repTimestamp
     };
 
-    apicache.clear();
+    clearApiCache();
     res.json({
       success: true,
       message: `Successfully repurposed ${qtyNum} pcs of ${pName} into '${recipe}'`,
-      repurposed_log: createdLog
+      repurposed_log: createdLog,
+      waste_prevented_cost: wastePreventedCost
     });
   } catch (err) {
     console.error("Error logging repurpose action:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/repurpose/not-eligible', async (req, res) => {
+  const { batch_id, product_id, reason, branch_id } = req.body;
+  if (!batch_id && !product_id) {
+    return res.status(400).json({ error: "Batch ID or Product ID is required." });
+  }
+  const bId = branch_id ? parseInt(branch_id) : 212;
+  const phNow = getPhilippineNow();
+  const notEligibleReason = reason || "Disqualified from repurposing by authorized staff";
+  try {
+    await queryDb(
+      "UPDATE bw_inventory SET status = 'Not Eligible' WHERE (batch_id = $1 OR id = $2) AND branch_id = $3",
+      [String(batch_id), parseInt(batch_id) || 0, bId]
+    ).catch(() => {});
+
+    await queryDb(
+      `INSERT INTO bw_inventory_movements (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status, created_at)
+       VALUES ('Audit', $1, $2, 0, 0, 0, 'pcs', $3, $4, $5, 'Completed', $6)`,
+      [bId, String(product_id || batch_id), String(batch_id || 'N/A'), `Disqualified from repurposing: ${notEligibleReason}`, req.user ? req.user.name : 'Baker / Staff', phNow.datetime]
+    ).catch(() => {});
+
+    clearApiCache();
+    res.json({ success: true, message: `Batch ${batch_id || product_id} marked as Not Eligible: ${notEligibleReason}`, reason: notEligibleReason });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -2478,26 +2696,57 @@ app.get('/api/inventory/batches', async (req, res) => {
   const { branch_id, status } = req.query;
   try {
     let sql = `
-      SELECT b.*, COALESCE(p.name, b.product_id) as product_name, COALESCE(p.category, 'Bread') as category,
-             COALESCE(p.unit, 'pcs') as unit, COALESCE(p.repurpose_recipe, 'Bread Crumbs') as repurpose_recipe,
-             COALESCE(br.name, 'Branch ' || b.branch_id) as branch_name
-      FROM bw_inventory_batches b
-      LEFT JOIN bw_products p ON p.id = b.product_id
-      LEFT JOIN bw_branches br ON br.id = b.branch_id
-      WHERE 1=1
+      SELECT 
+        i.id,
+        i.batch_id,
+        i.product_id,
+        COALESCE(p.name, i.product_id) as product_name,
+        COALESCE(p.category, 'Bread') as category,
+        COALESCE(p.unit, 'pcs') as unit,
+        COALESCE(p.repurpose_recipe, 'Bread Crumbs') as repurpose_recipe,
+        p.cost_price,
+        p.price,
+        i.stock_level as current_quantity,
+        i.stock_level,
+        i.production_date,
+        COALESCE(i.production_time, '06:00:00') as production_time,
+        i.expiry_date,
+        COALESCE(i.expiry_time, '18:00:00') as expiry_time,
+        COALESCE(p.shelf_life_days, 2) as shelf_life_days,
+        COALESCE(i.status, 'In Stock') as status,
+        i.branch_id,
+        COALESCE(br.name, 'Lasang') as branch_name,
+        COALESCE(i.degradation_percent, 0) as degradation_percent,
+        COALESCE(i.shelf_status, 'Fresh') as shelf_status,
+        i.created_at
+      FROM bw_inventory i
+      LEFT JOIN bw_products p ON (p.id = i.product_id OR CONCAT('p', p.id) = i.product_id)
+      LEFT JOIN bw_branches br ON br.id = i.branch_id
+      WHERE (p.id IS NOT NULL OR i.stock_level > 0)
     `;
     const params = [];
     if (branch_id && branch_id !== 'all') {
       params.push(parseInt(branch_id));
-      sql += ` AND b.branch_id = $${params.length}`;
+      sql += ` AND i.branch_id = $${params.length}`;
     }
     if (status) {
       params.push(status);
-      sql += ` AND b.status = $${params.length}`;
+      sql += ` AND i.status = $${params.length}`;
     }
-    sql += " ORDER BY b.expiry_date ASC, b.id ASC";
+    sql += " ORDER BY i.expiry_date ASC, i.id ASC";
     const result = await queryDb(sql, params);
-    res.json(result.rows || []);
+
+    const rows = (result.rows || []).map(row => {
+      const prodDateStr = row.production_date ? String(row.production_date).split('T')[0].replace(/-/g, '') : '20261031';
+      const batchCode = row.batch_id || `BAT-B${row.branch_id}-${row.product_id}-${prodDateStr}`;
+      return {
+        ...row,
+        batch_code: batchCode,
+        batch_id: batchCode
+      };
+    });
+
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2972,7 +3221,7 @@ app.get('/api/production', async (req, res) => {
 app.post('/api/production', async (req, res) => {
   const { product_id, planned, actual, date, baker, status, code, branch_id, created_at } = req.body;
   try {
-    const bId = branch_id ? parseInt(branch_id) : 1;
+    const bId = (branch_id && branch_id !== 'all') ? parseInt(branch_id) : 212;
     const phNow = getPhilippineNow();
     const prodDate = date || phNow.date;
     const prodCreatedAt = created_at || phNow.datetime;
@@ -2996,7 +3245,7 @@ app.get('/api/waste', async (req, res) => {
   try {
     let query = "SELECT * FROM bw_waste";
     let params = [];
-    if (branch_id) {
+    if (branch_id && branch_id !== 'all') {
       query += " WHERE branch_id = $1";
       params.push(parseInt(branch_id));
     }
@@ -3011,7 +3260,7 @@ app.get('/api/waste', async (req, res) => {
 app.post('/api/waste', async (req, res) => {
   const { product_id, qty, cost, reason, date, branch_id, created_at } = req.body;
   try {
-    const bId = branch_id ? parseInt(branch_id) : 1;
+    const bId = (branch_id && branch_id !== 'all') ? parseInt(branch_id) : 212;
     const phNow = getPhilippineNow();
     const wasteDate = date || phNow.date;
     const wasteCreatedAt = created_at || phNow.datetime;

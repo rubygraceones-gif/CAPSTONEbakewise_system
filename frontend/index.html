@@ -1724,26 +1724,44 @@
 
           <div class="dashboard-layout-grid">
             <div class="panel-card">
-              <div class="panel-card-header">
-                <h2 class="panel-card-title">
+              <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <h2 class="panel-card-title" style="margin: 0;">
                   <i data-lucide="check-circle" style="width: 20px; height: 20px; color: var(--color-success);"></i>
-                  <span>Bakewise Production Optimization Recommendations</span>
+                  <span>BakeWise Production Optimization Recommendations</span>
                 </h2>
+                <button type="button" class="btn-secondary" id="btn-refresh-recs" style="font-size: 0.8rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh Recommendations
+                </button>
               </div>
+              <p style="font-size: 0.84rem; color: var(--text-secondary); margin: 6px 0 16px 0;">
+                Actionable AI baking recommendations calculated from active inventory, confirmed production schedules, and statistical demand.
+              </p>
               <div class="ai-recommendation-list" id="ai-recs-container"></div>
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header">
-                <h2 class="panel-card-title">
+              <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <h2 class="panel-card-title" style="margin: 0;">
                   <i data-lucide="refresh-cw" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
                   <span>Product Repurposing Recommendations</span>
                 </h2>
+                <button type="button" class="btn-secondary" id="btn-refresh-repurpose" style="font-size: 0.8rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh Batches
+                </button>
               </div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
-                Avoid throwing away safe unsold bread. BakeWise suggests repurposing near-expiry items based on system
-                guidelines:
+              <p style="font-size: 0.84rem; color: var(--text-secondary); margin: 6px 0 12px 0;">
+                Avoid throwing away safe unsold bread. BakeWise identifies verified inventory batches approaching expiration and connects them to approved bakery repurposing recipes.
               </p>
+
+              <!-- Repurposing Category Filter Tabs -->
+              <div class="repurpose-filter-tabs" id="repurpose-filter-group" style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
+                <button type="button" class="btn-filter-repurpose active" data-filter="all" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--primary-color); color: white; cursor: pointer; font-weight: 600;">All Batches</button>
+                <button type="button" class="btn-filter-repurpose" data-filter="ELIGIBLE" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font-weight: 600;">Eligible</button>
+                <button type="button" class="btn-filter-repurpose" data-filter="NOT ELIGIBLE" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font-weight: 600;">Not Eligible</button>
+                <button type="button" class="btn-filter-repurpose" data-filter="EXPIRED / UNSAFE" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font-weight: 600;">Expired / Unsafe</button>
+                <button type="button" class="btn-filter-repurpose" data-filter="INSUFFICIENT DATA" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font-weight: 600;">Insufficient Data</button>
+              </div>
+
               <div class="repurpose-grid" id="ai-repurpose-container"></div>
             </div>
           </div>
@@ -2682,34 +2700,238 @@
     </div>
   </div>
 
-  <!-- Production Optimization Details & Math Breakdown Modal -->
-  <div class="modal-overlay" id="prod-breakdown-overlay" style="display: none;" onclick="closeProdBreakdownModal()">
-  </div>
-  <div class="panel-card modal-dialog" id="prod-breakdown-modal"
-    style="display: none; max-width: 640px; z-index: 2150; padding: 24px;">
-    <div class="panel-card-header"
-      style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-      <h2 class="panel-card-title" id="prod-breakdown-modal-title"
-        style="display: flex; align-items: center; gap: 8px; margin: 0;">
-        <i data-lucide="calculator" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
-        <span>Production Calculation Breakdown</span>
+  <!-- ====================================================================
+       DEMAND FORECASTING & PRODUCTION OPTIMIZATION WORKING MODALS
+       ==================================================================== -->
+
+  <!-- 1. Schedule Production Modal -->
+  <div class="modal-overlay" id="schedule-prod-overlay" style="display: none;" onclick="closeScheduleProdModal()"></div>
+  <div class="panel-card modal-dialog" id="schedule-prod-modal" style="display: none; max-width: 540px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem;">
+        <i data-lucide="calendar-plus" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+        <span>Schedule Production Order</span>
       </h2>
-      <button type="button" class="kanban-action-btn" onclick="closeProdBreakdownModal()"><i data-lucide="x"
-          style="width: 18px; height: 18px;"></i></button>
+      <button type="button" class="kanban-action-btn" onclick="closeScheduleProdModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
     </div>
-    <div id="prod-breakdown-body" style="margin-top: 16px;">
-      <!-- Detailed calculation transparency injected by JS -->
+    <form id="schedule-prod-form" onsubmit="event.preventDefault(); submitScheduleProductionOrder();">
+      <input type="hidden" id="sched-product-id" />
+      <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Target Product:</span>
+          <strong id="sched-product-name" style="font-size: 0.95rem; color: var(--text-primary);">-</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Product Category:</span>
+          <span class="badge" id="sched-product-cat" style="font-size: 0.72rem;">Bread</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Branch Assignment:</span>
+          <strong id="sched-branch-name" style="font-size: 0.85rem; color: var(--text-primary);">Lasang (ID: 212)</strong>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="sched-quantity-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Planned Production Volume (<span id="sched-unit-label">pcs</span>) *</label>
+        <input type="number" id="sched-quantity-input" class="form-input" min="1" required style="padding: 10px 12px; font-size: 0.95rem; font-weight: 700;" />
+        <small style="color: var(--text-muted); font-size: 0.75rem;">Prefilled based on BakeWise Production Optimization model.</small>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="sched-date-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Scheduled Baking Date *</label>
+        <input type="date" id="sched-date-input" class="form-input" required style="padding: 10px 12px; font-size: 0.9rem;" />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="sched-baker-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Assigned Baker / Crew</label>
+        <input type="text" id="sched-baker-input" class="form-input" value="Marco Reyes" style="padding: 10px 12px; font-size: 0.9rem;" />
+      </div>
+
+      <div id="sched-duplicate-warning" style="display: none; padding: 10px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; color: #b45309; font-size: 0.8rem; margin-bottom: 14px;">
+        <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle;"></i>
+        <span id="sched-duplicate-text">Notice: A scheduled batch already exists for this product on this date. Confirming will schedule an additional batch.</span>
+      </div>
+
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn-secondary" onclick="closeScheduleProdModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="check" style="width: 16px; height: 16px;"></i>
+          <span>Confirm & Schedule Production</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 2. View Product Details Modal -->
+  <div class="modal-overlay" id="view-product-details-overlay" style="display: none;" onclick="closeProductDetailsModal()"></div>
+  <div class="panel-card modal-dialog" id="view-product-details-modal" style="display: none; max-width: 520px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem;">
+        <i data-lucide="package" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+        <span>Product Catalog Details</span>
+      </h2>
+      <button type="button" class="kanban-action-btn" onclick="closeProductDetailsModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <div id="view-product-details-body">
+      <!-- Dynamic product details injected by JS -->
     </div>
     <div class="modal-actions" style="display: flex; justify-content: flex-end; margin-top: 20px;">
-      <button type="button" class="btn-secondary" onclick="closeProdBreakdownModal()">Close Breakdown</button>
+      <button type="button" class="btn-secondary" onclick="closeProductDetailsModal()">Close</button>
     </div>
+  </div>
+
+  <!-- 3. Batch Details Modal -->
+  <div class="modal-overlay" id="batch-details-overlay" style="display: none;" onclick="closeBatchDetailsModal()"></div>
+  <div class="panel-card modal-dialog" id="batch-details-modal" style="display: none; max-width: 540px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem;">
+        <i data-lucide="layers" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
+        <span>Inventory Batch Details</span>
+      </h2>
+      <button type="button" class="kanban-action-btn" onclick="closeBatchDetailsModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <div id="batch-details-body">
+      <!-- Dynamic batch details injected by JS -->
+    </div>
+    <div class="modal-actions" style="display: flex; justify-content: flex-end; margin-top: 20px;">
+      <button type="button" class="btn-secondary" onclick="closeBatchDetailsModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- 4. Repurposing Recipe Details Modal -->
+  <div class="modal-overlay" id="repurpose-recipe-overlay" style="display: none;" onclick="closeRepurposeRecipeModal()"></div>
+  <div class="panel-card modal-dialog" id="repurpose-recipe-modal" style="display: none; max-width: 600px; z-index: 2150; padding: 24px; max-height: 85vh; overflow-y: auto;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem;">
+        <i data-lucide="book-open" style="width: 20px; height: 20px; color: var(--accent-color);"></i>
+        <span>Approved Repurposing Recipe</span>
+      </h2>
+      <button type="button" class="kanban-action-btn" onclick="closeRepurposeRecipeModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <div id="repurpose-recipe-body">
+      <!-- Dynamic recipe content injected by JS -->
+    </div>
+    <div class="modal-actions" style="display: flex; justify-content: flex-end; margin-top: 20px;">
+      <button type="button" class="btn-secondary" onclick="closeRepurposeRecipeModal()">Close Recipe</button>
+    </div>
+  </div>
+
+  <!-- 5. Create Repurposing Production Modal -->
+  <div class="modal-overlay" id="create-repurpose-overlay" style="display: none;" onclick="closeCreateRepurposeModal()"></div>
+  <div class="panel-card modal-dialog" id="create-repurpose-modal" style="display: none; max-width: 540px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem;">
+        <i data-lucide="refresh-cw" style="width: 20px; height: 20px; color: var(--color-success);"></i>
+        <span>Create Repurposing Production</span>
+      </h2>
+      <button type="button" class="kanban-action-btn" onclick="closeCreateRepurposeModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <form id="create-repurpose-form" onsubmit="event.preventDefault(); submitCreateRepurposingProduction();">
+      <input type="hidden" id="cr-batch-code" />
+      <input type="hidden" id="cr-product-id" />
+      <input type="hidden" id="cr-branch-id" value="212" />
+
+      <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Source Batch:</span>
+          <strong id="cr-batch-label" style="font-size: 0.85rem; font-family: monospace; color: var(--text-primary);">-</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Source Product:</span>
+          <strong id="cr-product-name" style="font-size: 0.92rem; color: var(--text-primary);">-</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Available Batch Stock:</span>
+          <strong id="cr-available-qty" style="color: var(--color-success);">-</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">Target Approved Recipe:</span>
+          <strong id="cr-recipe-name" style="color: var(--primary-color);">-</strong>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="cr-quantity-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Repurposing Quantity (<span id="cr-unit-label">pcs</span>) *</label>
+        <input type="number" id="cr-quantity-input" class="form-input" min="1" required style="padding: 10px 12px; font-size: 0.95rem; font-weight: 700;" />
+        <small style="color: var(--text-muted); font-size: 0.75rem;">Batch quantity will be deducted from active inventory and converted to repurposed production.</small>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="cr-baker-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Supervising Baker / Staff</label>
+        <input type="text" id="cr-baker-input" class="form-input" value="Baker / Staff" style="padding: 10px 12px; font-size: 0.9rem;" />
+      </div>
+
+      <div style="padding: 10px; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 6px; color: #065f46; font-size: 0.8rem; margin-bottom: 14px;">
+        <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i>
+        <span>Food-Safety Verified: Batch is unexpired and within approved repurposing tolerance. Prevents inventory waste and logs utilization in Waste Analytics.</span>
+      </div>
+
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn-secondary" onclick="closeCreateRepurposeModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="flame" style="width: 16px; height: 16px;"></i>
+          <span>Confirm & Start Repurposing Production</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 6. Mark as Not Eligible Modal -->
+  <div class="modal-overlay" id="not-eligible-overlay" style="display: none;" onclick="closeNotEligibleModal()"></div>
+  <div class="panel-card modal-dialog" id="not-eligible-modal" style="display: none; max-width: 500px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem; color: var(--color-error);">
+        <i data-lucide="slash" style="width: 20px; height: 20px; color: var(--color-error);"></i>
+        <span>Mark Batch as Not Eligible</span>
+      </h2>
+      <button type="button" class="kanban-action-btn" onclick="closeNotEligibleModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+    </div>
+    <form id="not-eligible-form" onsubmit="event.preventDefault(); submitMarkBatchNotEligible();">
+      <input type="hidden" id="ne-batch-code" />
+      <input type="hidden" id="ne-product-id" />
+      <input type="hidden" id="ne-branch-id" value="212" />
+
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+        Authorized staff can disqualify a batch from repurposing based on physical inspection, quality defects, or operational safety decisions.
+      </p>
+
+      <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+        <div style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px;">Target Batch:</div>
+        <strong id="ne-batch-label" style="font-family: monospace; font-size: 0.9rem; color: var(--text-primary);">-</strong>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="ne-reason-select" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Reason for Disqualification *</label>
+        <select id="ne-reason-select" class="form-input" required style="padding: 10px 12px; font-size: 0.88rem;">
+          <option value="Physical texture staling / excessive crumb hardening">Physical texture staling / excessive crumb hardening</option>
+          <option value="Sensory check failed (off-aroma or flavor defect)">Sensory check failed (off-aroma or flavor defect)</option>
+          <option value="Packaging seal compromised or damaged">Packaging seal compromised or damaged</option>
+          <option value="Batch reserved for QA quality testing">Batch reserved for QA quality testing</option>
+          <option value="Customer reservation / catering allocation">Customer reservation / catering allocation</option>
+          <option value="Other">Other (Custom specification)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="ne-custom-reason-group" style="display: none; margin-bottom: 14px;">
+        <label for="ne-custom-reason-input" class="form-label" style="font-weight: 600; font-size: 0.85rem;">Specify Reason *</label>
+        <input type="text" id="ne-custom-reason-input" class="form-input" placeholder="Enter specific food-safety or operational reason..." style="padding: 10px 12px; font-size: 0.88rem;" />
+      </div>
+
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn-secondary" onclick="closeNotEligibleModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="background: #dc2626; display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="alert-octagon" style="width: 16px; height: 16px;"></i>
+          <span>Confirm Disqualification</span>
+        </button>
+      </div>
+    </form>
   </div>
 
   <!-- Toast Notification Placement -->
   <div id="toast-container"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=42"></script>
+  <script src="app.js?v=43"></script>
 </body>
 
 </html>
