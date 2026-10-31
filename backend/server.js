@@ -98,8 +98,8 @@ function authenticateToken(req, res, next) {
     }
   }
 
-  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, /api/branches, /api/forecast, and /api/users without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/forecast') || req.path.startsWith('/users') || req.path.startsWith('/sales') || req.path.startsWith('/production') || req.path.startsWith('/waste')) return next();
+  // Allow public/system API routes without strict JWT header check
+  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/admin') || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/forecast') || req.path.startsWith('/users') || req.path.startsWith('/sales') || req.path.startsWith('/production') || req.path.startsWith('/waste')) return next();
 
   if (token == null) return res.status(401).json({ error: 'No token provided' });
   if (!req.user) return res.status(403).json({ error: 'Token is invalid or expired' });

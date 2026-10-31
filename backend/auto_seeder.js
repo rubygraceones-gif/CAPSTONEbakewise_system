@@ -108,7 +108,7 @@ async function runAutoSeeder(queryDb, force = false) {
           placeholders.push(`$${pIdx++}`);
           params.push(r[col] !== undefined ? r[col] : null);
         }
-        valueClauses.join ? valueClauses.push(`(${placeholders.join(', ')})`) : null;
+        valueClauses.push(`(${placeholders.join(', ')})`);
       }
 
       const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${valueClauses.join(', ')}`;
@@ -472,12 +472,10 @@ async function runAutoSeeder(queryDb, force = false) {
       'payment_amount', 'change_amount', 'payment_method', 'status', 'date', 'created_at'
     ], dayTxBatch);
 
-    // Fetch inserted IDs to link items
-    const minTxNum = dayTxBatch[0].transaction_number;
-    const maxTxNum = dayTxBatch[dayTxBatch.length - 1].transaction_number;
+    // Fetch inserted IDs to link items by exact date and branches
     const insertedTxsRes = await queryDb(
-      "SELECT id, transaction_number FROM bw_pos_transactions WHERE transaction_number >= $1 AND transaction_number <= $2",
-      [minTxNum, maxTxNum]
+      "SELECT id, transaction_number FROM bw_pos_transactions WHERE date = $1 AND branch_id IN ($2, $3)",
+      [dateStr, lasangId, tibungcoId]
     );
     const txIdMap = {};
     (insertedTxsRes.rows || []).forEach(t => { txIdMap[t.transaction_number] = t.id; });
