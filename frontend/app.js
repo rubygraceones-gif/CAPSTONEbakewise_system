@@ -349,14 +349,14 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v44')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v45')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
       localStorage.removeItem("bakewise_v2_branches");
-      localStorage.setItem('bakewise_v2_data_cleared_v44', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v45', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -1249,33 +1249,41 @@ class BakeWiseStore {
   }
 
   async addBranch(name, latitude, longitude, address, store_hours, contact_no) {
-    const parsedLat = parseFloat(latitude);
-    const parsedLng = parseFloat(longitude);
-    if (isNaN(parsedLat) || isNaN(parsedLng)) return false;
+    const parsedLat = parseFloat(latitude) || 7.25;
+    const parsedLng = parseFloat(longitude) || 125.68;
 
     if (this.isBackendOnline) {
       try {
         const res = await fetch('/api/branches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no })
+          body: JSON.stringify({ name: name.trim(), latitude: parsedLat, longitude: parsedLng, address: address.trim(), store_hours, contact_no })
         });
         if (res.ok) {
           const newBr = await res.json();
-          this.branches.push(newBr);
+          const existingIdx = this.branches.findIndex(b => b.id === newBr.id);
+          if (existingIdx >= 0) {
+            this.branches[existingIdx] = newBr;
+          } else {
+            this.branches.push(newBr);
+          }
           this.save("bakewise_v2_branches", this.branches);
+          this.logActivity(`Registered new branch: ${name}`);
           return true;
         } else {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || "Failed to register branch.");
+          throw new Error(errData.error || "Failed to register branch in database.");
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error("Backend branch registration error:", e);
+        throw e;
+      }
     }
 
-    const newBr = { id: this.branches.length + 1, name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no, status: 'Active' };
+    const newBr = { id: Date.now(), name: name.trim(), latitude: parsedLat, longitude: parsedLng, address: address.trim(), store_hours, contact_no, status: 'Active' };
     this.branches.push(newBr);
     this.save("bakewise_v2_branches", this.branches);
-    this.logActivity(`Added new branch: ${name}`);
+    this.logActivity(`Added new branch (local): ${name}`);
     return true;
   }
 
@@ -2764,18 +2772,23 @@ function setupFormSubmissions() {
       const lng = document.getElementById("br-lng-input")?.value || 120.9842;
       const address = document.getElementById("br-address-input").value;
 
+      const submitBtn = branchForm.querySelector("button[type='submit']");
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = "0.6"; }
+
       try {
         const success = await store.addBranch(name, lat, lng, address, storeHours, contactNo);
         if (success) {
-          showToast("Branch registered.", "success");
+          showToast(`Branch "${name}" successfully registered in database.`, "success");
           branchForm.reset();
-          populateSelectDropdowns();
-          refreshAdminBranchesPane();
+          if (typeof populateSelectDropdowns === 'function') populateSelectDropdowns();
+          await refreshAdminBranchesPane();
         } else {
-          showToast("Error registering branch.", "error");
+          showToast("Failed to register branch.", "error");
         }
       } catch (err) {
         showToast(err.message || "Error registering branch.", "error");
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = "1"; }
       }
     });
   }
@@ -2886,26 +2899,12 @@ function setupFormSubmissions() {
     });
   }
 
-  const printBtn = document.getElementById("btn-print-report");
-  if (printBtn) {
-    printBtn.addEventListener("click", () => {
-      document.body.classList.remove('printing-pos-receipt');
-      const activeBranchName = store.getCurrentBranchName ? store.getCurrentBranchName() : 'Network Wide';
-      const nowStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const tsElem = document.getElementById("print-report-timestamp");
-      if (tsElem) {
-        tsElem.textContent = `Generated: ${nowStr} | Location: ${activeBranchName} | Rose Bakeshop x BakeWise Enterprise`;
-      }
-      window.print();
-    });
-  }
-
-  // Export Custom Reports to CSV
-  const csvExportBtn = document.getElementById("btn-export-report-csv");
-  if (csvExportBtn && !csvExportBtn.dataset.bound) {
-    csvExportBtn.dataset.bound = "true";
-    csvExportBtn.addEventListener("click", () => {
-      exportCustomReportToCsv();
+  // Custom Reports Download PDF Button
+  const pdfBtn = document.getElementById("btn-download-pdf-report");
+  if (pdfBtn && !pdfBtn.dataset.bound) {
+    pdfBtn.dataset.bound = "true";
+    pdfBtn.addEventListener("click", () => {
+      downloadCustomReportPdf();
     });
   }
 
@@ -6394,6 +6393,9 @@ async function render7DayProjectionTable() {
 // BAKEWISE PRODUCTION OPTIMIZATION RECOMMENDATIONS
 // ====================================================================
 
+let recsCurrentPage = 1;
+const RECS_PER_PAGE = 5;
+
 async function renderBakeRecommendations() {
   const container = document.getElementById("ai-recs-container");
   if (!container) return;
@@ -6484,7 +6486,7 @@ async function renderBakeRecommendations() {
             recommended: 0,
             status: 'Insufficient Data',
             badgeStyle: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
-            reason: 'Insufficient historical sales transactions to calculate reliable statistical demand. Additional POS data required.'
+            reason: 'Insufficient historical sales transactions to calculate reliable statistical demand.'
           };
         }
 
@@ -6502,11 +6504,11 @@ async function renderBakeRecommendations() {
           if (usableStock < safetyStock) {
             status = 'Low Stock';
             badgeStyle = 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a;';
-            reason = 'Current usable inventory is below the required operational safety buffer. Baking is recommended to replenish inventory.';
+            reason = 'Usable inventory is below the operational safety buffer. Baking recommended to replenish stock.';
           } else {
             status = 'Produce Now';
             badgeStyle = 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;';
-            reason = 'Current usable inventory is insufficient to cover the expected demand and required stock allowance.';
+            reason = 'Current usable inventory is insufficient to cover expected demand and stock allowance.';
           }
         } else {
           if (scheduledProduction > 0 && usableStock < grossNeeded) {
@@ -6520,7 +6522,7 @@ async function renderBakeRecommendations() {
           } else {
             status = 'No Production Needed';
             badgeStyle = 'background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;';
-            reason = 'Current inventory is balanced with demand. No additional production is justified.';
+            reason = 'Current inventory is balanced with demand. No additional production justified.';
           }
         }
 
@@ -6558,57 +6560,112 @@ async function renderBakeRecommendations() {
     const recs = await Promise.all(recsPromises);
     window._lastProductionRecs = recs;
 
-    const cardsHtml = recs.map(r => `
-      <div class="ai-recommendation-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; background: var(--bg-surface); display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-              <strong style="font-size: 1.02rem; color: var(--text-primary);">${escapeHtml(r.productName)}</strong>
-              <span class="badge" style="font-size: 0.72rem; background: rgba(0,0,0,0.05); color: var(--text-secondary);">${escapeHtml(r.category)}</span>
-            </div>
-            <div style="font-size: 0.83rem; color: var(--text-secondary); margin-top: 2px;">
-              Available Stock: <strong style="color: var(--text-primary);">${r.usableStock} ${escapeHtml(r.unit)}</strong>
-              ${r.scheduledProduction > 0 ? ` &bull; <span style="color: #0369a1; font-weight: 600;">Scheduled: ${r.scheduledProduction} ${escapeHtml(r.unit)}</span>` : ''}
-            </div>
+    // Pagination calculations
+    const totalPages = Math.ceil(recs.length / RECS_PER_PAGE) || 1;
+    if (recsCurrentPage > totalPages) recsCurrentPage = totalPages;
+    if (recsCurrentPage < 1) recsCurrentPage = 1;
+
+    const startIdx = (recsCurrentPage - 1) * RECS_PER_PAGE;
+    const pageItems = recs.slice(startIdx, startIdx + RECS_PER_PAGE);
+
+    const rowsHtml = pageItems.map(r => `
+      <tr>
+        <td>
+          <div style="font-weight: 700; color: var(--text-primary); font-size: 0.92rem;">${escapeHtml(r.productName)}</div>
+          <span class="badge" style="font-size: 0.7rem; background: rgba(0,0,0,0.05); color: var(--text-secondary); margin-top: 2px;">${escapeHtml(r.category)}</span>
+        </td>
+        <td style="text-align: center;">
+          <strong style="color: var(--text-primary); font-size: 0.9rem;">${r.usableStock}</strong>
+          <span style="font-size: 0.78rem; color: var(--text-muted);"> ${escapeHtml(r.unit)}</span>
+        </td>
+        <td style="text-align: center;">
+          ${r.scheduledProduction > 0 
+            ? `<strong style="color: #0369a1; font-size: 0.88rem;">${r.scheduledProduction} ${escapeHtml(r.unit)}</strong>`
+            : `<span style="color: var(--text-muted); font-size: 0.85rem;">-</span>`}
+        </td>
+        <td style="text-align: center;">
+          <strong style="font-size: 1.05rem; color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'};">
+            ${r.status === 'Insufficient Data' ? '--' : r.recommended}
+          </strong>
+          <span style="font-size: 0.78rem; color: var(--text-muted);"> ${escapeHtml(r.unit)}</span>
+        </td>
+        <td style="text-align: center;">
+          <span class="badge" style="${r.badgeStyle} font-weight: 800; font-size: 0.74rem; padding: 4px 8px; border-radius: 6px; white-space: nowrap;">
+            ${r.status}
+          </span>
+        </td>
+        <td>
+          <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.35; max-width: 320px;">
+            ${escapeHtml(r.reason)}
           </div>
-
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-            <span class="badge" style="${r.badgeStyle} font-weight: 800; font-size: 0.76rem; padding: 3px 8px; border-radius: 6px;">
-              ${r.status}
-            </span>
-            <div style="font-size: 0.83rem; color: var(--text-muted); text-align: right;">
-              Recommended: <strong style="font-size: 1.1rem; color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'};">${r.status === 'Insufficient Data' ? '--' : r.recommended} ${escapeHtml(r.unit)}</strong>
-            </div>
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
+            <button type="button" class="btn-secondary btn-rec-view-product" data-pid="${escapeHtml(r.productId)}" title="View Product Details" style="padding: 5px 8px; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
+              <i data-lucide="eye" style="width: 13px; height: 13px;"></i>
+            </button>
+            ${(r.status === 'Produce Now' || r.status === 'Low Stock' || r.status === 'Insufficient Data') ? `
+              <button type="button" class="btn-primary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.recommended > 0 ? r.recommended : 20}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.76rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap;">
+                <i data-lucide="calendar-plus" style="width: 13px; height: 13px;"></i> Schedule
+              </button>
+            ` : (r.status === 'Production Scheduled') ? `
+              <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.scheduledProduction}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.76rem; padding: 5px 8px; display: inline-flex; align-items: center; gap: 4px; color: #0369a1; border-color: #bae6fd; cursor: pointer; white-space: nowrap;">
+                <i data-lucide="calendar" style="width: 13px; height: 13px;"></i> View
+              </button>
+            ` : `
+              <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="15" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.76rem; padding: 5px 8px; display: inline-flex; align-items: center; gap: 4px; opacity: 0.85; cursor: pointer; white-space: nowrap;">
+                <i data-lucide="plus" style="width: 13px; height: 13px;"></i> Custom
+              </button>
+            `}
           </div>
-        </div>
-
-        <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-          <strong>Reason:</strong> ${escapeHtml(r.reason)}
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 4px;">
-          <button type="button" class="btn-secondary btn-rec-view-product" data-pid="${escapeHtml(r.productId)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-            <i data-lucide="eye" style="width: 13px; height: 13px;"></i> View Product
-          </button>
-
-          ${(r.status === 'Produce Now' || r.status === 'Low Stock' || r.status === 'Insufficient Data') ? `
-            <button type="button" class="btn-primary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.recommended > 0 ? r.recommended : 20}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-              <i data-lucide="calendar-plus" style="width: 13px; height: 13px;"></i> Schedule Production
-            </button>
-          ` : (r.status === 'Production Scheduled') ? `
-            <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.scheduledProduction}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; color: #0369a1; border-color: #bae6fd; cursor: pointer;">
-              <i data-lucide="calendar" style="width: 13px; height: 13px;"></i> View Schedule
-            </button>
-          ` : `
-            <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="15" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; opacity: 0.85; cursor: pointer;">
-              <i data-lucide="plus" style="width: 13px; height: 13px;"></i> Schedule Custom
-            </button>
-          `}
-        </div>
-      </div>
+        </td>
+      </tr>
     `).join('');
 
-    setSafeHtml(container, cardsHtml);
+    const tableHtml = `
+      <div class="table-responsive" style="margin-top: 4px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+          <thead style="background: var(--bg-surface-secondary, rgba(0,0,0,0.03)); border-bottom: 1px solid var(--border-color);">
+            <tr>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Product</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Available Stock</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Scheduled</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Recommended</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Production Status</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Reason / Rationale</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 6px 4px; flex-wrap: wrap; gap: 8px;">
+        <button type="button" id="btn-recs-prev-page" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; ${recsCurrentPage <= 1 ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          <i data-lucide="chevron-left" style="width: 14px; height: 14px;"></i> Previous
+        </button>
+        <span style="font-weight: 600; font-size: 0.82rem; color: var(--text-secondary);">
+          Page ${recsCurrentPage} of ${totalPages} (${recs.length} products total)
+        </span>
+        <button type="button" id="btn-recs-next-page" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; ${recsCurrentPage >= totalPages ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          Next <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+    `;
+
+    setSafeHtml(container, tableHtml);
+
+    // Attach pagination events
+    const prevBtn = document.getElementById("btn-recs-prev-page");
+    if (prevBtn && recsCurrentPage > 1) {
+      prevBtn.onclick = () => { recsCurrentPage--; renderBakeRecommendations(); };
+    }
+    const nextBtn = document.getElementById("btn-recs-next-page");
+    if (nextBtn && recsCurrentPage < totalPages) {
+      nextBtn.onclick = () => { recsCurrentPage++; renderBakeRecommendations(); };
+    }
 
     // Attach button click events
     document.querySelectorAll(".btn-rec-schedule-prod").forEach(btn => {
@@ -6854,6 +6911,9 @@ window.closeProductDetailsModal = closeProductDetailsModal;
 
 let currentRepurposeFilter = 'all';
 
+let repurposeCurrentPage = 1;
+const REPURPOSE_PER_PAGE = 5;
+
 async function renderRepurposingAlerts() {
   const container = document.getElementById("ai-repurpose-container");
   if (!container) return;
@@ -6927,7 +6987,7 @@ async function renderRepurposingAlerts() {
 
     if (!Array.isArray(batches) || batches.length === 0) {
       setSafeHtml(container, `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+        <div style="text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
           <i data-lucide="package-search" style="width: 36px; height: 36px; color: var(--primary-color); margin-bottom: 8px;"></i>
           <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No inventory batches found.</h4>
           <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">Batch records are automatically synchronized from Lasang inventory management.</p>
@@ -6955,7 +7015,7 @@ async function renderRepurposingAlerts() {
           status_category: 'INSUFFICIENT DATA',
           eligibility_label: 'INSUFFICIENT DATA',
           badge_style: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
-          reason: 'Missing batch traceability, production timestamp, or validated expiration date. Food safety standards require verifiable batch records.',
+          reason: 'Missing batch traceability or expiration date. Verifiable batch records required.',
           repurpose_recipe: 'N/A',
           is_repurposable: false
         };
@@ -6981,7 +7041,7 @@ async function renderRepurposingAlerts() {
           badge_style: 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;',
           remaining_hours: 0,
           degradation_score: 100,
-          reason: `Product has reached the end of its validated shelf life (Expired on ${batch.expiry_date.split('T')[0]}). Repurposing expired bread is strictly prohibited under food-safety regulations. Disposal required.`,
+          reason: `Shelf life ended (${batch.expiry_date.split('T')[0]}). Repurposing expired bread prohibited. Disposal required.`,
           repurpose_recipe: 'N/A - Disposal Required',
           is_repurposable: false
         };
@@ -7014,7 +7074,7 @@ async function renderRepurposingAlerts() {
           badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
           remaining_hours: remainingHours,
           degradation_score: degradationScore,
-          reason: 'Perishable dairy cream/custard filling requires strict continuous refrigeration. Prohibited from repurposing under bakery food-safety standards.',
+          reason: 'Perishable cream/custard filling requires strict refrigeration. Repurposing prohibited.',
           repurpose_recipe: 'N/A - Perishable Cake',
           is_repurposable: false
         };
@@ -7030,7 +7090,7 @@ async function renderRepurposingAlerts() {
           badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
           remaining_hours: remainingHours,
           degradation_score: degradationScore,
-          reason: batch.status === 'Not Eligible' ? 'Disqualified from repurposing by authorized staff decision.' : 'No approved repurposing recipe is registered for this bakery product.',
+          reason: batch.status === 'Not Eligible' ? 'Disqualified from repurposing by authorized staff decision.' : 'No approved repurposing recipe registered.',
           repurpose_recipe: 'N/A',
           is_repurposable: false
         };
@@ -7045,7 +7105,7 @@ async function renderRepurposingAlerts() {
         badge_style: 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;',
         remaining_hours: remainingHours,
         degradation_score: degradationScore,
-        reason: `Batch is safe and within permitted use window (${remainingHours}h remaining, ${degradationScore}% freshness degradation). Approved recipe '${recipe}' available to prevent waste.`,
+        reason: `Batch is safe (${remainingHours}h remaining, ${degradationScore}% degradation). Approved recipe '${recipe}' available.`,
         repurpose_recipe: recipe,
         is_repurposable: true
       };
@@ -7061,7 +7121,7 @@ async function renderRepurposingAlerts() {
 
     if (filteredBatches.length === 0) {
       setSafeHtml(container, `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+        <div style="text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
           <i data-lucide="shield-check" style="width: 36px; height: 36px; color: var(--color-success); margin-bottom: 8px;"></i>
           <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No batches matching filter "${escapeHtml(currentRepurposeFilter)}".</h4>
           <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">All batches in Lasang branch are evaluated against live inventory and food safety standards.</p>
@@ -7071,62 +7131,65 @@ async function renderRepurposingAlerts() {
       return;
     }
 
-    const cardsHtml = filteredBatches.map(b => {
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredBatches.length / REPURPOSE_PER_PAGE) || 1;
+    if (repurposeCurrentPage > totalPages) repurposeCurrentPage = totalPages;
+    if (repurposeCurrentPage < 1) repurposeCurrentPage = 1;
+
+    const startIdx = (repurposeCurrentPage - 1) * REPURPOSE_PER_PAGE;
+    const pageBatches = filteredBatches.slice(startIdx, startIdx + REPURPOSE_PER_PAGE);
+
+    const rowsHtml = pageBatches.map(b => {
       const branchName = b.branch_name || 'Lasang';
       const expiryFormatted = b.expiry_date ? b.expiry_date.split('T')[0] : 'N/A';
-      const remainingText = b.remaining_hours !== undefined ? `${b.remaining_hours}h remaining` : 'N/A';
+      const remainingText = b.remaining_hours !== undefined ? `${b.remaining_hours}h left` : 'N/A';
 
       return `
-        <div class="repurpose-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
-              <div>
-                <strong style="font-size: 1rem; color: var(--text-primary);">${escapeHtml(b.product_name)}</strong>
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">Batch: ${escapeHtml(b.batch_code || 'N/A')} &bull; ${escapeHtml(branchName)}</div>
-              </div>
-              <span class="badge" style="${b.badge_style} font-weight: 800; font-size: 0.74rem; padding: 3px 8px; border-radius: 6px;">
-                ${b.eligibility_label}
-              </span>
+        <tr>
+          <td>
+            <div style="font-family: monospace; font-size: 0.78rem; font-weight: 700; color: var(--text-primary);">${escapeHtml(b.batch_code || b.batch_id || 'N/A')}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(branchName)}</div>
+          </td>
+          <td>
+            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">${escapeHtml(b.product_name)}</div>
+            <span class="badge" style="font-size: 0.7rem; background: rgba(0,0,0,0.05); color: var(--text-secondary); margin-top: 2px;">${escapeHtml(b.category || '')}</span>
+          </td>
+          <td style="text-align: center;">
+            <strong style="color: var(--text-primary); font-size: 0.9rem;">${b.current_quantity}</strong>
+            <span style="font-size: 0.76rem; color: var(--text-muted);"> ${escapeHtml(b.unit || 'pcs')}</span>
+          </td>
+          <td>
+            <div style="font-size: 0.78rem; color: var(--text-primary);">${expiryFormatted} ${escapeHtml(b.expiry_time || '')}</div>
+            <div style="font-size: 0.74rem; font-weight: 600; color: ${b.remaining_hours <= 12 ? 'var(--color-error)' : 'var(--text-secondary)'};">
+              ${remainingText} (${b.degradation_score || 0}% Degraded)
             </div>
-
-            <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; font-size: 0.8rem; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                <span style="color: var(--text-secondary);">Current Stock:</span>
-                <strong style="color: var(--text-primary);">${b.current_quantity} ${escapeHtml(b.unit || 'pcs')}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                <span style="color: var(--text-secondary);">Expiry Timestamp:</span>
-                <span>${expiryFormatted} ${escapeHtml(b.expiry_time || '')}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: var(--text-secondary);">Remaining Shelf Life:</span>
-                <strong style="color: ${b.remaining_hours <= 12 ? 'var(--color-error)' : 'var(--text-primary)'};">${remainingText} (${b.degradation_score || 0}% Degraded)</strong>
-              </div>
+          </td>
+          <td>
+            <span style="font-size: 0.78rem; background: rgba(217, 119, 6, 0.08); padding: 3px 6px; border-radius: 4px; font-weight: 600; color: #b45309; display: inline-block;">
+              ${escapeHtml(b.repurpose_recipe || 'N/A')}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <span class="badge" style="${b.badge_style} font-weight: 800; font-size: 0.74rem; padding: 4px 8px; border-radius: 6px; white-space: nowrap;">
+              ${b.eligibility_label}
+            </span>
+          </td>
+          <td>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.35; max-width: 260px;">
+              ${escapeHtml(b.reason)}
             </div>
-
-            <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
-              <strong>Reason:</strong> ${escapeHtml(b.reason)}
-            </div>
-
-            <div style="font-size: 0.8rem; background: rgba(217, 119, 6, 0.08); border-left: 3px solid var(--primary-color); padding: 6px 8px; border-radius: 4px; margin-bottom: 4px;">
-              <strong>Approved Recipe:</strong> ${escapeHtml(b.repurpose_recipe || 'N/A')}
-            </div>
-          </div>
-
-          <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="btn-secondary btn-repurpose-view-batch" data-batch="${escapeHtml(b.batch_code)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> View Batch
+          </td>
+          <td style="text-align: right;">
+            <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+              <button type="button" class="btn-secondary btn-repurpose-view-batch" data-batch="${escapeHtml(b.batch_code)}" title="View Batch Details" style="padding: 4px 6px; font-size: 0.74rem; cursor: pointer;">
+                <i data-lucide="layers" style="width: 12px; height: 12px;"></i>
               </button>
               ${(b.repurpose_recipe && b.repurpose_recipe !== 'N/A' && !b.repurpose_recipe.includes('Disposal')) ? `
-                <button type="button" class="btn-secondary btn-repurpose-view-recipe" data-recipe="${escapeHtml(b.repurpose_recipe)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-                  <i data-lucide="book-open" style="width: 12px; height: 12px;"></i> View Recipe
+                <button type="button" class="btn-secondary btn-repurpose-view-recipe" data-recipe="${escapeHtml(b.repurpose_recipe)}" title="View Approved Recipe" style="padding: 4px 6px; font-size: 0.74rem; cursor: pointer;">
+                  <i data-lucide="book-open" style="width: 12px; height: 12px;"></i>
                 </button>
               ` : ''}
-            </div>
-
-            ${b.is_repurposable ? `
-              <div style="display: flex; gap: 6px;">
+              ${b.is_repurposable ? `
                 <button type="button" class="btn-primary btn-repurpose-create-prod" 
                   data-batch="${escapeHtml(b.batch_code)}" 
                   data-pid="${escapeHtml(b.product_id)}" 
@@ -7134,24 +7197,66 @@ async function renderRepurposingAlerts() {
                   data-qty="${b.current_quantity}" 
                   data-unit="${escapeHtml(b.unit || 'pcs')}" 
                   data-recipe="${escapeHtml(b.repurpose_recipe)}" 
-                  style="flex: 2; font-size: 0.78rem; padding: 6px 10px; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-                  <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Create Repurposing Production
+                  style="font-size: 0.74rem; padding: 4px 8px; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap;">
+                  <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Repurpose
                 </button>
-                <button type="button" class="btn-secondary btn-repurpose-not-eligible" data-batch="${escapeHtml(b.batch_code)}" data-pid="${escapeHtml(b.product_id)}" style="flex: 1; font-size: 0.74rem; padding: 4px 6px; color: var(--color-error); border-color: #fecaca; display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
-                  <i data-lucide="slash" style="width: 12px; height: 12px;"></i> Disqualify
+                <button type="button" class="btn-secondary btn-repurpose-not-eligible" data-batch="${escapeHtml(b.batch_code)}" data-pid="${escapeHtml(b.product_id)}" title="Disqualify" style="font-size: 0.74rem; padding: 4px 6px; color: var(--color-error); border-color: #fecaca; cursor: pointer;">
+                  <i data-lucide="slash" style="width: 12px; height: 12px;"></i>
                 </button>
-              </div>
-            ` : `
-              <button class="btn-secondary" disabled style="width: 100%; font-size: 0.76rem; padding: 5px 8px; opacity: 0.65; cursor: not-allowed; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-                <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i> Repurposing Prohibited (Food-Safety Rule)
-              </button>
-            `}
-          </div>
-        </div>
+              ` : `
+                <span style="font-size: 0.72rem; color: var(--text-muted); padding: 2px 4px;">Prohibited</span>
+              `}
+            </div>
+          </td>
+        </tr>
       `;
     }).join('');
 
-    setSafeHtml(container, cardsHtml);
+    const tableHtml = `
+      <div class="table-responsive" style="margin-top: 4px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+          <thead style="background: var(--bg-surface-secondary, rgba(0,0,0,0.03)); border-bottom: 1px solid var(--border-color);">
+            <tr>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Batch ID & Branch</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Product</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Stock</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Expiry & Freshness</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Approved Recipe</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Eligibility Status</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: left;">Food Safety Rationale</th>
+              <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 6px 4px; flex-wrap: wrap; gap: 8px;">
+        <button type="button" id="btn-repurpose-prev-page" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; ${repurposeCurrentPage <= 1 ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          <i data-lucide="chevron-left" style="width: 14px; height: 14px;"></i> Previous
+        </button>
+        <span style="font-weight: 600; font-size: 0.82rem; color: var(--text-secondary);">
+          Page ${repurposeCurrentPage} of ${totalPages} (${filteredBatches.length} batches total)
+        </span>
+        <button type="button" id="btn-repurpose-next-page" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; ${repurposeCurrentPage >= totalPages ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          Next <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+    `;
+
+    setSafeHtml(container, tableHtml);
+
+    // Attach pagination events
+    const prevBtn = document.getElementById("btn-repurpose-prev-page");
+    if (prevBtn && repurposeCurrentPage > 1) {
+      prevBtn.onclick = () => { repurposeCurrentPage--; renderRepurposingAlerts(); };
+    }
+    const nextBtn = document.getElementById("btn-repurpose-next-page");
+    if (nextBtn && repurposeCurrentPage < totalPages) {
+      nextBtn.onclick = () => { repurposeCurrentPage++; renderRepurposingAlerts(); };
+    }
 
     // Attach click handlers
     document.querySelectorAll(".btn-repurpose-view-batch").forEach(btn => {
@@ -7190,7 +7295,7 @@ async function renderRepurposingAlerts() {
   } catch (err) {
     console.error("renderRepurposingAlerts fatal error:", err);
     setSafeHtml(container, `
-      <div style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+      <div style="padding: 24px; text-align: center; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
         <i data-lucide="alert-circle" style="width: 28px; height: 28px; color: var(--primary-color); margin-bottom: 6px;"></i>
         <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary);">Unable to display repurposing recommendations right now.</div>
         <div style="font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">Please click "Refresh Batches" to reload live inventory records.</div>
@@ -9669,3 +9774,270 @@ function exportCustomReportToCsv() {
   showToast("Report exported successfully as CSV.", "success");
 }
 window.exportCustomReportToCsv = exportCustomReportToCsv;
+
+
+// ====================================================================
+// CUSTOM REPORTS PDF GENERATOR (ROSE BAKESHOP × BAKEWISE)
+// ====================================================================
+
+async function downloadCustomReportPdf() {
+  const btn = document.getElementById("btn-download-pdf-report");
+  if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
+
+  try {
+    if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+      showToast("PDF generator library is still loading, please retry in a second.", "warning");
+      return;
+    }
+
+    const startInput = document.getElementById("rep-filter-start");
+    const endInput = document.getElementById("rep-filter-end");
+    const startDate = (startInput && startInput.value) ? startInput.value : "2026-10-14";
+    const endDate = (endInput && endInput.value) ? endInput.value : "2026-11-13";
+
+    const branchIdStr = store.getSelectedBranchId();
+    const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
+    const branchName = branchId === 'all' 
+      ? 'All Branches (Lasang Network)' 
+      : ((store.branches || []).find(b => b.id === branchId)?.name || `Branch #${branchId}`);
+
+    // 1. Calculate filtered sales
+    const pSales = (store.sales || []).filter(s => {
+      const matchDate = (!s.date || (s.date >= startDate && s.date <= endDate));
+      const sBranch = s.branchId != null ? s.branchId : s.branch_id;
+      const matchBranch = (branchId === 'all' || (sBranch != null && parseInt(sBranch) === branchId));
+      return matchDate && matchBranch;
+    });
+
+    const totalSalesRevenue = pSales.reduce((sum, s) => sum + (parseFloat(s.price || 0) * (parseInt(s.qty) || 0)), 0);
+    const totalUnitsSold = pSales.reduce((sum, s) => sum + (parseInt(s.qty) || 0), 0);
+
+    // COGS calculation
+    const totalCogs = pSales.reduce((sum, s) => {
+      const p = (store.products || []).find(x => x.id === (s.productId || s.product_id));
+      const uCost = (p && p.cost != null) ? parseFloat(p.cost) : (parseFloat(s.price || 0) * 0.55);
+      return sum + ((parseInt(s.qty) || 0) * uCost);
+    }, 0);
+
+    // Waste calculation
+    const pWaste = (store.waste || []).filter(w => {
+      const matchDate = (!w.date || (w.date >= startDate && w.date <= endDate));
+      const wBranch = w.branchId != null ? w.branchId : w.branch_id;
+      const matchBranch = (branchId === 'all' || (wBranch != null && parseInt(wBranch) === branchId));
+      return matchDate && matchBranch;
+    });
+
+    const totalWasteUnits = pWaste.reduce((sum, w) => sum + (parseInt(w.qty) || 0), 0);
+    const totalWasteCost = pWaste.reduce((sum, w) => {
+      const p = (store.products || []).find(x => x.id === (w.productId || w.product_id));
+      const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 15);
+      return sum + ((parseInt(w.qty) || 0) * uCost);
+    }, 0);
+
+    // Production calculation
+    const pProd = (store.production || []).filter(pr => {
+      const matchDate = (!pr.date || (pr.date >= startDate && pr.date <= endDate));
+      const prBranch = pr.branchId != null ? pr.branchId : pr.branch_id;
+      const matchBranch = (branchId === 'all' || (prBranch != null && parseInt(prBranch) === branchId));
+      return matchDate && matchBranch;
+    });
+
+    const totalPlanned = pProd.reduce((sum, pr) => sum + (parseInt(pr.planned) || 0), 0);
+    const totalActual = pProd.reduce((sum, pr) => sum + (parseInt(pr.actual) || 0), 0);
+    const effPercent = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 100;
+
+    // True Net Profit
+    const trueNetProfit = totalSalesRevenue - totalCogs - totalWasteCost;
+
+    // Generate jsPDF document
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+
+    // --- HEADER ---
+    doc.setFillColor(194, 65, 12); // #c2410c warm bakery orange
+    doc.rect(0, 0, pageWidth, 55, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("ROSE BAKESHOP × BAKEWISE", margin, 32);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Enterprise Operations & Executive Financial Management Report", margin, 46);
+
+    // Subheader metadata
+    let currentY = 75;
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Executive Management Report", margin, currentY);
+
+    currentY += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Branch Scope: ${branchName}   |   Reporting Period: ${startDate} to ${endDate}`, margin, currentY);
+    currentY += 13;
+    doc.text(`Generated: ${new Date().toLocaleString()}   |   System: BakeWise Enterprise v2.0`, margin, currentY);
+
+    // --- EXECUTIVE SUMMARY CARDS ---
+    currentY += 18;
+    const cardWidth = (pageWidth - (margin * 2) - 30) / 4;
+    const cardHeight = 44;
+
+    const summaryCards = [
+      { label: "Total Gross Sales", val: `P${totalSalesRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: [234, 88, 12] },
+      { label: "Cost of Goods (COGS)", val: `P${totalCogs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: [100, 116, 139] },
+      { label: "Waste Loss Cost", val: `P${totalWasteCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: [220, 38, 38] },
+      { label: "True Net Profit", val: `P${trueNetProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: [22, 163, 74] }
+    ];
+
+    summaryCards.forEach((c, idx) => {
+      const cardX = margin + (idx * (cardWidth + 10));
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(cardX, currentY, cardWidth, cardHeight, 4, 4, 'FD');
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(c.label.toUpperCase(), cardX + 8, currentY + 14);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(c.color[0], c.color[1], c.color[2]);
+      doc.text(c.val, cardX + 8, currentY + 32);
+    });
+
+    currentY += cardHeight + 20;
+
+    // --- TABLE 1: SALES PERFORMANCE SUMMARY ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("1. Sales Performance by Product", margin, currentY);
+    currentY += 6;
+
+    const salesTableData = (store.products || []).map(p => {
+      const thisProdSales = pSales.filter(s => s.productId === p.id || s.product_id === p.id);
+      const units = thisProdSales.reduce((sum, s) => sum + (parseInt(s.qty) || 0), 0);
+      const income = units * parseFloat(p.price || 0);
+      return [
+        p.name,
+        p.category || 'Bakery',
+        `${units} ${p.unit || 'pcs'}`,
+        `P${parseFloat(p.price || 0).toFixed(2)}`,
+        `P${income.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      ];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['Product Name', 'Category', 'Units Sold', 'Unit Price', 'Gross Sales Revenue']],
+      body: salesTableData,
+      theme: 'striped',
+      headStyles: { fillColor: [194, 65, 12], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: margin, right: margin }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 22;
+
+    // --- TABLE 2: WASTE & SPOILAGE LOSS ANALYTICS ---
+    if (currentY > 640) { doc.addPage(); currentY = 50; }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("2. Unsold Spoilage & Waste Loss Analytics", margin, currentY);
+    currentY += 6;
+
+    const wasteTableData = (store.products || []).map(p => {
+      const thisProdWaste = pWaste.filter(w => w.productId === p.id || w.product_id === p.id);
+      const units = thisProdWaste.reduce((sum, w) => sum + (parseInt(w.qty) || 0), 0);
+      const uCost = parseFloat(p.cost || 15);
+      const costLost = units * uCost;
+      const reasons = [...new Set(thisProdWaste.map(w => w.reason).filter(Boolean))].join(', ') || 'N/A';
+      return [
+        p.name,
+        `${units} ${p.unit || 'pcs'}`,
+        reasons,
+        `P${uCost.toFixed(2)}`,
+        `P${costLost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      ];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['Product Name', 'Total Discarded', 'Primary Waste Reasons', 'Unit Cost', 'Total Cost Lost']],
+      body: wasteTableData,
+      theme: 'striped',
+      headStyles: { fillColor: [180, 83, 9], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: margin, right: margin }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 22;
+
+    // --- TABLE 3: BAKING PRODUCTION EFFICIENCY ---
+    if (currentY > 640) { doc.addPage(); currentY = 50; }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("3. Baking Production & Batch Output Efficiency", margin, currentY);
+    currentY += 6;
+
+    const effTableData = (store.products || []).map(p => {
+      const thisProdBake = pProd.filter(pr => pr.productId === p.id || pr.product_id === p.id);
+      const planned = thisProdBake.reduce((sum, pr) => sum + (parseInt(pr.planned) || 0), 0);
+      const actual = thisProdBake.reduce((sum, pr) => sum + (parseInt(pr.actual) || 0), 0);
+      const dev = actual - planned;
+      const rate = planned > 0 ? `${Math.round((actual / planned) * 100)}%` : '100%';
+      return [
+        p.name,
+        `${planned} ${p.unit || 'pcs'}`,
+        `${actual} ${p.unit || 'pcs'}`,
+        dev >= 0 ? `+${dev}` : `${dev}`,
+        rate
+      ];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['Product Name', 'Planned Bake Run', 'Actual Finished Output', 'Deviation', 'Bake Efficiency']],
+      body: effTableData,
+      theme: 'striped',
+      headStyles: { fillColor: [3, 105, 161], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: margin, right: margin }
+    });
+
+    // Page numbering and footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Rose Bakeshop × BakeWise Enterprise Management System – Confidential Internal Report", margin, 825);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 50, 825);
+    }
+
+    const cleanFilename = `Rose_Bakeshop_BakeWise_Report_${startDate}_to_${endDate}.pdf`;
+    doc.save(cleanFilename);
+    showToast(`PDF report successfully generated and downloaded as "${cleanFilename}".`, "success");
+  } catch (err) {
+    console.error("PDF generation fatal error:", err);
+    showToast(err.message || "Failed to generate PDF report.", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
+  }
+}
+window.downloadCustomReportPdf = downloadCustomReportPdf;

@@ -2229,14 +2229,10 @@
                 style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
             </div>
             <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-              <button class="btn-primary" id="btn-export-report-csv"
-                style="padding: 7px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; background-color: #059669; border-color: #059669; color: white;">
-                <i data-lucide="file-spreadsheet" style="width: 16px; height: 16px;"></i>
-                <span>Export CSV</span>
-              </button>
-              <button class="btn-print" id="btn-print-report" style="display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="printer" style="width: 18px; height: 18px;"></i>
-                <span>Print / PDF Report</span>
+              <button class="btn-primary" id="btn-download-pdf-report"
+                style="padding: 8px 18px; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ea580c, #c2410c); border: none; color: white; border-radius: 6px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <i data-lucide="file-down" style="width: 18px; height: 18px;"></i>
+                <span>Download PDF Report</span>
               </button>
             </div>
           </div>
@@ -2930,8 +2926,12 @@
   <!-- Toast Notification Placement -->
   <div id="toast-container"></div>
 
+    <!-- jsPDF & AutoTable for Clean Branded PDF Report Downloads -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=44"></script>
+  <script src="app.js?v=45"></script>
 </body>
 
 </html>

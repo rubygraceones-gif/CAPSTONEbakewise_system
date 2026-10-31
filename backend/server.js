@@ -1028,16 +1028,15 @@ async function healOrphanedBranchRecords() {
 
     const lasangId = parseInt(bLasang.id);
 
-    // 1. Permanently remove Tibungco and any non-Lasang branches
+    // 1. Permanently remove Tibungco branch if previously registered
     try {
-      await queryDb(`DELETE FROM bw_branches WHERE id != $1 OR LOWER(name) LIKE '%tibungco%'`, [lasangId]);
+      await queryDb(`DELETE FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%'`);
     } catch (e) { console.warn("Notice: Tibungco branch deletion:", e.message); }
 
-    // 2. Permanently remove all accounts belonging to Tibungco / other branches
+    // 2. Permanently remove old Tibungco demo staff accounts
     try {
       await queryDb(
-        `DELETE FROM bw_users WHERE (branch_id IS NOT NULL AND branch_id != $1) OR LOWER(email) IN ('roberto.gomez@bakewise.com', 'lorna.villanueva@bakewise.com', 'arnel.mendoza@bakewise.com', 'patricia.dizon@bakewise.com', 'kristine.ramos@bakewise.com')`,
-        [lasangId]
+        `DELETE FROM bw_users WHERE LOWER(email) IN ('roberto.gomez@bakewise.com', 'lorna.villanueva@bakewise.com', 'arnel.mendoza@bakewise.com', 'patricia.dizon@bakewise.com', 'kristine.ramos@bakewise.com')`
       );
     } catch (e) { console.warn("Notice: Tibungco users deletion:", e.message); }
 
@@ -1060,18 +1059,16 @@ async function healOrphanedBranchRecords() {
       }
     } catch (e) { console.warn("Notice: Catalina Kato deduplication:", e.message); }
 
-    // 4. Permanently delete all Tibungco data across all database tables
+    // 4. Clean up any leftover Tibungco operational records if any exist
     try {
-      await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id != $1)`, [lasangId]);
-      await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_sales WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_inventory WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_production WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_waste WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_inventory_batches WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_repurpose_logs WHERE branch_id != $1`, [lasangId]);
-      await queryDb(`DELETE FROM bw_branch_products WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%'))`);
+      await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_sales WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_inventory WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_production WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_waste WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_inventory_batches WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
+      await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id IN (SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%')`);
     } catch (e) { console.warn("Notice: Tibungco tables data purge:", e.message); }
 
     // 5. Ensure Catalina Kato is the Cashier across all Lasang POS transactions & sales records
@@ -1398,46 +1395,53 @@ app.get('/api/branches', async (req, res) => {
 
 app.post('/api/branches', async (req, res) => {
   const { name, latitude, longitude, address, store_hours, contact_no } = req.body;
+  
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Branch name is required." });
+  }
+  if (!address || !address.trim()) {
+    return res.status(400).json({ error: "Complete branch address is required." });
+  }
+
   const cleanContact = (contact_no ? String(contact_no).trim() : '');
   const phContactRegex = /^(09\d{9}|639\d{9})$/;
   if (!cleanContact || !phContactRegex.test(cleanContact)) {
-    return res.status(400).json({ error: "Please enter a valid Philippine contact number using numbers only." });
+    return res.status(400).json({ error: "Please enter a valid Philippine contact number using numbers only (e.g. 09123456789)." });
   }
+
+  const latVal = parseFloat(latitude) || 7.25;
+  const lngVal = parseFloat(longitude) || 125.68;
+  const cleanName = name.trim();
+  const cleanAddress = address.trim();
+  const cleanHours = store_hours || '5:00 AM - 10:00 PM';
+
   try {
-    const result = await queryDb(
-      "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *",
-      [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, cleanContact]
-    );
-    const branchRecord = (result.rows && result.rows[0]) ? result.rows[0] : null;
-    const branchId = branchRecord ? branchRecord.id : null;
-
-    if (branchId) {
-      // Initialize inventory for all active products for the newly created branch
-      const prodsRes = await queryDb("SELECT id FROM bw_products");
-      const today = new Date().toISOString().split('T')[0];
-      const expiry = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      for (const p of (prodsRes.rows || [])) {
-        const pIdStr = String(p.id).trim();
-        const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
-        const check = await queryDb(
-          "SELECT id FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
-          [pIdStr, altPid, branchId]
-        );
-        if (!check.rows || check.rows.length === 0) {
-          await queryDb(
-            "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5)",
-            [pIdStr, 35, today, expiry, branchId]
-          );
-        }
-      }
-      await healOrphanedBranchRecords();
+    // Check for duplicate branch name
+    const dupCheck = await queryDb("SELECT id FROM bw_branches WHERE LOWER(name) = LOWER($1)", [cleanName]);
+    if (dupCheck.rows && dupCheck.rows.length > 0) {
+      return res.status(400).json({ error: `A branch named '${cleanName}' is already registered.` });
     }
 
+    const result = await queryDb(
+      "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *",
+      [cleanName, latVal, lngVal, cleanAddress, cleanHours, cleanContact]
+    );
+
     clearApiCache();
-    res.status(201).json(result.rows[0] || { name, latitude, longitude, address, store_hours, contact_no: cleanContact, status: 'Active' });
+    const newBranch = (result.rows && result.rows[0]) ? result.rows[0] : {
+      name: cleanName,
+      latitude: latVal,
+      longitude: lngVal,
+      address: cleanAddress,
+      store_hours: cleanHours,
+      contact_no: cleanContact,
+      status: 'Active'
+    };
+
+    res.status(201).json(newBranch);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Branch registration error:", err);
+    res.status(500).json({ error: err.message || "Failed to register branch." });
   }
 });
 
@@ -1473,6 +1477,32 @@ app.delete('/api/branches/:id', async (req, res) => {
     const checkBranch = await queryDb("SELECT id, name FROM bw_branches WHERE id = $1", [branchId]);
     if (!checkBranch || !checkBranch.rows || checkBranch.rows.length === 0) {
       return res.status(404).json({ error: `Branch ID ${branchId} does not exist.` });
+    }
+
+    const { action, force } = req.query; // 'archive' or standard delete
+
+    // Safe financial audit protection check
+    const hasSales = await queryDb("SELECT COUNT(*) as cnt FROM bw_sales WHERE branch_id = $1", [branchId]);
+    const hasTx = await queryDb("SELECT COUNT(*) as cnt FROM bw_pos_transactions WHERE branch_id = $1", [branchId]);
+    const salesCount = parseInt(hasSales.rows[0]?.cnt || hasSales.rows[0]?.count || 0);
+    const txCount = parseInt(hasTx.rows[0]?.cnt || hasTx.rows[0]?.count || 0);
+    const totalHistoricalRecords = salesCount + txCount;
+
+    if (totalHistoricalRecords > 0 && action !== 'archive' && force !== 'true') {
+      return res.status(400).json({
+        error: `Cannot permanently delete branch because it has ${totalHistoricalRecords} historical transaction records. To preserve audit and financial reporting integrity, please archive this branch instead.`,
+        canArchive: true,
+        hasHistoricalRecords: true
+      });
+    }
+
+    if (action === 'archive') {
+      await queryDb("UPDATE bw_branches SET status = 'Archived' WHERE id = $1", [branchId]);
+      clearApiCache();
+      return res.json({
+        success: true,
+        message: `Branch '${checkBranch.rows[0].name}' has been successfully archived. Historical transaction records preserved.`
+      });
     }
 
     if (activeDbDriver === 'pg' && pgPool) {
