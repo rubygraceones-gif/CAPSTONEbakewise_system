@@ -5126,7 +5126,6 @@ async function refreshAdminBranchesPane() {
   if (tbody) {
     setSafeHtml(tbody, pagedBranches.map(b => `
       <tr>
-        <td><code>#${b.id}</code></td>
         <td style="font-weight: 700;">${b.name}</td>
         <td>${b.address || ''}</td>
         <td>${b.store_hours || ''}</td>
