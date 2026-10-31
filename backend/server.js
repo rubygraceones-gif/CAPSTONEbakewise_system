@@ -2717,8 +2717,6 @@ app.get('/api/inventory/batches', async (req, res) => {
         COALESCE(i.status, 'In Stock') as status,
         i.branch_id,
         COALESCE(br.name, 'Lasang') as branch_name,
-        COALESCE(i.degradation_percent, 0) as degradation_percent,
-        COALESCE(i.shelf_status, 'Fresh') as shelf_status,
         i.created_at
       FROM bw_inventory i
       LEFT JOIN bw_products p ON (p.id = i.product_id OR CONCAT('p', p.id) = i.product_id)
@@ -2737,13 +2735,31 @@ app.get('/api/inventory/batches', async (req, res) => {
     sql += " ORDER BY i.expiry_date ASC, i.id ASC";
     const result = await queryDb(sql, params);
 
+    const phNow = getPhilippineNow();
+    const nowTime = phNow.now.getTime();
+
     const rows = (result.rows || []).map(row => {
-      const prodDateStr = row.production_date ? String(row.production_date).split('T')[0].replace(/-/g, '') : '20261031';
-      const batchCode = row.batch_id || `BAT-B${row.branch_id}-${row.product_id}-${prodDateStr}`;
+      const prodDateStr = row.production_date ? String(row.production_date).split('T')[0] : '2026-10-31';
+      const expDateStr = row.expiry_date ? String(row.expiry_date).split('T')[0] : '2026-11-02';
+      const cleanCodeDate = prodDateStr.replace(/-/g, '');
+      const batchCode = row.batch_id || `BAT-B${row.branch_id}-${row.product_id}-${cleanCodeDate}`;
+
+      const prodTime = new Date(`${prodDateStr}T${row.production_time || '06:00:00'}`).getTime();
+      const expTime = new Date(`${expDateStr}T${row.expiry_time || '18:00:00'}`).getTime();
+      const totalLife = Math.max(1, expTime - prodTime);
+      const remaining = Math.max(0, expTime - nowTime);
+      const degradation = Math.max(0, Math.min(100, Math.round(((totalLife - remaining) / totalLife) * 100)));
+
+      let shelfStatus = 'Fresh';
+      if (nowTime >= expTime) shelfStatus = 'Expired';
+      else if (degradation >= 75) shelfStatus = 'Near Expiry';
+
       return {
         ...row,
         batch_code: batchCode,
-        batch_id: batchCode
+        batch_id: batchCode,
+        degradation_percent: degradation,
+        shelf_status: shelfStatus
       };
     });
 
