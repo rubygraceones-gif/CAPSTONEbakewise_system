@@ -892,21 +892,27 @@ async function initializePgSchema() {
     console.warn("⚠️ Postgres branch seed notice:", err.message);
   }
 
-  // Seed default user accounts into PostgreSQL
+  // Seed default user accounts into PostgreSQL only if bw_users is empty
   try {
-    const defaultHash = bcrypt.hashSync('password123', 10);
-    const defaultSeedUsers = [
-      [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
-      [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
-      [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
-      [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
-      [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
-    ];
-    for (const u of defaultSeedUsers) {
-      await pgPool.query(
-        'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING',
-        u
-      );
+    const pgUserCount = await pgPool.query("SELECT COUNT(*) as count FROM bw_users");
+    if (pgUserCount && pgUserCount.rows && parseInt(pgUserCount.rows[0].count) === 0) {
+      console.log("Seeding default administrative users into empty bw_users table (PostgreSQL)...");
+      const defaultHash = bcrypt.hashSync('password123', 10);
+      const defaultSeedUsers = [
+        [1, 'manager@bakewise.com', defaultHash, 'Branch Manager', 'manager', 1],
+        [2, 'sales@bakewise.com', defaultHash, 'Sales Staff', 'sales', 1],
+        [3, 'inventory@bakewise.com', defaultHash, 'Inventory Specialist', 'inventory', 1],
+        [4, 'production@bakewise.com', defaultHash, 'Baking Specialist', 'production', 1],
+        [5, 'admin@bakewise.com', defaultHash, 'System Administrator', 'admin', null]
+      ];
+      for (const u of defaultSeedUsers) {
+        await pgPool.query(
+          'INSERT INTO bw_users (id, email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING',
+          u
+        );
+      }
+    } else {
+      console.log(`Skipping Postgres user seeding: bw_users table already contains ${pgUserCount.rows[0].count} accounts.`);
     }
   } catch (err) {
     console.warn("⚠️ Postgres user seed notice:", err.message);
@@ -1275,6 +1281,13 @@ app.put('/api/users/:id', async (req, res) => {
 app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    const target = await queryDb("SELECT id, email, role FROM bw_users WHERE id = $1", [parseInt(id)]);
+    if (target.rows && target.rows.length > 0) {
+      const u = target.rows[0];
+      if (u.email === 'admin@bakewise.com') {
+        return res.status(403).json({ error: 'The primary System Administrator account is protected and cannot be deleted.' });
+      }
+    }
     await queryDb("DELETE FROM bw_users WHERE id = $1", [parseInt(id)]);
     clearApiCache();
     res.json({ success: true });

@@ -188,11 +188,7 @@ class BakeWiseStore {
     ]);
 
     this.users = this.load("bakewise_v2_users", [
-      { id: 1, email: "manager@bakewise.com", name: "Branch Manager", role: "manager", branch_id: 1 },
-      { id: 2, email: "sales@bakewise.com", name: "Sales Staff", role: "sales", branch_id: 1 },
-      { id: 3, email: "inventory@bakewise.com", name: "Inventory Specialist", role: "inventory", branch_id: 1 },
-      { id: 4, email: "production@bakewise.com", name: "Baking Specialist", role: "production", branch_id: 1 },
-      { id: 5, email: "admin@bakewise.com", name: "System Administrator", role: "admin", branch_id: null }
+      { id: 1, email: "admin@bakewise.com", name: "System Administrator", role: "admin", branch_id: null }
     ]);
 
     this.isBackendOnline = false;
@@ -530,12 +526,21 @@ class BakeWiseStore {
     }
   }
 
+  setSelectedBranchId(val) {
+    this._selectedBranchId = val;
+    const select = document.getElementById("branch-switcher-select");
+    if (select && select.value !== val) {
+      select.value = val;
+    }
+  }
+
   getSelectedBranchId() {
     if (this.currentUser && this.currentUser.role !== 'admin') {
       return this.currentUser.branch_id || 1;
     }
     const select = document.getElementById("branch-switcher-select");
-    return select ? select.value : 'all';
+    if (select && select.value) return select.value;
+    return this._selectedBranchId || 'all';
   }
 
   logActivity(message, type = 'system', targetBranch = 'all') {
@@ -5044,50 +5049,86 @@ async function refreshAdminUsersPane() {
   if (store.isBackendOnline) {
     try {
       const res = await fetch('/api/users');
-      if (res.ok) store.users = await res.json();
+      if (res.ok) {
+        store.users = await res.json();
+        store.save("bakewise_v2_users", store.users);
+      }
     } catch (e) { console.error("Error fetching users:", e); }
   }
 
+  const selectedBranchId = store.getSelectedBranchId();
+  const isAllBranches = !selectedBranchId || selectedBranchId === 'all';
+
+  // Branch filtering following global administrator and individual branch assignment rules
+  const branchUsers = (store.users || []).filter(u => {
+    if (isAllBranches) return true;
+    if (u.role === 'admin') return true; // Global Administrator has global access across all branches
+    return u.branch_id != null && parseInt(u.branch_id) === parseInt(selectedBranchId);
+  });
+
+  // Calculate dynamic account counts from actual database records in scope
+  const totalCount = branchUsers.length;
+  const managerCount = branchUsers.filter(u => u.role === 'manager').length;
+  const staffCount = branchUsers.filter(u => ['sales', 'staff', 'production', 'baker', 'inventory'].includes(u.role)).length;
+  const adminCount = branchUsers.filter(u => u.role === 'admin').length;
+
+  // Update summary cards dynamically
+  const totalEl = document.getElementById("user-kpi-total");
+  const managersEl = document.getElementById("user-kpi-managers");
+  const staffEl = document.getElementById("user-kpi-staff");
+  const adminsEl = document.getElementById("user-kpi-admins");
+
+  if (totalEl) totalEl.textContent = `${totalCount} ${totalCount === 1 ? 'Account' : 'Accounts'}`;
+  if (managersEl) managersEl.textContent = `${managerCount} ${managerCount === 1 ? 'Manager' : 'Managers'}`;
+  if (staffEl) staffEl.textContent = `${staffCount} Staff`;
+  if (adminsEl) adminsEl.textContent = `${adminCount} ${adminCount === 1 ? 'Admin' : 'Admins'}`;
+
+  // Filter for directory table based on search input and role filter
   const searchInput = document.getElementById("user-search-input");
   const roleFilter = document.getElementById("user-role-filter");
 
   const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
   const roleVal = roleFilter ? roleFilter.value : "all";
 
-  const filteredUsers = store.users.filter(u => {
-    const matchQuery = !query || u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query);
+  const filteredUsers = branchUsers.filter(u => {
+    const matchQuery = !query || (u.name && u.name.toLowerCase().includes(query)) || (u.email && u.email.toLowerCase().includes(query));
     const matchRole = roleVal === "all" || u.role === roleVal || (roleVal === "sales" && u.role === "staff") || (roleVal === "production" && u.role === "baker");
     return matchQuery && matchRole;
   });
 
   const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE) || 1;
   if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
-  const startIndex = (usersCurrentPage - 1) * ITEMS_PER_PAGE;
-  const pagedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const startIdx = (usersCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedUsers = filteredUsers.slice(startIdx, startIdx + ITEMS_PER_PAGE);
 
-  setSafeHtml(tbody, pagedUsers.map(u => {
-    const branch = store.branches.find(b => b.id === u.branch_id);
-    const branchName = branch ? branch.name : (u.role === 'admin' ? 'Global Network' : 'Main Branch (Central)');
+  if (pagedUsers.length === 0) {
+    setSafeHtml(tbody, `<tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-secondary); font-style: italic;">No registered user accounts found.</td></tr>`);
+  } else {
+    setSafeHtml(tbody, pagedUsers.map(u => {
+      const branch = store.branches.find(b => b.id === u.branch_id);
+      const branchName = branch ? branch.name : (u.role === 'admin' ? 'Global Network' : 'Main Branch (Central)');
+      const isProtected = u.email === 'admin@bakewise.com' || (store.currentUser && (store.currentUser.id === u.id || store.currentUser.email === u.email));
 
-    return `
-      <tr>
-        <td style="font-weight: 700;">${u.name}</td>
-        <td><code>${u.email}</code></td>
-        <td><span class="badge ${u.role === 'admin' ? 'danger' : u.role === 'manager' ? 'warning' : 'info'}">${store.getRoleLabel(u.role)}</span></td>
-        <td>${branchName}</td>
-        <td style="vertical-align: middle;">
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="kanban-action-btn edit-user-btn" data-id="${u.id}" title="Edit User Account" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
-              <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-            </button>
-            <button class="kanban-action-btn delete-user-btn" data-id="${u.id}" title="Delete User Account" style="color: var(--color-error); border: none; background: transparent; cursor: pointer;">
-              <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join(''));
+      return `
+        <tr>
+          <td style="font-weight: 700;">${u.name}</td>
+          <td><code>${u.email}</code></td>
+          <td><span class="badge ${u.role === 'admin' ? 'danger' : u.role === 'manager' ? 'warning' : 'info'}">${store.getRoleLabel(u.role)}</span></td>
+          <td>${branchName}</td>
+          <td style="vertical-align: middle;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="kanban-action-btn edit-user-btn" data-id="${u.id}" title="Edit User Account" style="color: var(--primary-color); border: none; background: transparent; cursor: pointer;">
+                <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+              </button>
+              <button class="kanban-action-btn delete-user-btn" data-id="${u.id}" title="${isProtected ? 'Protected Administrator' : 'Delete User Account'}" style="color: ${isProtected ? 'var(--text-secondary)' : 'var(--color-error)'}; border: none; background: transparent; cursor: ${isProtected ? 'not-allowed' : 'pointer'}; opacity: ${isProtected ? '0.4' : '1'};" ${isProtected ? 'disabled' : ''}>
+                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join(''));
+  }
   lucide.createIcons();
 
   if (searchInput && !searchInput.dataset.listening) {
@@ -5191,7 +5232,19 @@ async function refreshAdminUsersPane() {
 
   document.querySelectorAll(".delete-user-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
       const id = btn.getAttribute("data-id");
+      const targetUser = store.users.find(u => u.id.toString() === id.toString());
+      if (targetUser) {
+        if (targetUser.email === 'admin@bakewise.com') {
+          showToast("The primary System Administrator account cannot be deleted.", "error");
+          return;
+        }
+        if (store.currentUser && (store.currentUser.id === targetUser.id || store.currentUser.email === targetUser.email)) {
+          showToast("You cannot delete your own active administrator account.", "error");
+          return;
+        }
+      }
       if (await showConfirmModal("Are you sure you want to delete this staff account?")) {
         await store.deleteUser(id);
         await refreshAdminUsersPane();
@@ -5912,7 +5965,7 @@ function setupFilters() {
   });
   ['user-search-input', 'user-role-filter'].forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.addEventListener('input', () => { userCurrentPage = 1; refreshAdminUsersPane(); });
+    if(el) el.addEventListener('input', () => { usersCurrentPage = 1; refreshAdminUsersPane(); });
   });
 }
 document.addEventListener('DOMContentLoaded', () => {
