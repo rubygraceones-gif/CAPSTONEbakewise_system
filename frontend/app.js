@@ -607,8 +607,8 @@ class BakeWiseStore {
 
     getRoleLabel(role) {
     const roleLabels = {
-      "admin": "System Administrator",
-      "manager": "Branch Manager",
+      "admin": "Admin",
+      "manager": "Manager",
       "sales": "Sales Staff",
       "staff": "Sales Staff",
       "inventory": "Inventory Specialist",
@@ -1243,7 +1243,7 @@ function navigateToPane(paneId) {
       "pane-shelf-life": "Shelf Life Prediction & Repurposing",
       "pane-products": "Product Catalog & Pricing Directory",
       "pane-reports": "Performance Reporting Dashboard",
-      "pane-admin-users": "Staff Directory & Accounts Manager",
+      "pane-admin-users": "Staff Accounts",
       "pane-admin-branches": "Bakeshop Network Branches"
     };
     const titleElem = document.getElementById("current-view-title");
@@ -1935,7 +1935,7 @@ function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
 
   if (isSysAdmin) {
     if (branchCb) {
-      branchCb.setDisabled(true, 'Global Access (No Branch Required)');
+      branchCb.setDisabled(true, 'All Branches');
       branchCb.selectedValue = '';
       if (branchCb.hiddenInput) {
         branchCb.hiddenInput.value = '';
@@ -2051,8 +2051,8 @@ function populateSelectDropdowns() {
   });
 
   const userRoleItems = [
-    { id: 'admin', name: 'System Administrator' },
-    { id: 'manager', name: 'Branch Manager' },
+    { id: 'admin', name: 'Admin' },
+    { id: 'manager', name: 'Manager' },
     { id: 'sales', name: 'Sales Staff' },
     { id: 'inventory', name: 'Inventory Specialist' },
     { id: 'production', name: 'Baking Specialist' }
@@ -5121,7 +5121,8 @@ async function refreshAdminUsersPane() {
   const roleVal = roleFilter ? roleFilter.value : "all";
 
   const filteredUsers = branchUsers.filter(u => {
-    const matchQuery = !query || (u.name && u.name.toLowerCase().includes(query)) || (u.email && u.email.toLowerCase().includes(query));
+    const displayNameForSearch = u.name === 'System Administrator' ? 'Admin' : (u.name === 'Branch Manager' ? 'Manager' : (u.name || ''));
+    const matchQuery = !query || (u.name && u.name.toLowerCase().includes(query)) || displayNameForSearch.toLowerCase().includes(query) || (u.email && u.email.toLowerCase().includes(query));
     const matchRole = roleVal === "all" || u.role === roleVal || (roleVal === "sales" && u.role === "staff") || (roleVal === "production" && u.role === "baker");
     return matchQuery && matchRole;
   });
@@ -5136,12 +5137,13 @@ async function refreshAdminUsersPane() {
   } else {
     setSafeHtml(tbody, pagedUsers.map(u => {
       const branch = store.branches.find(b => b.id === u.branch_id);
-      const branchName = branch ? branch.name : (u.role === 'admin' ? 'Global Network' : 'Main Branch (Central)');
+      const branchName = branch ? branch.name : (u.role === 'admin' ? 'All Branches' : 'Main Branch (Central)');
+      const displayName = u.name === 'System Administrator' ? 'Admin' : (u.name === 'Branch Manager' ? 'Manager' : u.name);
       const isProtected = u.email === 'admin@bakewise.com' || (store.currentUser && (store.currentUser.id === u.id || store.currentUser.email === u.email));
 
       return `
         <tr>
-          <td style="font-weight: 700;">${u.name}</td>
+          <td style="font-weight: 700;">${displayName}</td>
           <td><code>${u.email}</code></td>
           <td><span class="badge ${u.role === 'admin' ? 'danger' : u.role === 'manager' ? 'warning' : 'info'}">${store.getRoleLabel(u.role)}</span></td>
           <td>${branchName}</td>

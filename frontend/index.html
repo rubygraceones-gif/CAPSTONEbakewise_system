@@ -633,9 +633,9 @@
                 <i data-lucide="users" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Registered Accounts</span>
+                <span class="stats-label">Total Accounts</span>
                 <span class="stats-value" id="user-kpi-total">1 Account</span>
-                <span class="stats-trend up" style="color: var(--color-success);">System User Directory</span>
+                <span class="stats-trend up" style="color: var(--color-success);">Staff List</span>
               </div>
             </div>
 
@@ -646,7 +646,7 @@
               <div class="card-stats">
                 <span class="stats-label">Branch Managers</span>
                 <span class="stats-value" id="user-kpi-managers">0 Managers</span>
-                <span class="stats-trend up" style="color: var(--color-success);">Operational Approvals</span>
+                <span class="stats-trend up" style="color: var(--color-success);">Branch Management</span>
               </div>
             </div>
 
@@ -655,9 +655,9 @@
                 <i data-lucide="utensils" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Sales & Kitchen Staff</span>
+                <span class="stats-label">Staff Members</span>
                 <span class="stats-value" id="user-kpi-staff">0 Staff</span>
-                <span class="stats-trend text-light" style="color: var(--text-secondary);">Frontline Counters</span>
+                <span class="stats-trend text-light" style="color: var(--text-secondary);">Sales & Kitchen</span>
               </div>
             </div>
 
@@ -666,9 +666,9 @@
                 <i data-lucide="key" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">System Admins</span>
+                <span class="stats-label">Admins</span>
                 <span class="stats-value" id="user-kpi-admins">1 Admin</span>
-                <span class="stats-trend up" style="color: var(--primary-color);">Global Control</span>
+                <span class="stats-trend up" style="color: var(--primary-color);">Full Access</span>
               </div>
             </div>
           </div>
@@ -678,19 +678,19 @@
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
                   <i data-lucide="user-plus" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
-                  <span>Create New Staff Account</span>
+                  <span>Add New Staff</span>
                 </h2>
               </div>
               <form id="admin-user-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="usr-name-input" class="form-label">Full Name / Title</label>
+                  <label for="usr-name-input" class="form-label">Full Name</label>
                   <div class="input-container">
                     <i data-lucide="user" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="usr-name-input" class="form-input" required placeholder="e.g. Branch Manager">
+                    <input type="text" id="usr-name-input" class="form-input" required placeholder="e.g. Manager">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="usr-email-input" class="form-label">Work Email Address</label>
+                  <label for="usr-email-input" class="form-label">Email Address</label>
                   <div class="input-container">
                     <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <input type="email" id="usr-email-input" class="form-input" required placeholder="staff@bakewise.com" pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
@@ -709,13 +709,13 @@
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="usr-role-select" class="form-label">System Role / Permissions</label>
+                  <label for="usr-role-select" class="form-label">Role</label>
                   <div class="input-container">
                     <i data-lucide="shield" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <select id="usr-role-select" class="form-input" required>
                       <option value="" disabled selected>Select a role...</option>
-                      <option value="admin">System Administrator</option>
-                      <option value="manager">Branch Manager</option>
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
                       <option value="sales">Sales Staff</option>
                       <option value="inventory">Inventory Specialist</option>
                       <option value="production">Baking Specialist</option>
@@ -723,28 +723,28 @@
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="usr-branch-select" class="form-label">Assigned Bakeshop Branch</label>
+                  <label for="usr-branch-select" class="form-label">Assigned Branch</label>
                   <div class="input-container">
                     <i data-lucide="map-pin" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <select id="usr-branch-select" class="form-input" required></select>
                   </div>
-                    <small class="form-helper-text" id="usr-branch-select-helper" style="display: none;">System Administrators have global access and do not require a branch assignment.</small>
+                    <small class="form-helper-text" id="usr-branch-select-helper" style="display: none;">Admins have full access to all branches and do not require a branch assignment.</small>
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">
                   <i data-lucide="user-plus" style="width: 18px; height: 18px;"></i>
-                  <span>Register Account</span>
+                  <span>Add Staff</span>
                 </button>
               </form>
             </div>
 
             <div class="panel-card">
               <div class="panel-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
-                <h2 class="panel-card-title">Registered Accounts Directory</h2>
+                <h2 class="panel-card-title">Staff List</h2>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                   <select id="user-role-filter" class="form-input" style="padding: 6px 10px; font-size: 0.82rem; min-width: 140px; max-width: 180px;">
                     <option value="all">All Roles</option>
-                    <option value="admin">System Administrator</option>
-                    <option value="manager">Branch Manager</option>
+                    <option value="admin">Admin</option>
+                    <option value="manager">Manager</option>
                     <option value="sales">Sales Staff</option>
                     <option value="inventory">Inventory Specialist</option>
                     <option value="production">Baking Specialist</option>
@@ -756,10 +756,10 @@
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th>Account Designation</th>
+                      <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
-                      <th>Assigned Branch</th>
+                      <th>Branch</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -768,7 +768,7 @@
               </div>
               <div id="users-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
                 <button id="users-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
-                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
+                  <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Back
                 </button>
                 <span id="users-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
                 <button id="users-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
@@ -1708,11 +1708,11 @@
     <form id="user-edit-form" method="POST">
       <input type="hidden" id="edit-user-id">
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-usr-name" class="form-label">Full Name / Designation</label>
+        <label for="edit-usr-name" class="form-label">Full Name</label>
         <input type="text" id="edit-usr-name" class="form-input" style="padding-left: 14px;" required>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-usr-email" class="form-label">Work Email</label>
+        <label for="edit-usr-email" class="form-label">Email Address</label>
         <input type="email" id="edit-usr-email" class="form-input" style="padding-left: 14px;" required pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
@@ -1727,20 +1727,20 @@
         </div>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-usr-role" class="form-label">System Role</label>
+        <label for="edit-usr-role" class="form-label">Role</label>
         <select id="edit-usr-role" class="form-input" style="padding-left: 14px;" required>
           <option value="" disabled selected>Select a role...</option>
           <option value="sales">Sales Staff</option>
           <option value="inventory">Inventory Specialist</option>
           <option value="production">Baking Specialist</option>
-          <option value="manager">Branch Manager</option>
-          <option value="admin">System Administrator</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-branch" class="form-label">Assigned Branch</label>
         <select id="edit-usr-branch" class="form-input" style="padding-left: 14px;"></select>
-        <small class="form-helper-text" id="edit-usr-branch-helper" style="display: none;">System Administrators have global access and do not require a branch assignment.</small>
+        <small class="form-helper-text" id="edit-usr-branch-helper" style="display: none;">Admins have full access to all branches and do not require a branch assignment.</small>
       </div>
       <div class="form-actions" style="margin-top: 16px;">
         <button type="button" class="btn-secondary" id="btn-user-modal-cancel">Cancel</button>
