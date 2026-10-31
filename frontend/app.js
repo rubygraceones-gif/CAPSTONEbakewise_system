@@ -332,12 +332,13 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_1')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v34')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
-      localStorage.setItem('bakewise_v2_data_cleared_1', 'true');
+      localStorage.removeItem("bakewise_v2_products");
+      localStorage.setItem('bakewise_v2_data_cleared_v34', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -3473,7 +3474,11 @@ function refreshDashboard() {
 
   const wasteToday = store.waste
     .filter(w => w.date === latestDateStr && (branchId === 'all' || w.branchId === branchId))
-    .reduce((sum, w) => sum + (w.qty * w.cost), 0);
+    .reduce((sum, w) => {
+      const p = store.products.find(x => x.id === (w.productId || w.product_id));
+      const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+      return sum + ((parseInt(w.qty) || 0) * uCost);
+    }, 0);
   document.getElementById("dash-waste-value").textContent = `₱${wasteToday.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   let expiryCount = 0;
@@ -3612,7 +3617,11 @@ function renderDashboardSalesWasteChart() {
 
     const dayWaste = store.waste
       .filter(w => w.date === dStr && (branchId === 'all' || w.branchId === branchId))
-      .reduce((sum, w) => sum + (w.qty * w.cost), 0);
+      .reduce((sum, w) => {
+        const p = store.products.find(x => x.id === (w.productId || w.product_id));
+        const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+        return sum + ((parseInt(w.qty) || 0) * uCost);
+      }, 0);
     wasteData.push(dayWaste);
 
     current.setDate(current.getDate() + 1);
@@ -3750,8 +3759,12 @@ function renderDashboardBranchesChart() {
   
   const wasteData = store.branches.map(b => {
     return store.waste
-      .filter(w => w.branchId === b.id)
-      .reduce((sum, w) => sum + (w.qty * w.cost), 0);
+      .filter(w => (w.branchId != null ? w.branchId : w.branch_id) === b.id)
+      .reduce((sum, w) => {
+        const p = store.products.find(x => x.id === (w.productId || w.product_id));
+        const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+        return sum + ((parseInt(w.qty) || 0) * uCost);
+      }, 0);
   });
 
   const isDark = document.body.classList.contains("dark-mode");
@@ -3814,8 +3827,12 @@ function renderDashboardBranchesChart() {
   const branchInsightEl = document.getElementById("insight-branches-chart");
   if (branchInsightEl) {
     const allBranchPerformance = store.branches.map(b => {
-      const bSales = store.sales.filter(s => s.branchId === b.id).reduce((sum, s) => sum + (s.qty * s.price), 0);
-      const bWaste = store.waste.filter(w => w.branchId === b.id).reduce((sum, w) => sum + (w.qty * w.cost), 0);
+      const bSales = store.sales.filter(s => (s.branchId != null ? s.branchId : s.branch_id) === b.id).reduce((sum, s) => sum + (s.qty * s.price), 0);
+      const bWaste = store.waste.filter(w => (w.branchId != null ? w.branchId : w.branch_id) === b.id).reduce((sum, w) => {
+        const p = store.products.find(x => x.id === (w.productId || w.product_id));
+        const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+        return sum + ((parseInt(w.qty) || 0) * uCost);
+      }, 0);
       return { name: b.name, sales: bSales, waste: bWaste };
     });
     
@@ -5745,9 +5762,10 @@ function refreshWastePane() {
   const pagedWaste = sortedWaste.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   setSafeHtml(tbody, pagedWaste.map(w => {
-    const p = store.products.find(x => x.id === w.productId) || { name: "Unknown" };
+    const p = store.products.find(x => x.id === (w.productId || w.product_id)) || { name: "Unknown" };
     const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(w.branchId || w.branch_id)) || (store.branches.length > 0 ? store.branches[0] : { name: "Main Branch" });
-    const totalCost = w.qty * w.cost;
+    const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+    const totalCost = (parseInt(w.qty) || 0) * uCost;
     const dateObj = parseLocalDate(w.date);
 
     return `
@@ -7025,9 +7043,9 @@ function refreshReportsPane() {
     const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     setSafeHtml(reportWasteTbody, pagedProducts.map(p => {
-      const pWaste = store.waste.filter(w => w.productId === p.id && w.date >= startDateStr && w.date <= endDateStr && (branchId === 'all' || w.branchId === branchId));
-      const totalWaste = pWaste.reduce((sum, w) => sum + w.qty, 0);
-      const costLost = totalWaste * p.cost;
+      const pWaste = store.waste.filter(w => (w.productId === p.id || w.product_id === p.id) && w.date >= startDateStr && w.date <= endDateStr && (branchId === 'all' || (w.branchId != null ? w.branchId : w.branch_id) === branchId));
+      const totalWaste = pWaste.reduce((sum, w) => sum + (parseInt(w.qty) || 0), 0);
+      const costLost = totalWaste * parseFloat(p.cost || 0);
       const reasons = pWaste.map(w => w.reason);
       let primaryReason = reasons.length > 0 ? reasons[0] : "N/A";
 
@@ -7360,7 +7378,11 @@ async function refreshAdminBranchesPane() {
     ? (store._waste || []).filter(w => {
         const bId = w.branch_id != null ? w.branch_id : w.branchId;
         return bId != null && (registeredBranchIds.size === 0 || registeredBranchIds.has(bId.toString()));
-      }).reduce((sum, w) => sum + (w.qty * w.cost), 0)
+      }).reduce((sum, w) => {
+        const p = (store.products || []).find(prod => prod.id === (w.productId || w.product_id));
+        const uCost = (p && p.cost != null) ? parseFloat(p.cost) : parseFloat(w.cost || 0);
+        return sum + ((parseInt(w.qty) || 0) * uCost);
+      }, 0)
     : 0;
   const netMargin = totalNetworkSales - totalNetworkWaste;
 

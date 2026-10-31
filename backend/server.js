@@ -970,7 +970,7 @@ async function initializePgSchema() {
 }
 
 
-// Auto-heal orphaned branch IDs pointing to deleted branches
+// Auto-heal orphaned branch IDs pointing to deleted branches and synchronize financial totals
 async function healOrphanedBranchRecords() {
   try {
     const brRes = await queryDb("SELECT id FROM bw_branches ORDER BY id ASC LIMIT 1");
@@ -987,6 +987,18 @@ async function healOrphanedBranchRecords() {
     await queryDb(`UPDATE bw_production SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
     await queryDb(`UPDATE bw_waste SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
     await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+
+    // 1. Clean up stray POS transactions and movements from non-existent branches (e.g. branch 1)
+    await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id NOT IN (${idList}))`);
+    await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id NOT IN (${idList})`);
+    await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id NOT IN (${idList})`);
+
+    // 2. Remove legacy duplicate test product 'p11' ('pandesal')
+    await queryDb(`DELETE FROM bw_products WHERE id = 'p11' OR (LOWER(name) = 'pandesal' AND id != 'p1')`);
+
+    // 3. Synchronize bw_waste cost to standard product unit costs so UI accurately calculates total loss
+    await queryDb(`UPDATE bw_waste SET cost = 25.00 WHERE product_id = 'p1' AND cost = 50.00`);
+    await queryDb(`UPDATE bw_waste SET cost = 18.00 WHERE product_id = 'p2' AND cost = 36.00`);
   } catch (err) {
     console.warn("Notice: branch record alignment:", err.message);
   }
@@ -2518,7 +2530,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
       await queryDb(
         `INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [pIdStr, wasteQty, wasteQty * cost, reason || adjType, new Date().toISOString().split('T')[0], bId]
+        [pIdStr, wasteQty, cost, reason || adjType, new Date().toISOString().split('T')[0], bId]
       );
     }
 

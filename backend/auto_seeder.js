@@ -495,13 +495,13 @@ async function runAutoSeeder(queryDb, force = false) {
       if (dayIdx % 5 === 2) {
         const wastePid = (branchId === lasangId) ? 'p1' : 'p2';
         const wasteQty = 2;
-        const wasteCost = wasteQty * PRODUCTS_MASTER[wastePid].cost;
+        const unitCost = PRODUCTS_MASTER[wastePid].cost;
         runningStock[branchId][wastePid] -= wasteQty;
 
         dayWasteBatch.push({
           product_id: wastePid,
           qty: wasteQty,
-          cost: wasteCost,
+          cost: unitCost,
           reason: 'Overbaked Batch Trimming / Display Scrap',
           date: dateStr,
           branch_id: branchId,
