@@ -340,13 +340,13 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v39')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v40')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
-      localStorage.setItem('bakewise_v2_data_cleared_v39', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v40', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);

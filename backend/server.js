@@ -16,7 +16,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const apicache = require('apicache');
 require('dotenv').config();
-const { runAutoSeeder } = require('./auto_seeder');
+const { runAutoSeeder, generateDayTimes, DATES } = require('./auto_seeder');
 
 // Helper to get current date, time, and full timestamp in Philippine Standard Time (Asia/Manila, UTC+8)
 function getPhilippineNow() {
@@ -34,8 +34,9 @@ function getPhilippineNow() {
   const parts = formatter.formatToParts(now);
   const m = {};
   parts.forEach(p => { m[p.type] = p.value; });
+  const hour = m.hour === '24' ? '00' : m.hour;
   const dateStr = `${m.year}-${m.month}-${m.day}`;
-  const timeStr = `${m.hour}:${m.minute}:${m.second}`;
+  const timeStr = `${hour}:${m.minute}:${m.second}`;
   return {
     date: dateStr,
     time: timeStr,
@@ -1115,13 +1116,18 @@ async function healOrphanedBranchRecords() {
         [lasangId]
       );
       const totalCount = parseInt(countRes.rows[0]?.count || 0);
-      // Check if timestamps are already varied across days (sample tx 1 on 10-14 vs 10-15)
+      // Check if timestamps are already varied across days (sample tx 1 and 250 on 10-14 vs 10-15)
       const sampleTxs = await queryDb(
         "SELECT date, created_at FROM bw_pos_transactions WHERE transaction_number LIKE '%-001' AND date IN ('2026-10-14', '2026-10-15') ORDER BY date ASC"
       );
       const timesDiffer = (sampleTxs.rows && sampleTxs.rows.length >= 2 && String(sampleTxs.rows[0].created_at).slice(-8) !== String(sampleTxs.rows[1].created_at).slice(-8));
+
+      const sampleTxs250 = await queryDb(
+        "SELECT date, created_at FROM bw_pos_transactions WHERE transaction_number LIKE '%-250' AND date IN ('2026-10-14', '2026-10-15') ORDER BY date ASC"
+      );
+      const timesDiffer250 = (sampleTxs250.rows && sampleTxs250.rows.length >= 2 && String(sampleTxs250.rows[0].created_at).slice(-8) !== String(sampleTxs250.rows[1].created_at).slice(-8));
       
-      if (totalCount < 7500 || !timesDiffer) {
+      if (totalCount < 7500 || !timesDiffer || !timesDiffer250) {
         console.log(`[DATA HEALING] Reseeding with varied daily timestamps for Lasang (Cashier: Catalina Kato)...`);
         runAutoSeeder(queryDb, true).catch(err => console.error("Auto-seeder run error:", err.message));
       }
@@ -1157,6 +1163,63 @@ app.all('/api/admin/seed-demo-data', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[ADMIN SEED ERROR]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ADMINISTRATIVE TRIGGER TO DIRECTLY APPLY VARIED DAILY TIMESTAMPS
+app.all('/api/admin/apply-varied-timestamps', async (req, res) => {
+  try {
+    const branchRes = await queryDb("SELECT id FROM bw_branches WHERE LOWER(name) LIKE '%lasang%' LIMIT 1");
+    if (!branchRes.rows || branchRes.rows.length === 0) {
+      return res.status(404).json({ error: "Lasang branch not found" });
+    }
+    const lasangId = parseInt(branchRes.rows[0].id);
+
+    console.log('[TIMESTAMP UPDATE] Applying unique varied timestamps for 31 days...');
+    const updatedDays = [];
+
+    for (let dayIdx = 0; dayIdx < DATES.length; dayIdx++) {
+      const { dateStr } = DATES[dayIdx];
+      const dayTimes = generateDayTimes(dayIdx, 250);
+
+      // Fetch all transactions for this date ordered by id ASC
+      const txsRes = await queryDb(
+        "SELECT id, transaction_number FROM bw_pos_transactions WHERE branch_id = $1 AND date = $2 ORDER BY id ASC",
+        [lasangId, dateStr]
+      );
+      const rows = txsRes.rows || [];
+      if (rows.length === 0) continue;
+
+      for (let i = 0; i < rows.length; i++) {
+        const timeStr = dayTimes[i % 250];
+        const newCreatedAt = `${dateStr} ${timeStr}`;
+        await queryDb(
+          "UPDATE bw_pos_transactions SET created_at = $1, cashier = 'Catalina Kato' WHERE id = $2",
+          [newCreatedAt, rows[i].id]
+        );
+      }
+
+      // Also align production and batches for that day
+      const prodMin = 20 + ((dayIdx * 7 + 13) % 25);
+      const prodSec = (dayIdx * 19 + 7) % 60;
+      const prodTimeStr = `05:${String(prodMin).padStart(2, '0')}:${String(prodSec).padStart(2, '0')}`;
+      const prodCreatedAt = `${dateStr} ${prodTimeStr}`;
+      await queryDb("UPDATE bw_production SET created_at = $1 WHERE branch_id = $2 AND date = $3", [prodCreatedAt, lasangId, dateStr]).catch(() => {});
+      await queryDb("UPDATE bw_inventory_batches SET created_at = $1, production_time = $2 WHERE branch_id = $3 AND production_date = $4", [prodCreatedAt, prodTimeStr, lasangId, dateStr]).catch(() => {});
+
+      updatedDays.push({
+        date: dateStr,
+        txCount: rows.length,
+        firstTxTime: dayTimes[0],
+        lastTxTime: dayTimes[Math.min(rows.length - 1, 249)]
+      });
+    }
+
+    if (typeof clearApiCache === 'function') clearApiCache();
+    res.json({ success: true, updatedDaysCount: updatedDays.length, sampleDays: updatedDays.slice(0, 5) });
+  } catch (err) {
+    console.error('[TIMESTAMP UPDATE ERROR]', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -2186,15 +2249,15 @@ app.post('/api/pos/checkout', async (req, res) => {
       // Record in bw_inventory_movements (Stock movement audit trail)
       await queryDb(
         `INSERT INTO bw_inventory_movements 
-         (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status)
-         VALUES ('Sale Deduction', $1, $2, $3, $4, $5, $6, $7, 'POS Sale', $8, 'Completed')`,
-        [bId, pIdStr, -qty, initialTotalStock, totalRemainingStock, itemUnit, txNumber, activeCashier]
+         (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status, created_at)
+         VALUES ('Sale Deduction', $1, $2, $3, $4, $5, $6, $7, 'POS Sale', $8, 'Completed', $9)`,
+        [bId, pIdStr, -qty, initialTotalStock, totalRemainingStock, itemUnit, txNumber, activeCashier, txCreatedAt]
       );
 
       // C. Record in bw_sales (Preserving legacy analytics)
       await queryDb(
-        "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id) VALUES ($1, $2, $3, $4, $5, $6)",
-        [pIdStr, qty, unitPrice, txDate, activeCashier, bId]
+        "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [pIdStr, qty, unitPrice, txDate, activeCashier, bId, txCreatedAt]
       );
     }
 
@@ -2308,11 +2371,13 @@ app.post('/api/repurpose', async (req, res) => {
       }
     }
 
-    // Insert Repurpose Log
+    // Insert Repurpose Log with accurate timestamp
+    const phNow = getPhilippineNow();
+    const repTimestamp = req.body.timestamp || req.body.created_at || phNow.datetime;
     const logRes = await queryDb(
-      `INSERT INTO bw_repurpose_logs (batch_id, product_id, product_name, quantity, target_recipe, branch_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [bIdStr, String(product_id), pName, qtyNum, recipe, bId]
+      `INSERT INTO bw_repurpose_logs (batch_id, product_id, product_name, quantity, target_recipe, branch_id, timestamp)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [bIdStr, String(product_id), pName, qtyNum, recipe, bId, repTimestamp]
     );
 
     // Deduct from bw_inventory_batches if matching batch exists
@@ -2329,9 +2394,9 @@ app.post('/api/repurpose', async (req, res) => {
     const prevStock = invRes.rows && invRes.rows[0] ? parseInt(invRes.rows[0].stock_level) : qtyNum;
     await queryDb(`
       INSERT INTO bw_inventory_movements
-      (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status)
-      VALUES ('Repurposed', $1, $2, $3, $4, $5, 'pcs', $6, $7, $8, 'Completed')
-    `, [bId, String(product_id), qtyNum, prevStock, Math.max(0, prevStock - qtyNum), bIdStr, `Repurposed into ${recipe}`, req.user ? req.user.name : 'Baker / Staff']).catch(e => console.warn("movement log notice:", e.message));
+      (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status, created_at)
+      VALUES ('Repurposed', $1, $2, $3, $4, $5, 'pcs', $6, $7, $8, 'Completed', $9)
+    `, [bId, String(product_id), qtyNum, prevStock, Math.max(0, prevStock - qtyNum), bIdStr, `Repurposed into ${recipe}`, req.user ? req.user.name : 'Baker / Staff', repTimestamp]).catch(e => console.warn("movement log notice:", e.message));
 
     const createdLog = (logRes.rows && logRes.rows[0]) ? logRes.rows[0] : {
       batch_id: bIdStr,
@@ -2634,6 +2699,8 @@ app.post('/api/inventory/adjust', async (req, res) => {
   const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
   const performer = performed_by || (req.user ? (req.user.name || req.user.email) : 'Staff');
   const authorizer = authorized_by || (req.user ? (req.user.name || req.user.email) : 'Branch Manager');
+  const phNow = getPhilippineNow();
+  const adjCreatedAt = req.body.created_at || phNow.datetime;
 
   try {
     const invCheck = await queryDb(
@@ -2653,9 +2720,9 @@ app.post('/api/inventory/adjust', async (req, res) => {
 
     const movementRes = await queryDb(
       `INSERT INTO bw_inventory_movements 
-       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, notes, performed_by, authorized_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Completed') RETURNING *`,
-      [adjType, bId, pIdStr, adjQty, currentStock, newStock, unitStr, reason || adjType, notes || '', performer, authorizer]
+       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, notes, performed_by, authorized_by, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Completed', $12) RETURNING *`,
+      [adjType, bId, pIdStr, adjQty, currentStock, newStock, unitStr, reason || adjType, notes || '', performer, authorizer, adjCreatedAt]
     );
 
     if (adjType === 'Damaged' || adjType === 'Expired') {
@@ -2663,9 +2730,9 @@ app.post('/api/inventory/adjust', async (req, res) => {
       const cost = (pRes.rows && pRes.rows[0]) ? parseFloat(pRes.rows[0].cost) : 10.00;
       const wasteQty = Math.abs(adjQty);
       await queryDb(
-        `INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [pIdStr, wasteQty, cost, reason || adjType, new Date().toISOString().split('T')[0], bId]
+        `INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [pIdStr, wasteQty, cost, reason || adjType, phNow.date, bId, adjCreatedAt]
       );
     }
 

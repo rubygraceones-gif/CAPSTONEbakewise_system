@@ -45,6 +45,58 @@ function createRng(seed) {
   };
 }
 
+// Generate realistic, non-repeating, varied daily operating timestamps across store hours
+function generateDayTimes(dayIdx, count = 250) {
+  // Store opening between 05:04:43 and 05:25:00 depending on dayIdx
+  const startSec = (5 * 3600) + (4 * 60) + ((dayIdx * 197 + 43) % (22 * 60));
+  // Store closing between 20:35:00 and 20:58:00 depending on dayIdx
+  const endSec = (20 * 3600) + (35 * 60) + ((dayIdx * 211 + 67) % (24 * 60));
+  const totalSecs = endSec - startSec;
+
+  const weights = [];
+  for (let i = 0; i < count - 1; i++) {
+    const fraction = i / (count - 1);
+    const approxSec = startSec + fraction * totalSecs;
+    const approxHour = approxSec / 3600;
+
+    let density = 1.0;
+    if (approxHour >= 6.0 && approxHour <= 8.5) density = 2.2;
+    else if (approxHour >= 11.5 && approxHour <= 13.0) density = 1.6;
+    else if (approxHour >= 15.5 && approxHour <= 18.5) density = 2.0;
+    else if (approxHour >= 19.0 && approxHour <= 20.0) density = 1.2;
+    else if (approxHour > 20.0) density = 0.6;
+    else density = 0.8;
+
+    const pseudoRand = ((dayIdx * 733 + (i + 1) * 317) % 1000) / 1000.0;
+    const intervalWeight = (1.0 / density) * (0.7 + 0.6 * pseudoRand);
+    weights.push(intervalWeight);
+  }
+
+  const sumW = weights.reduce((a, b) => a + b, 0);
+  const times = [];
+  let cur = startSec;
+  times.push(formatTime(cur));
+
+  let lastSec = cur;
+  for (let i = 0; i < weights.length; i++) {
+    const step = (weights[i] / sumW) * totalSecs;
+    cur += step;
+    let roundedSec = Math.round(cur);
+    if (roundedSec <= lastSec) roundedSec = lastSec + 1;
+    lastSec = roundedSec;
+    times.push(formatTime(roundedSec));
+  }
+
+  function formatTime(s) {
+    const sec = Math.floor(s % 60);
+    const min = Math.floor((s / 60) % 60);
+    const hr = Math.floor(s / 3600);
+    return String(hr).padStart(2, '0') + ':' + String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  }
+
+  return times;
+}
+
 async function runAutoSeeder(queryDb, force = false) {
   console.log('========================================================================');
   console.log('AUTO-SEEDER: LASANG SOLE BRANCH & CATALINA KATO CASHIER (Oct 14 - Nov 13, 2026)');
@@ -151,7 +203,7 @@ async function runAutoSeeder(queryDb, force = false) {
     console.log(`✓ Seeded ${invRows.length} active consolidated inventory records for Lasang.`);
   }
 
-  // Check if Catalina Kato is already cashier and transactions fully populated
+  // Check if Catalina Kato is already cashier and transactions fully populated with varied timestamps
   const countRes = await queryDb(
     "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id = $1 AND date >= '2026-10-14' AND date <= '2026-11-13' AND cashier = 'Catalina Kato'",
     [lasangId]
@@ -159,8 +211,21 @@ async function runAutoSeeder(queryDb, force = false) {
   const currentCount = parseInt(countRes.rows[0]?.count || 0);
   console.log(`Current completed POS transactions with Cashier Catalina Kato: ${currentCount}`);
 
-  if (!force && currentCount >= 7750) {
-    console.log('✓ Target 7,750 Lasang sales with Cashier Catalina Kato are already fully populated. Ensuring inventory...');
+  // Check if timestamps are properly varied across different days
+  const checkSample = await queryDb(
+    "SELECT date, created_at FROM bw_pos_transactions WHERE branch_id = $1 AND transaction_number LIKE '%-250' ORDER BY date ASC LIMIT 5",
+    [lasangId]
+  );
+  let hasVariedTimes = false;
+  if (checkSample.rows && checkSample.rows.length >= 3) {
+    const t0 = String(checkSample.rows[0].created_at).slice(-8);
+    const t1 = String(checkSample.rows[1].created_at).slice(-8);
+    const t2 = String(checkSample.rows[2].created_at).slice(-8);
+    hasVariedTimes = (t0 !== t1 && t1 !== t2 && t0 !== t2);
+  }
+
+  if (!force && currentCount >= 7750 && hasVariedTimes) {
+    console.log('✓ Target 7,750 Lasang sales with Cashier Catalina Kato and varied timestamps are already fully populated. Ensuring inventory...');
     await seedRichInventory(lasangId);
     return { success: true, alreadyPopulated: true, totalTransactions: currentCount, branch: 'Lasang' };
   }
@@ -281,22 +346,40 @@ async function runAutoSeeder(queryDb, force = false) {
     const dayProductSoldQty = {};
     branchConfig.productIds.forEach(pId => { dayProductSoldQty[pId] = 0; });
 
+    // Generate unique, strictly-increasing, realistic varied timestamps across store hours for this day
+    const dayTimes = generateDayTimes(dayIdx, 250);
+
+    // Varied daily production times (~05:20 to ~05:45 AM)
+    const prodMin = 20 + ((dayIdx * 7 + 13) % 25);
+    const prodSec = (dayIdx * 19 + 7) % 60;
+    const prodTimeStr = `05:${String(prodMin).padStart(2, '0')}:${String(prodSec).padStart(2, '0')}`;
+
+    // Varied daily closing/expiry times (~18:10 to ~18:55 PM)
+    const expMin = 10 + ((dayIdx * 11 + 5) % 45);
+    const expTimeStr = `18:${String(expMin).padStart(2, '0')}:00`;
+
+    // Varied waste log times (~19:15 to ~19:55 PM)
+    const wasteMin = 15 + ((dayIdx * 11 + 5) % 40);
+    const wasteSec = (dayIdx * 23 + 17) % 60;
+    const wasteTimeStr = `19:${String(wasteMin).padStart(2, '0')}:${String(wasteSec).padStart(2, '0')}`;
+
+    // Varied repurpose times (~16:10 to ~16:50 PM)
+    const repurposeMin = 10 + ((dayIdx * 13 + 3) % 40);
+    const repurposeSec = (dayIdx * 31 + 9) % 60;
+    const repurposeTimeStr = `16:${String(repurposeMin).padStart(2, '0')}:${String(repurposeSec).padStart(2, '0')}`;
+
+    // Varied consolidation / movement times (~20:45 to ~20:58 PM)
+    const movMin = 45 + ((dayIdx * 3 + 2) % 14);
+    const movSec = (dayIdx * 29 + 11) % 60;
+    const movTimeStr = `20:${String(movMin).padStart(2, '0')}:${String(movSec).padStart(2, '0')}`;
+
     // Generate exactly 250 sales with Cashier: Catalina Kato
     for (let txSeq = 1; txSeq <= 250; txSeq++) {
       const rng = createRng((dayIdx + 1) * 100000 + lasangId * 1000 + txSeq);
       const cashier = 'Catalina Kato';
 
-      // Transaction timestamp - distributed sequentially across store hours 05:15 to 20:45
-      const minuteOffset = Math.floor(((txSeq - 1) / 250) * 930);
-      const txTotalMinutes = 5 * 60 + 15 + minuteOffset;
-      const hour = Math.floor(txTotalMinutes / 60);
-      const minute = txTotalMinutes % 60;
-      const second = Math.floor((txSeq * 19 + 7) % 60);
-
-      const hourStr = String(hour).padStart(2, '0');
-      const minStr = String(minute).padStart(2, '0');
-      const secStr = String(second).padStart(2, '0');
-      const timeStr = `${hourStr}:${minStr}:${secStr}`;
+      // Unique non-repeating timestamp for this exact transaction sequence on this day
+      const timeStr = dayTimes[txSeq - 1];
       const createdAt = `${dateStr} ${timeStr}`;
 
       const seqStr = String(txSeq).padStart(3, '0');
@@ -375,7 +458,7 @@ async function runAutoSeeder(queryDb, force = false) {
       dayTxBatch.push(txRecord);
     }
 
-    // Morning Production: 05:45 AM
+    // Morning Production: varied time per day
     for (const pId of branchConfig.productIds) {
       const p = PRODUCTS_MASTER[pId];
       const soldEst = dayProductSoldQty[pId] || 15;
@@ -392,7 +475,7 @@ async function runAutoSeeder(queryDb, force = false) {
         status: 'Completed',
         code: prodCode,
         branch_id: lasangId,
-        created_at: `${dateStr} 05:45:00`
+        created_at: `${dateStr} ${prodTimeStr}`
       });
 
       const batchNum = `BAT-B${lasangId}-${pId}-${dateClean}`;
@@ -410,12 +493,12 @@ async function runAutoSeeder(queryDb, force = false) {
         quantity_remaining: Math.max(0, bakeQty - (dayProductSoldQty[pId] || 0)),
         production_date: dateStr,
         expiry_date: expStr,
-        production_time: '05:45:00',
-        expiry_time: '18:00:00',
+        production_time: prodTimeStr,
+        expiry_time: expTimeStr,
         freshness_degradation: 0,
         status: 'Fresh',
         food_safety_status: 'Safe',
-        created_at: `${dateStr} 05:45:00`
+        created_at: `${dateStr} ${prodTimeStr}`
       });
 
       runningStock[pId] += bakeQty;
@@ -451,7 +534,7 @@ async function runAutoSeeder(queryDb, force = false) {
         reason: 'Overbaked Batch Trimming / Display Scrap',
         date: dateStr,
         branch_id: lasangId,
-        created_at: `${dateStr} 16:30:00`
+        created_at: `${dateStr} ${wasteTimeStr}`
       });
     }
 
@@ -467,7 +550,7 @@ async function runAutoSeeder(queryDb, force = false) {
         quantity: repurposeQty,
         target_recipe: 'Bread Crumbs',
         branch_id: lasangId,
-        timestamp: `${dateStr} 17:00:00`
+        timestamp: `${dateStr} ${repurposeTimeStr}`
       });
     }
 
@@ -479,7 +562,7 @@ async function runAutoSeeder(queryDb, force = false) {
         quantity: dayProductSoldQty[pId] || 10,
         movement_type: 'Out - Sale',
         notes: `Consolidated daily POS sales for ${dateStr} (Cashier: Catalina Kato)`,
-        created_at: `${dateStr} 20:50:00`
+        created_at: `${dateStr} ${movTimeStr}`
       });
     }
 
@@ -552,4 +635,4 @@ async function runAutoSeeder(queryDb, force = false) {
   return { success: true, totalTransactions: 7750, dateRange: '2026-10-14 to 2026-11-13', branch: 'Lasang', cashier: 'Catalina Kato' };
 }
 
-module.exports = { runAutoSeeder, SEED_IDENTIFIER };
+module.exports = { runAutoSeeder, generateDayTimes, DATES, SEED_IDENTIFIER };
