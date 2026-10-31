@@ -989,47 +989,54 @@ async function healOrphanedBranchRecords() {
     await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
 
     // 1. Clean up stray POS transactions and movements from non-existent branches (e.g. branch 1)
-    await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id NOT IN (${idList}))`);
-    await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id NOT IN (${idList})`);
-    await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id NOT IN (${idList})`);
+    try {
+      await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id NOT IN (${idList}))`);
+      await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id NOT IN (${idList})`);
+      await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id NOT IN (${idList})`);
+    } catch (e) { console.warn("Notice: orphan cleanup:", e.message); }
 
     // 2. Remove legacy duplicate test product 'p11' ('pandesal')
-    await queryDb(`DELETE FROM bw_products WHERE id = 'p11' OR (LOWER(name) = 'pandesal' AND id != 'p1')`);
+    try {
+      await queryDb(`DELETE FROM bw_products WHERE id = 'p11' OR (LOWER(name) = 'pandesal' AND id != 'p1')`);
+    } catch (e) { console.warn("Notice: p11 cleanup:", e.message); }
 
     // 3. Synchronize bw_waste cost to standard product unit costs so UI accurately calculates total loss
-    await queryDb(`UPDATE bw_waste SET cost = 25.00 WHERE product_id = 'p1' AND cost = 50.00`);
-    await queryDb(`UPDATE bw_waste SET cost = 18.00 WHERE product_id = 'p2' AND cost = 36.00`);
+    try {
+      await queryDb(`UPDATE bw_waste SET cost = 25.00 WHERE product_id = 'p1' AND cost = 50.00`);
+      await queryDb(`UPDATE bw_waste SET cost = 18.00 WHERE product_id = 'p2' AND cost = 36.00`);
+    } catch (e) { console.warn("Notice: waste cost sync:", e.message); }
 
     // 4. Consolidate bw_inventory to keep exactly 1 active current stock row per product per branch (avoid duplication)
-    await queryDb(`
-      DELETE FROM bw_inventory 
-      WHERE id NOT IN (
-        SELECT id FROM (
-          SELECT MAX(id) as id 
-          FROM bw_inventory 
-          GROUP BY branch_id, product_id
-        ) as latest_inv
-      )
-    `);
+    try {
+      await queryDb(`
+        DELETE FROM bw_inventory 
+        WHERE id NOT IN (
+          SELECT id FROM (
+            SELECT MAX(id) as id 
+            FROM bw_inventory 
+            GROUP BY branch_id, product_id
+          ) as latest_inv
+        )
+      `);
+    } catch (e) { console.warn("Notice: inventory consolidation:", e.message); }
 
-    // 5. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
-    await queryDb(`
-      UPDATE bw_pos_transactions
-      SET created_at = CONCAT(
-        DATE_FORMAT(date, '%Y-%m-%d'), ' ',
-        LPAD(FLOOR((315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)) / 60), 2, '0'), ':',
-        LPAD(MOD(FLOOR(315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)), 60), 2, '0'), ':',
-        LPAD(MOD(CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) * 19 + 7, 60), 2, '0')
-      )
-      WHERE transaction_number LIKE '%-%-%-%'
-    `);
+    // 5. Normalize SIM-POS- to POS- transaction numbers
+    try {
+      await queryDb(`
+        UPDATE bw_pos_transactions
+        SET transaction_number = REPLACE(transaction_number, 'SIM-POS-', 'POS-')
+        WHERE transaction_number LIKE 'SIM-POS-%'
+      `);
+    } catch (e) { console.warn("Notice: transaction number normalization:", e.message); }
 
-    // 6. Normalize SIM-POS- to POS- transaction numbers
-    await queryDb(`
-      UPDATE bw_pos_transactions
-      SET transaction_number = REPLACE(transaction_number, 'SIM-POS-', 'POS-')
-      WHERE transaction_number LIKE 'SIM-POS-%'
-    `);
+    // 6. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
+    try {
+      await queryDb(`
+        UPDATE bw_pos_transactions
+        SET created_at = TIMESTAMP(date, SEC_TO_TIME((315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)) * 60 + MOD(CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) * 19 + 7, 60)))
+        WHERE transaction_number LIKE '%-%'
+      `);
+    } catch (e) { console.warn("Notice: pos timestamp update:", e.message); }
   } catch (err) {
     console.warn("Notice: branch record alignment:", err.message);
   }
