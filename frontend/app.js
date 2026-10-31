@@ -3433,40 +3433,58 @@ async function refreshSalesPane() {
   }
 }
 
-function getPosProductStockInfo(productId) {
+let currentPosSelectedBranchId = null;
+
+function getPosEffectiveBranchId() {
   const user = store.currentUser;
   const isAdmin = !user || user.role === 'admin';
-  const selectedBranchId = store.getSelectedBranchId();
-  const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 1;
+  const userBranchId = user && user.branch_id ? parseInt(user.branch_id) : 2;
+
+  if (!isAdmin) {
+    return userBranchId;
+  }
+
+  // Admin: Check local POS terminal dropdown
+  if (currentPosSelectedBranchId) {
+    const exists = (store.branches || []).some(b => parseInt(b.id) === parseInt(currentPosSelectedBranchId));
+    if (exists) return parseInt(currentPosSelectedBranchId);
+  }
+
+  // Admin: Check topbar switcher if specific branch is selected
+  const topbarVal = store.getSelectedBranchId();
+  if (topbarVal && topbarVal !== 'all') {
+    const exists = (store.branches || []).some(b => parseInt(b.id) === parseInt(topbarVal));
+    if (exists) {
+      currentPosSelectedBranchId = parseInt(topbarVal);
+      return currentPosSelectedBranchId;
+    }
+  }
+
+  // Admin: Fallback to first registered branch in store
+  if (store.branches && store.branches.length > 0) {
+    currentPosSelectedBranchId = parseInt(store.branches[0].id);
+    return currentPosSelectedBranchId;
+  }
+
+  return 2;
+}
+window.getPosEffectiveBranchId = getPosEffectiveBranchId;
+
+function getPosProductStockInfo(productId) {
+  const effectiveBranchId = getPosEffectiveBranchId();
+  const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
+  const branchName = bObj ? bObj.name : `Branch ${effectiveBranchId}`;
+  const scopeLabel = `(${branchName})`;
 
   const pStr = String(productId).trim();
   const altPid = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
-  let isNetwork = false;
-  let effectiveBranchId = null;
-  let scopeLabel = "";
-
-  if (isAdmin) {
-    if (selectedBranchId === 'all' || !selectedBranchId) {
-      isNetwork = true;
-      scopeLabel = "(All Branches)";
-    } else {
-      effectiveBranchId = parseInt(selectedBranchId);
-      const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
-      scopeLabel = `(${bObj ? bObj.name : 'Branch ' + effectiveBranchId})`;
-    }
-  } else {
-    effectiveBranchId = userBranchId;
-    const bObj = (store.branches || []).find(b => parseInt(b.id) === effectiveBranchId);
-    scopeLabel = `(${bObj ? bObj.name : 'Branch ' + effectiveBranchId})`;
-  }
-
+  // STRICT BRANCH ISOLATION: Calculate stock exclusively for the effective branch
   const inventoryRecords = (store._inventory || []).filter(i => {
-    const iPid = String(i.productId).trim();
+    const iPid = String(i.productId !== undefined ? i.productId : (i.product_id !== undefined ? i.product_id : '')).trim();
     const pidMatch = iPid === pStr || iPid === altPid;
-    if (isNetwork) return pidMatch;
-    const bidMatch = parseInt(i.branchId) === parseInt(effectiveBranchId);
-    return pidMatch && bidMatch;
+    const itemBranchId = parseInt(i.branchId !== undefined ? i.branchId : (i.branch_id !== undefined ? i.branch_id : 0));
+    return pidMatch && itemBranchId === effectiveBranchId;
   });
 
   const stockAvailable = inventoryRecords.reduce((sum, item) => {
@@ -3477,7 +3495,8 @@ function getPosProductStockInfo(productId) {
   return {
     stock: Math.max(0, stockAvailable),
     scopeLabel: scopeLabel,
-    isNetwork: isNetwork,
+    branchName: branchName,
+    isNetwork: false,
     effectiveBranchId: effectiveBranchId
   };
 }
@@ -3514,13 +3533,16 @@ function updateProductCardCartState(productId) {
   });
   const inCartQty = cartItem ? cartItem.qty : 0;
   const remainingStock = Math.max(0, stockAvailable - inCartQty);
-  const isOutOfStock = stockAvailable <= 0 || remainingStock <= 0;
+  const isOutOfStock = stockAvailable <= 0;
+  const isMaxInCart = remainingStock <= 0;
 
   const btn = card.querySelector('.pos-product-add-btn');
   if (btn) {
-    btn.disabled = isOutOfStock;
+    btn.disabled = isOutOfStock || isMaxInCart;
     const labelSpan = btn.querySelector('span');
-    const labelText = stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? ('Add (' + inCartQty + ' in cart)') : 'Add to Cart'));
+    const labelText = isOutOfStock
+      ? 'Out of Stock (0)'
+      : (isMaxInCart ? `All in Cart (${inCartQty})` : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'));
     if (labelSpan) {
       labelSpan.textContent = labelText;
     } else {
@@ -3546,7 +3568,7 @@ function renderPosProducts() {
 
   const searchText = (document.getElementById("pos-product-search")?.value || "").toLowerCase().trim();
 
-  const filtered = store.products.filter(p => {
+  const filtered = (store.products || []).filter(p => {
     const matchesCategory = activePosCategory === 'all' || (p.category && p.category.toLowerCase() === activePosCategory.toLowerCase());
     const matchesSearch = !searchText || p.name.toLowerCase().includes(searchText) || (p.category && p.category.toLowerCase().includes(searchText));
     return matchesCategory && matchesSearch;
@@ -3577,7 +3599,8 @@ function renderPosProducts() {
     });
     const inCartQty = cartItem ? cartItem.qty : 0;
     const remainingStock = Math.max(0, stockAvailable - inCartQty);
-    const isOutOfStock = stockAvailable <= 0 || remainingStock <= 0;
+    const isOutOfStock = stockAvailable <= 0;
+    const isMaxInCart = remainingStock <= 0;
 
     let stockBadgeClass = "in-stock";
     let stockLabel = `In Stock: ${stockAvailable}${scopeLabelStr}`;
@@ -3588,6 +3611,11 @@ function renderPosProducts() {
       stockBadgeClass = "low-stock";
       stockLabel = `Low Stock: ${stockAvailable}${scopeLabelStr}`;
     }
+
+    const btnDisabled = isOutOfStock || isMaxInCart;
+    const btnLabel = isOutOfStock
+      ? 'Out of Stock (0)'
+      : (isMaxInCart ? `All in Cart (${inCartQty})` : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'));
 
     return `
       <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${isOutOfStock ? 'style="opacity: 0.55; cursor: not-allowed;"' : 'style="cursor: pointer;"'}>
@@ -3600,8 +3628,8 @@ function renderPosProducts() {
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${isOutOfStock ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-            <span>${stockAvailable <= 0 ? 'Out of Stock (0)' : (remainingStock <= 0 ? 'Out of Stock' : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'))}</span>
+          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${btnDisabled ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>
+            <span>${btnLabel}</span>
           </button>
         </div>
       </div>
@@ -3621,24 +3649,26 @@ function addToPosCart(productId) {
   const pStr = String(p.id).trim();
   const altStr = pStr.startsWith('p') ? pStr.substring(1) : `p${pStr}`;
 
-  const stockAvailable = getBranchProductStock(p.id);
+  const stockInfo = getPosProductStockInfo(p.id);
+  const stockAvailable = stockInfo.stock;
 
   const existingIndex = posCart.findIndex(c => {
     const cStr = String(c.productId).trim();
     return cStr === pStr || cStr === altStr;
   });
 
+  if (stockAvailable <= 0) {
+    showToast(`Cannot add ${p.name}. Item is out of stock at ${stockInfo.branchName}.`, "danger");
+    return;
+  }
+
   if (existingIndex >= 0) {
     if (posCart[existingIndex].qty + 1 > stockAvailable) {
-      showToast(`Insufficient stock for ${p.name}. Only ${stockAvailable} units are available.`, "warning");
+      showToast(`Insufficient stock for ${p.name}. Only ${stockAvailable} units are available in stock at ${stockInfo.branchName}.`, "warning");
       return;
     }
     posCart[existingIndex].qty += 1;
   } else {
-    if (stockAvailable <= 0) {
-      showToast(`Cannot add ${p.name}. Item is out of stock.`, "danger");
-      return;
-    }
     posCart.push({
       productId: p.id,
       name: p.name,
@@ -3664,11 +3694,12 @@ function updatePosCartQty(productId, delta) {
   if (index < 0) return;
 
   const item = posCart[index];
-  const stockAvailable = getBranchProductStock(item.productId);
+  const stockInfo = getPosProductStockInfo(item.productId);
+  const stockAvailable = stockInfo.stock;
 
   if (delta > 0) {
     if (item.qty + 1 > stockAvailable) {
-      showToast(`Insufficient stock. Only ${stockAvailable} units are available.`, "warning");
+      showToast(`Insufficient stock for ${item.name}. Only ${stockAvailable} units are available at ${stockInfo.branchName}.`, "warning");
       return;
     }
     item.qty += 1;
@@ -3716,22 +3747,44 @@ function updatePosCartUI() {
   const countElem = document.getElementById("pos-cart-count");
   const subtotalElem = document.getElementById("pos-summary-subtotal");
   const totalElem = document.getElementById("pos-summary-total");
+  const checkoutBtn = document.getElementById("btn-pos-checkout");
   const checkoutBtnText = document.getElementById("btn-pos-checkout-text");
   const changeValueElem = document.getElementById("pos-change-value");
   const branchCtxElem = document.getElementById("pos-ctx-branch");
   const cashierCtxElem = document.getElementById("pos-ctx-cashier");
+  const posBranchSelect = document.getElementById("pos-branch-select");
 
   // Context updates
-  const selectedBranchId = store.getSelectedBranchId();
-  const effBranchId = (selectedBranchId === 'all' || !selectedBranchId)
-    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1)
-    : parseInt(selectedBranchId);
-  const branchObj = store.branches.find(b => b.id === effBranchId);
-  if (branchCtxElem) branchCtxElem.textContent = `Branch: ${branchObj ? branchObj.name : 'Main Branch'}`;
-  if (cashierCtxElem) cashierCtxElem.textContent = `Cashier: ${store.currentUser ? store.currentUser.name : 'System Administrator'}`;
+  const effBranchId = getPosEffectiveBranchId();
+  const branchObj = (store.branches || []).find(b => parseInt(b.id) === effBranchId);
+  const branchName = branchObj ? branchObj.name : `Branch ${effBranchId}`;
+  const isAdmin = !store.currentUser || store.currentUser.role === 'admin';
+
+  if (posBranchSelect) {
+    if (isAdmin && store.branches && store.branches.length > 0) {
+      posBranchSelect.style.display = "inline-block";
+      if (branchCtxElem) branchCtxElem.style.display = "none";
+      const branchOptsHtml = store.branches.map(b => `<option value="${b.id}" ${parseInt(b.id) === effBranchId ? 'selected' : ''}>${b.name}</option>`).join('');
+      if (posBranchSelect.innerHTML !== branchOptsHtml) {
+        setSafeHtml(posBranchSelect, branchOptsHtml);
+      }
+      posBranchSelect.value = String(effBranchId);
+    } else {
+      posBranchSelect.style.display = "none";
+      if (branchCtxElem) {
+        branchCtxElem.style.display = "inline-flex";
+        branchCtxElem.textContent = `Branch: ${branchName}`;
+      }
+    }
+  } else if (branchCtxElem) {
+    branchCtxElem.textContent = `Branch: ${branchName}`;
+  }
+
+  const cashierName = store.currentUser ? store.currentUser.name : 'System Administrator';
+  if (cashierCtxElem) cashierCtxElem.textContent = `Cashier: ${cashierName}`;
 
   const totalItemCount = posCart.reduce((acc, item) => acc + item.qty, 0);
-  if (countElem) countElem.textContent = `${totalItemCount} items`;
+  if (countElem) countElem.textContent = `${totalItemCount} ${totalItemCount === 1 ? 'item' : 'items'}`;
 
   if (!posCart.length) {
     if (listElem) {
@@ -3761,12 +3814,12 @@ function updatePosCartUI() {
             <div class="cart-item-price-unit">₱${item.price.toFixed(2)} × ${item.qty}</div>
           </div>
           <div class="cart-item-controls">
-            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="-1" >-</button>
+            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="-1" title="Decrease quantity">-</button>
             <span class="qty-val">${item.qty}</span>
-            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="1" >+</button>
+            <button type="button" class="qty-btn" data-product-id="${item.productId}" data-delta="1" title="Increase quantity">+</button>
           </div>
           <div class="cart-item-subtotal">₱${itemSubtotal.toFixed(2)}</div>
-          <button type="button" class="cart-item-remove" data-product-id="${item.productId}"  title="Remove item">
+          <button type="button" class="cart-item-remove" data-product-id="${item.productId}" title="Remove item">
             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
           </button>
         </div>
@@ -3776,7 +3829,17 @@ function updatePosCartUI() {
   }
 
   const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
-  const discountVal = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const discountInput = document.getElementById("pos-discount-input");
+  let discountVal = parseFloat(discountInput?.value || 0) || 0;
+  if (discountVal < 0) {
+    discountVal = 0;
+    if (discountInput) discountInput.value = "0.00";
+  }
+  if (discountVal > subtotal && subtotal > 0) {
+    discountVal = subtotal;
+    if (discountInput) discountInput.value = subtotal.toFixed(2);
+  }
+
   const grandTotal = Math.max(0, subtotal - discountVal);
 
   if (subtotalElem) subtotalElem.textContent = `₱${subtotal.toFixed(2)}`;
@@ -3784,8 +3847,13 @@ function updatePosCartUI() {
   if (checkoutBtnText) checkoutBtnText.textContent = `CHECKOUT (₱${grandTotal.toFixed(2)})`;
 
   // Calculate change
-  const tenderedVal = parseFloat(document.getElementById("pos-tendered-input")?.value || 0) || 0;
-  const changeVal = currentPosPaymentMethod === 'Cash' ? Math.max(0, tenderedVal - grandTotal) : 0;
+  const tenderedInput = document.getElementById("pos-tendered-input");
+  let tenderedVal = parseFloat(tenderedInput?.value || 0) || 0;
+  if (tenderedVal < 0) {
+    tenderedVal = 0;
+    if (tenderedInput) tenderedInput.value = "0.00";
+  }
+  const changeVal = currentPosPaymentMethod === 'Cash' ? (tenderedVal >= grandTotal ? (tenderedVal - grandTotal) : 0) : 0;
   if (changeValueElem) changeValueElem.textContent = `₱${changeVal.toFixed(2)}`;
 }
 
@@ -3807,37 +3875,46 @@ window.setPosCashPreset = setPosCashPreset;
 
 async function handlePosCheckout() {
   if (!posCart.length) {
-    showToast("Shopping cart is empty. Add products before checking out.", "warning");
+    showToast("Shopping cart is empty. Please add products before checking out.", "warning");
     return;
   }
 
-  // Stock validation before checkout
+  const effBranchId = getPosEffectiveBranchId();
+  const branchObj = (store.branches || []).find(b => parseInt(b.id) === effBranchId);
+  const branchName = branchObj ? branchObj.name : `Branch ${effBranchId}`;
+
+  // Strict stock validation before checkout
   for (const item of posCart) {
-    const stockAvailable = getBranchProductStock(item.productId);
-    if (item.qty > stockAvailable) {
-      showToast(`Insufficient stock. Only ${stockAvailable} units are available for ${item.name}.`, "danger");
+    const stockInfo = getPosProductStockInfo(item.productId);
+    if (item.qty > stockInfo.stock) {
+      showToast(`Insufficient stock. Only ${stockInfo.stock} units are available for ${item.name} at ${branchName}.`, "danger");
       return;
     }
   }
 
   const subtotal = posCart.reduce((sum, item) => sum + (item.qty * item.price), 0);
-  const discount = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const discountVal = parseFloat(document.getElementById("pos-discount-input")?.value || 0) || 0;
+  const discount = Math.min(Math.max(0, discountVal), subtotal);
   const total = Math.max(0, subtotal - discount);
-  const tendered = parseFloat(document.getElementById("pos-tendered-input")?.value || 0) || 0;
 
-  if (currentPosPaymentMethod === 'Cash' && tendered < total) {
-    showToast(`Insufficient payment. Please enter an amount equal to or greater than ₱${total.toFixed(2)}.`, "danger");
-    return;
+  const tenderedRaw = document.getElementById("pos-tendered-input")?.value;
+  const tendered = parseFloat(tenderedRaw || 0);
+
+  if (currentPosPaymentMethod === 'Cash') {
+    if (!tenderedRaw || isNaN(tendered) || tendered <= 0) {
+      showToast("Please enter the cash tendered amount before checking out.", "warning");
+      const tenderedInput = document.getElementById("pos-tendered-input");
+      if (tenderedInput) tenderedInput.focus();
+      return;
+    }
+    if (tendered < total) {
+      showToast(`Cash tendered (₱${tendered.toFixed(2)}) is insufficient. Total due is ₱${total.toFixed(2)}.`, "danger");
+      return;
+    }
   }
 
-  const selectedBranchId = store.getSelectedBranchId();
-  const branch_id = (selectedBranchId === 'all' || !selectedBranchId)
-    ? (store.currentUser?.branch_id ? parseInt(store.currentUser.branch_id) : 1)
-    : parseInt(selectedBranchId);
-  const branchObj = store.branches.find(b => b.id === branch_id);
-
   const payload = {
-    branch_id: branch_id,
+    branch_id: effBranchId,
     cashier_id: store.currentUser ? store.currentUser.id : 1,
     cashier_name: store.currentUser ? store.currentUser.name : 'System Administrator',
     subtotal: subtotal,
@@ -3845,7 +3922,7 @@ async function handlePosCheckout() {
     total: total,
     payment_amount: currentPosPaymentMethod === 'Cash' ? tendered : total,
     change_amount: currentPosPaymentMethod === 'Cash' ? Math.max(0, tendered - total) : 0,
-    payment_method: currentPosPaymentMethod,
+    payment_method: currentPosPaymentMethod || 'Cash',
     items: posCart.map(item => ({
       product_id: item.productId,
       product_name: item.name,
@@ -3855,9 +3932,12 @@ async function handlePosCheckout() {
     }))
   };
 
+  const checkoutBtn = document.getElementById("btn-pos-checkout");
+  const checkoutBtnText = document.getElementById("btn-pos-checkout-text");
+
   try {
-    const checkoutBtn = document.getElementById("btn-pos-checkout");
     if (checkoutBtn) checkoutBtn.disabled = true;
+    if (checkoutBtnText) checkoutBtnText.textContent = "Processing...";
 
     const res = await fetch("/api/pos/checkout", {
       method: "POST",
@@ -3867,30 +3947,32 @@ async function handlePosCheckout() {
 
     const data = await res.json();
     if (!res.ok || !data.success) {
-      throw new Error(data.message || "Failed to process POS checkout");
+      const errorMsg = data.message || data.error || (data.errors && data.errors.join(', ')) || "Failed to process POS checkout";
+      throw new Error(errorMsg);
     }
 
     showToast(`POS Transaction ${data.transaction.transaction_number} completed successfully!`, "success");
 
     if (data.low_stock_warnings && data.low_stock_warnings.length > 0) {
       data.low_stock_warnings.forEach(w => {
-        showToast(`Low Stock Alert: ${w.product_name} has only ${w.remaining_stock} units remaining.`, "warning");
+        showToast(`Low Stock Alert: ${w.product_name} has only ${w.remaining_stock} units remaining at ${branchName}.`, "warning");
       });
     }
 
-    // Refresh store dataset from server & update Sales History table immediately
+    // Refresh store dataset from server & update all dependent panes
     await store.syncWithBackend();
     refreshPosHistory();
     refreshDashboard();
     refreshAdminBranchesPane();
+    refreshInventoryPane();
     renderPosProducts();
 
     // Prepare receipt object
     currentReceiptTxData = {
       isNewCheckout: true,
       transaction_number: data.transaction.transaction_number,
-      transaction_date: data.transaction.transaction_date,
-      branch_id: branch_id,
+      transaction_date: data.transaction.transaction_date || data.transaction.date,
+      branch_id: effBranchId,
       branch_name: branchObj ? branchObj.name : 'Main Branch',
       branch_address: branchObj && branchObj.address ? branchObj.address : 'Commercial Center, Poblacion, Davao City',
       branch_contact: branchObj && branchObj.contact_no ? branchObj.contact_no : '0917-123-4567',
@@ -3907,6 +3989,14 @@ async function handlePosCheckout() {
     // Show thermal receipt modal
     showPosReceiptModal(currentReceiptTxData);
 
+    // Clear cart immediately upon successful sale
+    posCart = [];
+    const discountIn = document.getElementById("pos-discount-input");
+    if (discountIn) discountIn.value = "0.00";
+    const tenderedIn = document.getElementById("pos-tendered-input");
+    if (tenderedIn) tenderedIn.value = "";
+    updatePosCartUI();
+
   } catch (err) {
     showToast(`Checkout Error: ${err.message}`, "danger");
     try {
@@ -3914,8 +4004,8 @@ async function handlePosCheckout() {
       renderPosProducts();
     } catch(e) {}
   } finally {
-    const checkoutBtn = document.getElementById("btn-pos-checkout");
     if (checkoutBtn) checkoutBtn.disabled = false;
+    updatePosCartUI();
   }
 }
 window.handlePosCheckout = handlePosCheckout;
@@ -4608,6 +4698,31 @@ function setupPOSModule() {
       return;
     }
   });
+
+  // POS Branch Selector for Admins
+  const posBranchSelect = document.getElementById("pos-branch-select");
+  if (posBranchSelect) {
+    posBranchSelect.addEventListener("change", async function() {
+      const newBId = parseInt(this.value);
+      if (posCart.length > 0) {
+        const confirmed = await showConfirmModal(
+          "Switching branches will clear your current order cart. Do you want to proceed?",
+          "Switch POS Branch",
+          "arrow-right-left"
+        );
+        if (!confirmed) {
+          this.value = String(getPosEffectiveBranchId());
+          return;
+        }
+        posCart = [];
+      }
+      currentPosSelectedBranchId = newBId;
+      updatePosCartUI();
+      renderPosProducts();
+      const bObj = (store.branches || []).find(b => parseInt(b.id) === newBId);
+      showToast(`Switched POS terminal to ${bObj ? bObj.name : 'Branch ' + newBId}`, "info");
+    });
+  }
 
   // Discount & Tendered Inputs
   const discountInput = document.getElementById("pos-discount-input");

@@ -701,10 +701,21 @@ async function initializePgSchema() {
     console.warn("⚠️ Postgres product seed notice:", err.message);
   }
 
-  // Seed initial stock levels into bw_inventory for products across active branches
+  // Seed reference branches and initial inventory into PostgreSQL if branches are empty
   try {
+    let branches = await pgPool.query('SELECT id, name FROM bw_branches');
+    if (branches.rows.length === 0) {
+      console.log("Seeding reference branches: Main Branch, Lasang, Kibungsod...");
+      await pgPool.query(`
+        INSERT INTO bw_branches (name, address, contact_no, latitude, longitude, store_hours, status) VALUES
+        ('Main Branch', 'San Pedro St., Poblacion, Davao City', '09171234567', 7.0736, 125.6110, '05:00 AM - 09:00 PM', 'Active'),
+        ('Lasang', 'KM 23, Lasang, Davao City', '09181234567', 7.2136, 125.6810, '05:00 AM - 09:00 PM', 'Active'),
+        ('Kibungsod', 'National Highway, Kibungsod, Magsaysay', '09191234567', 6.7836, 125.1810, '05:00 AM - 09:00 PM', 'Active');
+      `);
+      branches = await pgPool.query('SELECT id, name FROM bw_branches');
+    }
+
     const prods = await pgPool.query('SELECT id FROM bw_products');
-    const branches = await pgPool.query('SELECT id FROM bw_branches');
     for (const b of branches.rows) {
       for (const p of prods.rows) {
         const pIdStr = String(p.id).trim();
@@ -714,10 +725,11 @@ async function initializePgSchema() {
           [pIdStr, altPid, b.id]
         );
         if (check.rows.length === 0) {
-          let stock = 35;
-          if (pIdStr === 'p1') stock = 100;
-          if (pIdStr === 'p4') stock = 20;
-          if (pIdStr === 'p7') stock = 50;
+          let stock = 40;
+          if (b.name === 'Main Branch' && pIdStr === 'p1') stock = 30;
+          else if (b.name === 'Lasang' && pIdStr === 'p1') stock = 50;
+          else if (b.name === 'Kibungsod' && pIdStr === 'p1') stock = 20;
+
           const prodDate = new Date().toISOString().split('T')[0];
           const expDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
           await pgPool.query(
@@ -923,6 +935,32 @@ app.post('/api/branches', async (req, res) => {
       "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *",
       [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, cleanContact]
     );
+    const branchRecord = (result.rows && result.rows[0]) ? result.rows[0] : null;
+    const branchId = branchRecord ? branchRecord.id : null;
+
+    if (branchId) {
+      // Initialize inventory for all active products for the newly created branch
+      const prodsRes = await queryDb("SELECT id FROM bw_products");
+      const today = new Date().toISOString().split('T')[0];
+      const expiry = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      for (const p of (prodsRes.rows || [])) {
+        const pIdStr = String(p.id).trim();
+        const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+        const check = await queryDb(
+          "SELECT id FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+          [pIdStr, altPid, branchId]
+        );
+        if (!check.rows || check.rows.length === 0) {
+          await queryDb(
+            "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5)",
+            [pIdStr, 35, today, expiry, branchId]
+          );
+        }
+      }
+      await healOrphanedBranchRecords();
+    }
+
     clearApiCache();
     res.status(201).json(result.rows[0] || { name, latitude, longitude, address, store_hours, contact_no: cleanContact, status: 'Active' });
   } catch (err) {
@@ -1419,49 +1457,69 @@ app.get('/api/pos/transactions/:id', async (req, res) => {
 
 // 3. POS CHECKOUT (ATOMIC TRANSACTION: VERIFY STOCK -> INSERT TX -> INSERT ITEMS -> DEDUCT INVENTORY -> RECORD SALES)
 app.post('/api/pos/checkout', async (req, res) => {
-  const { items, branch_id, cashier, subtotal, discount, total, payment_amount, change_amount, payment_method, date } = req.body;
+  const { items, branch_id, cashier, cashier_name, subtotal, discount, total, payment_amount, change_amount, payment_method, date } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "Cannot checkout an empty cart." });
+    return res.status(400).json({ success: false, error: "Please add products before proceeding to checkout.", message: "Please add products before proceeding to checkout." });
   }
 
   const bId = branch_id ? parseInt(branch_id) : 1;
   const txDate = date || new Date().toISOString().split('T')[0];
+  const activeCashier = cashier_name || cashier || 'Staff';
+  const payMethod = payment_method || 'Cash';
+  const numSubtotal = parseFloat(subtotal || 0);
+  const numDiscount = parseFloat(discount || 0);
+  const numTotal = Math.max(0, numSubtotal - numDiscount);
+  const numPayment = parseFloat(payment_amount != null ? payment_amount : numTotal);
+  const numChange = parseFloat(change_amount != null ? change_amount : Math.max(0, numPayment - numTotal));
 
   try {
-    // A. INVENTORY STOCK VALIDATION
+    // 1. Verify branch exists
+    const branchRes = await queryDb("SELECT id, name FROM bw_branches WHERE id = $1", [bId]);
+    if (!branchRes.rows || branchRes.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Selected branch does not exist or has been removed. Please select an active branch.",
+        message: "Selected branch does not exist or has been removed. Please select an active branch."
+      });
+    }
+    const branchName = branchRes.rows[0].name;
+
+    // 2. Validate Payment
+    if (payMethod === 'Cash' && numPayment < numTotal) {
+      return res.status(400).json({
+        success: false,
+        error: "Cash tendered is insufficient.",
+        message: "Cash tendered is insufficient."
+      });
+    }
+
+    // 3. STRICT BRANCH INVENTORY VALIDATION (Never deduct from other branches)
     for (const item of items) {
-      const altPid = String(item.product_id).startsWith('p') ? String(item.product_id).substring(1) : `p${item.product_id}`;
+      const pIdStr = String(item.product_id).trim();
+      const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+      const reqQty = parseInt(item.quantity) || 1;
+
       const invCheck = await queryDb(
-        "SELECT stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
-        [String(item.product_id), String(altPid), bId]
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
+        [pIdStr, altPid, bId]
       );
-      let currentStock = (invCheck.rows && invCheck.rows.length > 0)
+      const currentStock = (invCheck.rows && invCheck.rows.length > 0)
         ? invCheck.rows.reduce((sum, row) => sum + (parseInt(row.stock_level) || 0), 0)
         : 0;
 
-      if (currentStock < parseInt(item.quantity)) {
-        const netCheck = await queryDb(
-          "SELECT stock_level FROM bw_inventory WHERE product_id = $1 OR product_id = $2",
-          [String(item.product_id), String(altPid)]
-        );
-        currentStock = (netCheck.rows && netCheck.rows.length > 0)
-          ? netCheck.rows.reduce((sum, row) => sum + (parseInt(row.stock_level) || 0), 0)
-          : 0;
-      }
-
-      if (currentStock < parseInt(item.quantity)) {
-        const pRes = await queryDb("SELECT name FROM bw_products WHERE id = $1 OR id = $2", [String(item.product_id), String(altPid)]);
-        const pName = (pRes.rows && pRes.rows.length > 0) ? pRes.rows[0].name : item.product_name || item.product_id;
+      if (currentStock < reqQty) {
+        const pRes = await queryDb("SELECT name FROM bw_products WHERE id = $1 OR id = $2", [pIdStr, altPid]);
+        const pName = (pRes.rows && pRes.rows.length > 0) ? pRes.rows[0].name : (item.product_name || item.product_id);
         return res.status(400).json({
           success: false,
-          error: `Unable to complete transaction. ${pName} has only ${currentStock} units remaining.`,
-          message: `Unable to complete transaction. ${pName} has only ${currentStock} units remaining.`
+          error: `Insufficient stock. Only ${currentStock} units are available for ${pName} at ${branchName}.`,
+          message: `Insufficient stock. Only ${currentStock} units are available for ${pName} at ${branchName}.`
         });
       }
     }
 
-    // B. GENERATE UNIQUE TRANSACTION NUMBER (POS-YYYYMMDD-###)
+    // 4. GENERATE UNIQUE TRANSACTION NUMBER (POS-YYYYMMDD-###-XXX)
     const dateFormatted = txDate.replace(/-/g, '');
     const countRes = await queryDb("SELECT COUNT(*) as cnt FROM bw_pos_transactions WHERE date = $1", [txDate]);
     const cntVal = countRes.rows && countRes.rows[0] ? (countRes.rows[0].cnt || countRes.rows[0].count || 0) : 0;
@@ -1469,7 +1527,7 @@ app.post('/api/pos/checkout', async (req, res) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const txNumber = `POS-${dateFormatted}-${nextSeq}-${randomSuffix}`;
 
-    // C. INSERT POS TRANSACTION HEADER
+    // 5. INSERT POS TRANSACTION HEADER
     const nowIso = new Date().toISOString();
     const txInsert = await queryDb(
       `INSERT INTO bw_pos_transactions 
@@ -1478,85 +1536,97 @@ app.post('/api/pos/checkout', async (req, res) => {
       [
         txNumber,
         bId,
-        cashier || 'Cashier Staff',
-        parseFloat(subtotal || 0),
-        parseFloat(discount || 0),
-        parseFloat(total || 0),
-        parseFloat(payment_amount || 0),
-        parseFloat(change_amount || 0),
-        'Cash',
+        activeCashier,
+        numSubtotal,
+        numDiscount,
+        numTotal,
+        numPayment,
+        numChange,
+        payMethod,
         txDate
       ]
     );
+
     const createdTx = (txInsert.rows && txInsert.rows[0]) ? txInsert.rows[0] : {
       transaction_number: txNumber,
       branch_id: bId,
-      cashier: cashier || 'Cashier Staff',
-      subtotal,
-      discount,
-      total,
-      payment_amount,
-      change_amount,
-      payment_method: 'Cash',
+      branch_name: branchName,
+      cashier: activeCashier,
+      subtotal: numSubtotal,
+      discount: numDiscount,
+      total: numTotal,
+      payment_amount: numPayment,
+      change_amount: numChange,
+      payment_method: payMethod,
       status: 'Completed',
       date: txDate,
       created_at: nowIso
     };
     if (!createdTx.created_at) createdTx.created_at = nowIso;
+    createdTx.branch_name = branchName;
     const txId = createdTx.id || Date.now();
 
-    // D. PROCESS ITEMS: INSERT POS ITEMS, DEDUCT INVENTORY, RECORD SALES
+    // 6. PROCESS ITEMS: INSERT TRANSACTION ITEMS, DEDUCT STRICTLY FROM BRANCH INVENTORY, RECORD SALES
     const createdItems = [];
     const lowStockWarnings = [];
 
     for (const item of items) {
-      const altPid = String(item.product_id).startsWith('p') ? String(item.product_id).substring(1) : `p${item.product_id}`;
-      const itemSubtotal = parseFloat(item.unit_price) * parseInt(item.quantity);
+      const pIdStr = String(item.product_id).trim();
+      const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+      const qty = parseInt(item.quantity) || 1;
+      const unitPrice = parseFloat(item.unit_price) || 0;
+      const itemSubtotal = parseFloat(item.subtotal != null ? item.subtotal : (qty * unitPrice));
 
-      // 1. Insert Item Record
+      // A. Insert Item Record
       await queryDb(
         `INSERT INTO bw_pos_transaction_items (transaction_id, product_id, quantity, unit_price, subtotal) 
          VALUES ($1, $2, $3, $4, $5)`,
-        [txId, item.product_id, parseInt(item.quantity), parseFloat(item.unit_price), itemSubtotal]
+        [txId, pIdStr, qty, unitPrice, itemSubtotal]
       );
       
-      const pRes = await queryDb("SELECT name, category FROM bw_products WHERE id = $1", [item.product_id]);
-      const pName = (pRes.rows && pRes.rows[0]) ? pRes.rows[0].name : item.product_id;
+      const pRes = await queryDb("SELECT name, category FROM bw_products WHERE id = $1 OR id = $2", [pIdStr, altPid]);
+      const pName = (pRes.rows && pRes.rows[0]) ? pRes.rows[0].name : (item.product_name || item.product_id);
       const pCat = (pRes.rows && pRes.rows[0]) ? pRes.rows[0].category : 'Bread';
 
       createdItems.push({
-        product_id: item.product_id,
+        product_id: pIdStr,
         product_name: pName,
         product_category: pCat,
-        quantity: parseInt(item.quantity),
-        unit_price: parseFloat(item.unit_price),
+        quantity: qty,
+        unit_price: unitPrice,
         subtotal: itemSubtotal
       });
 
-      // 2. Deduct Inventory Stock
-      let invRow = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 AND stock_level > 0 ORDER BY id DESC LIMIT 1",
-        [String(item.product_id), String(altPid), bId]
+      // B. Deduct Inventory Stock strictly from this branch's inventory records
+      const invRows = await queryDb(
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
+        [pIdStr, altPid, bId]
       );
-      if (!invRow.rows || invRow.rows.length === 0) {
-        invRow = await queryDb(
-          "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND stock_level > 0 ORDER BY id DESC LIMIT 1",
-          [String(item.product_id), String(altPid)]
-        );
-      }
-      if (invRow.rows && invRow.rows.length > 0) {
-        const newStock = Math.max(0, parseInt(invRow.rows[0].stock_level) - parseInt(item.quantity));
-        await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newStock, invRow.rows[0].id]);
 
-        if (newStock <= 10) {
-          lowStockWarnings.push({ product_id: item.product_id, product_name: pName, remaining_stock: newStock });
+      let remainingToDeduct = qty;
+      let totalRemainingStock = 0;
+
+      for (const row of (invRows.rows || [])) {
+        const rowStock = parseInt(row.stock_level) || 0;
+        if (remainingToDeduct > 0 && rowStock > 0) {
+          const deductNow = Math.min(rowStock, remainingToDeduct);
+          const newLevel = rowStock - deductNow;
+          await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newLevel, row.id]);
+          remainingToDeduct -= deductNow;
+          totalRemainingStock += newLevel;
+        } else {
+          totalRemainingStock += rowStock;
         }
       }
 
-      // 3. Record in bw_sales (Legacy compatibility)
+      if (totalRemainingStock <= 10) {
+        lowStockWarnings.push({ product_id: pIdStr, product_name: pName, remaining_stock: totalRemainingStock });
+      }
+
+      // C. Record in bw_sales (Preserving legacy analytics)
       await queryDb(
         "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id) VALUES ($1, $2, $3, $4, $5, $6)",
-        [item.product_id, parseInt(item.quantity), parseFloat(item.unit_price), txDate, cashier || 'Cashier Staff', bId]
+        [pIdStr, qty, unitPrice, txDate, activeCashier, bId]
       );
     }
 
@@ -1565,11 +1635,18 @@ app.post('/api/pos/checkout', async (req, res) => {
     clearApiCache();
     res.status(201).json({
       success: true,
+      message: "Sale completed successfully!",
       transaction: createdTx,
+      low_stock_warnings: lowStockWarnings,
       lowStockWarnings
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[POS CHECKOUT ERROR]:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message || "Failed to process POS checkout",
+      message: err.message || "Failed to process POS checkout"
+    });
   }
 });
 
@@ -1594,15 +1671,19 @@ app.post('/api/pos/void/:id', async (req, res) => {
     const items = itemsRes.rows || [];
 
     for (const item of items) {
+      const pIdStr = String(item.product_id).trim();
+      const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : ('p' + pIdStr);
       const invCheck = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2",
-        [item.product_id, tx.branch_id]
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC LIMIT 1",
+        [pIdStr, altPid, tx.branch_id]
       );
       if (invCheck.rows && invCheck.rows.length > 0) {
         const restoredStock = parseInt(invCheck.rows[0].stock_level) + parseInt(item.quantity);
         await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [restoredStock, invCheck.rows[0].id]);
       }
     }
+
+    clearApiCache();
 
     res.json({ success: true, message: `Transaction ${tx.transaction_number} has been voided and inventory restored.` });
   } catch (err) {
@@ -1894,6 +1975,8 @@ app.get('*', (req, res) => {
 });
 
 // START EXPRESS SERVER
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`BakeWise Enterprise System server is listening on http://localhost:${PORT}`);
 });
+
+module.exports = { app, server };

@@ -855,8 +855,11 @@
                     </div>
                     <span class="cart-badge" id="pos-cart-count">0 items</span>
                   </div>
-                  <div class="cart-context-row">
-                    <span class="cart-ctx-pill" id="pos-ctx-branch">Branch: Main</span>
+                  <div class="cart-context-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span class="cart-ctx-pill" id="pos-ctx-branch">Branch: Main Branch</span>
+                      <select id="pos-branch-select" class="form-input" style="display: none; padding: 2px 8px; font-size: 0.8rem; height: 28px; border-radius: 6px; font-weight: 600; max-width: 170px;" title="Select POS Operating Branch"></select>
+                    </div>
                     <span class="cart-ctx-pill" id="pos-ctx-cashier">Cashier: Staff</span>
                   </div>
                 </div>
