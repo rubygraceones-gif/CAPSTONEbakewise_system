@@ -1001,31 +1001,74 @@
              ==================================================================== -->
         <section class="view-pane" id="pane-inventory">
           <div class="panel-card">
-            <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
-              <h2 class="panel-card-title">Current Bakery Inventory & Freshness Log</h2>
-              <button class="btn-secondary" id="btn-add-inventory-modal"
-                style="padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
-                <span>Add Inventory Stock</span>
-              </button>
+            <div class="panel-card-header" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="boxes" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
+                <span>Bakery Stock Inventory Management</span>
+              </h2>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button class="btn-secondary" id="btn-inventory-movements-modal"
+                  style="padding: 8px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="history" style="width: 16px; height: 16px;"></i>
+                  <span>Movement History</span>
+                </button>
+                <button class="btn-secondary" id="btn-transfer-inventory-modal"
+                  style="padding: 8px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="arrow-left-right" style="width: 16px; height: 16px;"></i>
+                  <span>Transfer Stock</span>
+                </button>
+                <button class="btn-primary" id="btn-add-inventory-modal"
+                  style="padding: 8px 16px; font-size: 0.85rem; width: auto; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+                  <span>Add Inventory Stock</span>
+                </button>
+              </div>
             </div>
             
-            <div class="inventory-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+            <div class="inventory-filters" style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="inventory-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
-                <select id="inventory-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                <select id="inventory-branch-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
                   <option value="all">All Branches</option>
                 </select>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="inventory-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
-                <input type="text" id="inventory-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                <input type="text" id="inventory-search-input" class="form-input" placeholder="Search by name..." style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-category-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
+                <select id="inventory-category-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
+                  <option value="all">All Categories</option>
+                  <option value="BREAD">BREAD</option>
+                  <option value="PASTRIES">PASTRIES</option>
+                  <option value="CAKES">CAKES</option>
+                  <option value="COOKIES">COOKIES</option>
+                  <option value="DRINKS">DRINKS</option>
+                </select>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="inventory-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Production Date:</label>
-                <input type="date" id="inventory-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                <input type="date" id="inventory-date-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-expiry-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Expiration Date:</label>
+                <input type="date" id="inventory-expiry-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="inventory-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Shelf Status:</label>
+                <select id="inventory-status-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
+                  <option value="all">All Statuses</option>
+                  <option value="Fresh">Fresh</option>
+                  <option value="Near Expiry">Near Expiry</option>
+                  <option value="Expired">Expired</option>
+                  <option value="Low Stock">Low Stock</option>
+                </select>
               </div>
             </div>
 
@@ -1036,11 +1079,12 @@
                     <th>Product</th>
                     <th>Branch</th>
                     <th>Category</th>
-                    <th>Stock Level</th>
+                    <th>Stock Quantity</th>
                     <th>Production Date & Time</th>
                     <th>Expiry Date & Time</th>
-                    <th>Freshness degradation</th>
+                    <th>Freshness Degradation</th>
                     <th>Shelf Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="inventory-tbody"></tbody>
@@ -1057,18 +1101,19 @@
             </div>
           </div>
 
+          <!-- Add Inventory Stock Modal -->
           <div id="inventory-modal" class="panel-card modal-dialog" style="display: none; padding: 24px;">
             <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="package-plus" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
-                <span>Add Inventory Item</span>
+                <span>Add Inventory Stock</span>
               </h2>
               <button class="btn-secondary" id="btn-inventory-modal-close"
                 style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
             <form id="inventory-add-form" method="POST">
               <div class="form-group" style="margin-bottom: 16px;">
-                <label for="inv-select-branch" class="form-label">Branch</label>
+                <label for="inv-select-branch" class="form-label">Branch Assignment</label>
                 <div class="input-container">
                   <i data-lucide="store" class="input-icon" style="width: 18px; height: 18px;"></i>
                   <select id="inv-select-branch" class="form-input" required></select>
@@ -1110,6 +1155,167 @@
                 </button>
               </div>
             </form>
+          </div>
+
+          <!-- Branch Stock Transfer Modal -->
+          <div id="inventory-transfer-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 550px; width: 95%;">
+            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+              <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="arrow-left-right" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
+                <span>Branch Stock Transfer</span>
+              </h2>
+              <button class="btn-secondary" id="btn-transfer-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+            </div>
+            <form id="inventory-transfer-form">
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="transfer-from-branch" class="form-label">Source Branch (Deduct Stock From)</label>
+                <div class="input-container">
+                  <i data-lucide="upload" class="input-icon"></i>
+                  <select id="transfer-from-branch" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="transfer-to-branch" class="form-label">Destination Branch (Add Stock To)</label>
+                <div class="input-container">
+                  <i data-lucide="download" class="input-icon"></i>
+                  <select id="transfer-to-branch" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="transfer-product-select" class="form-label">Product to Transfer</label>
+                <div class="input-container">
+                  <i data-lucide="box" class="input-icon"></i>
+                  <select id="transfer-product-select" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="transfer-quantity-input" class="form-label">Transfer Quantity</label>
+                <div class="input-container">
+                  <i data-lucide="hash" class="input-icon"></i>
+                  <input type="number" id="transfer-quantity-input" class="form-input" min="1" placeholder="e.g. 10" required>
+                </div>
+                <small id="transfer-avail-stock-note" style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="transfer-notes-input" class="form-label">Transfer Reason / Authorization</label>
+                <div class="input-container">
+                  <i data-lucide="file-text" class="input-icon"></i>
+                  <input type="text" id="transfer-notes-input" class="form-input" placeholder="e.g. Inter-branch stock balancing" required>
+                </div>
+              </div>
+              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <button type="button" class="btn-secondary" id="btn-transfer-modal-cancel">Cancel</button>
+                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                  <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+                  <span>Execute Transfer</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Stock Adjustment Modal -->
+          <div id="inventory-adjust-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 550px; width: 95%;">
+            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+              <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="sliders" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
+                <span>Stock Adjustment / Damage / Expiry</span>
+              </h2>
+              <button class="btn-secondary" id="btn-adjust-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+            </div>
+            <form id="inventory-adjust-form">
+              <input type="hidden" id="adjust-item-id">
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="adjust-branch-select" class="form-label">Branch</label>
+                <div class="input-container">
+                  <i data-lucide="store" class="input-icon"></i>
+                  <select id="adjust-branch-select" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="adjust-product-select" class="form-label">Product</label>
+                <div class="input-container">
+                  <i data-lucide="box" class="input-icon"></i>
+                  <select id="adjust-product-select" class="form-input" required></select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="adjust-type-select" class="form-label">Adjustment Type</label>
+                <div class="input-container">
+                  <i data-lucide="alert-triangle" class="input-icon"></i>
+                  <select id="adjust-type-select" class="form-input" required>
+                    <option value="Manual Adjustment">Manual Adjustment (Inventory Count)</option>
+                    <option value="Damaged">Damaged Goods (Deduct & Log Waste)</option>
+                    <option value="Expired">Expired Goods (Deduct & Log Waste)</option>
+                    <option value="Stock In">Manual Stock In (Add Stock)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="adjust-quantity-input" class="form-label">Adjustment Quantity</label>
+                <div class="input-container">
+                  <i data-lucide="hash" class="input-icon"></i>
+                  <input type="number" id="adjust-quantity-input" class="form-input" placeholder="e.g. -5 for deduction, +10 for addition" required>
+                </div>
+                <small id="adjust-current-stock-note" style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="adjust-reason-input" class="form-label">Reason / Authorization Notes</label>
+                <div class="input-container">
+                  <i data-lucide="file-text" class="input-icon"></i>
+                  <input type="text" id="adjust-reason-input" class="form-input" placeholder="e.g. Broken packaging or physical recount" required>
+                </div>
+              </div>
+              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <button type="button" class="btn-secondary" id="btn-adjust-modal-cancel">Cancel</button>
+                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                  <i data-lucide="check" style="width: 18px; height: 18px;"></i>
+                  <span>Confirm Adjustment</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Inventory Movements History Modal -->
+          <div id="inventory-movements-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 900px; width: 95%;">
+            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+              <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="history" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
+                <span>Inventory Stock Movement Audit Log</span>
+              </h2>
+              <button class="btn-secondary" id="btn-movements-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+              <select id="movements-branch-filter" class="form-input" style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
+                <option value="all">All Branches</option>
+              </select>
+              <select id="movements-type-filter" class="form-input" style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
+                <option value="all">All Movement Types</option>
+                <option value="Stock In">Stock In</option>
+                <option value="Sale Deduction">Sale Deduction</option>
+                <option value="Transfer Out">Transfer Out</option>
+                <option value="Transfer In">Transfer In</option>
+                <option value="Damaged">Damaged</option>
+                <option value="Expired">Expired</option>
+                <option value="Manual Adjustment">Manual Adjustment</option>
+              </select>
+            </div>
+            <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+              <table class="data-table" id="movements-table">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Type</th>
+                    <th>Branch</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Prev &rarr; New</th>
+                    <th>Reference / Reason</th>
+                    <th>Staff</th>
+                  </tr>
+                </thead>
+                <tbody id="movements-tbody"></tbody>
+              </table>
+            </div>
           </div>
           <div id="modal-overlay" class="modal-overlay"></div>
         </section>
@@ -1690,16 +1896,53 @@
               </button>
             </div>
 
+            <div class="product-catalog-filters" style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="products-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch Filter:</label>
+                <select id="products-branch-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
+                  <option value="all">All Branches</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="products-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product Name:</label>
+                <input type="text" id="products-search-input" class="form-input" placeholder="Search product..." style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="products-category-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
+                <select id="products-category-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
+                  <option value="all">All Categories</option>
+                  <option value="BREAD">BREAD</option>
+                  <option value="PASTRIES">PASTRIES</option>
+                  <option value="CAKES">CAKES</option>
+                  <option value="COOKIES">COOKIES</option>
+                  <option value="DRINKS">DRINKS</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="products-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
+                <select id="products-status-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
+                  <option value="all">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
             <div class="table-responsive">
               <table class="data-table">
                 <thead>
                   <tr>
-                    
                     <th>Product Name</th>
+                    <th>Branch</th>
                     <th>Category</th>
                     <th>Selling Price</th>
                     <th>Production Cost</th>
                     <th>Shelf Life</th>
+                    <th>Unit</th>
+                    <th>Status</th>
                     <th>Suggested Repurpose Recipe</th>
                     <th>Actions</th>
                   </tr>
@@ -1956,23 +2199,47 @@
     <form id="product-form" method="POST">
       <input type="hidden" id="product-id-hidden">
       <div class="form-group" style="margin-bottom: 12px;">
+        <label for="prod-branch-select" class="form-label">Branch Assignment</label>
+        <div class="input-container">
+          <i data-lucide="store" class="input-icon"></i>
+          <select id="prod-branch-select" class="form-input">
+            <option value="all">All Branches (Global Master)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
         <label for="prod-name-input" class="form-label">Product Name</label>
         <div class="input-container">
           <i data-lucide="package" class="input-icon"></i>
           <input type="text" id="prod-name-input" class="form-input" placeholder="e.g. Special Ensaymada" required>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom: 12px;">
-        <label for="prod-category-select" class="form-label">Category</label>
-        <div class="input-container">
-          <i data-lucide="tag" class="input-icon"></i>
-          <select id="prod-category-select" class="form-input" required>
-            <option value="BREAD">BREAD</option>
-            <option value="PASTRIES">PASTRIES</option>
-            <option value="CAKES">CAKES</option>
-            <option value="COOKIES">COOKIES</option>
-            <option value="DRINKS">DRINKS</option>
-          </select>
+      <div class="form-card-split" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label for="prod-category-select" class="form-label">Category</label>
+          <div class="input-container">
+            <i data-lucide="tag" class="input-icon"></i>
+            <select id="prod-category-select" class="form-input" required>
+              <option value="BREAD">BREAD</option>
+              <option value="PASTRIES">PASTRIES</option>
+              <option value="CAKES">CAKES</option>
+              <option value="COOKIES">COOKIES</option>
+              <option value="DRINKS">DRINKS</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="prod-unit-select" class="form-label">Unit of Measure</label>
+          <div class="input-container">
+            <i data-lucide="scale" class="input-icon"></i>
+            <select id="prod-unit-select" class="form-input">
+              <option value="pcs">pcs (Pieces)</option>
+              <option value="pack">pack (Pack)</option>
+              <option value="box">box (Box)</option>
+              <option value="slice">slice (Slice)</option>
+              <option value="loaf">loaf (Loaf)</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="form-card-split" style="margin-bottom: 12px;">
@@ -1991,11 +2258,30 @@
           </div>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom: 12px;">
-        <label for="prod-shelflife-input" class="form-label">Shelf Life (Days)</label>
+      <div class="form-card-split" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label for="prod-shelflife-input" class="form-label">Shelf Life (Days)</label>
+          <div class="input-container">
+            <i data-lucide="calendar" class="input-icon"></i>
+            <input type="number" id="prod-shelflife-input" class="form-input" placeholder="e.g. 3" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="prod-status-select" class="form-label">Catalog Status</label>
+          <div class="input-container">
+            <i data-lucide="check-circle" class="input-icon"></i>
+            <select id="prod-status-select" class="form-input">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" id="prod-initial-stock-group" style="margin-bottom: 12px;">
+        <label for="prod-initial-stock-input" class="form-label">Initial Stock Quantity (Optional)</label>
         <div class="input-container">
-          <i data-lucide="calendar" class="input-icon"></i>
-          <input type="number" id="prod-shelflife-input" class="form-input" placeholder="e.g. 3" required>
+          <i data-lucide="layers" class="input-icon"></i>
+          <input type="number" id="prod-initial-stock-input" class="form-input" placeholder="0" min="0">
         </div>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">

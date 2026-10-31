@@ -494,7 +494,11 @@ class BakeWiseStore {
             price: parseFloat(p.price),
             cost: parseFloat(p.cost),
             shelfLifeDays: p.shelf_life_days,
-            repurposeRecipe: p.repurpose_recipe
+            repurposeRecipe: p.repurpose_recipe,
+            branchId: p.branch_id || null,
+            unit: p.unit || 'pcs',
+            status: p.status || 'Active',
+            description: p.description || ''
           }));
           this.save("bakewise_v2_products", this.products);
         }
@@ -529,9 +533,20 @@ class BakeWiseStore {
             stockLevel: parseInt(inv.stock_level),
             productionDate: inv.production_date ? inv.production_date : (getRelativeDateString(0) + 'T05:00:00'),
             expiryDate: inv.expiry_date ? inv.expiry_date : (getRelativeDateString(1) + 'T05:00:00'),
-            branchId: inv.branch_id
+            branchId: inv.branch_id,
+            unit: inv.unit || 'pcs',
+            status: inv.status || 'In Stock',
+            batchId: inv.batch_id || null,
+            productionTime: inv.production_time || '06:00:00',
+            expiryTime: inv.expiry_time || '18:00:00',
+            degradationPercent: inv.degradation_percent !== undefined ? inv.degradation_percent : 0,
+            shelfStatus: inv.shelf_status || 'Fresh'
           }));
           this.save("bakewise_v2_inventory", this._inventory);
+        }
+
+        if (Array.isArray(data.movements)) {
+          this.movements = data.movements;
         }
 
         if (Array.isArray(data.production)) {
@@ -595,7 +610,11 @@ class BakeWiseStore {
           price: parseFloat(p.price),
           cost: parseFloat(p.cost),
           shelfLifeDays: p.shelf_life_days,
-          repurposeRecipe: p.repurpose_recipe
+          repurposeRecipe: p.repurpose_recipe,
+          branchId: p.branch_id || null,
+          unit: p.unit || 'pcs',
+          status: p.status || 'Active',
+          description: p.description || ''
         }));
         this.save("bakewise_v2_products", this.products);
       }
@@ -632,7 +651,14 @@ class BakeWiseStore {
           stockLevel: parseInt(inv.stock_level),
           productionDate: inv.production_date ? inv.production_date : (getRelativeDateString(0) + 'T05:00:00'),
           expiryDate: inv.expiry_date ? inv.expiry_date : (getRelativeDateString(1) + 'T05:00:00'),
-          branchId: inv.branch_id
+          branchId: inv.branch_id,
+          unit: inv.unit || 'pcs',
+          status: inv.status || 'In Stock',
+          batchId: inv.batch_id || null,
+          productionTime: inv.production_time || '06:00:00',
+          expiryTime: inv.expiry_time || '18:00:00',
+          degradationPercent: inv.degradation_percent !== undefined ? inv.degradation_percent : 0,
+          shelfStatus: inv.shelf_status || 'Fresh'
         }));
         this.save("bakewise_v2_inventory", this._inventory);
       }
@@ -774,7 +800,7 @@ class BakeWiseStore {
     this.clearSession();
   }
 
-  async addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe) {
+  async addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe, branchId = null, unit = 'pcs', status = 'Active', description = '', initialStock = 0) {
     let maxIdNum = 0;
     this.products.forEach(p => {
       if (p.id && p.id.startsWith("p")) {
@@ -783,14 +809,44 @@ class BakeWiseStore {
       }
     });
     const id = "p" + (maxIdNum + 1);
-    const product = { id, name, category, price: parseFloat(price), cost: parseFloat(cost), shelfLifeDays: parseInt(shelfLifeDays), repurposeRecipe };
+    const bId = (branchId && branchId !== 'all') ? parseInt(branchId) : null;
+    const product = {
+      id,
+      name,
+      category,
+      price: parseFloat(price),
+      cost: parseFloat(cost),
+      shelfLifeDays: parseInt(shelfLifeDays),
+      repurposeRecipe,
+      branchId: bId,
+      unit: unit || 'pcs',
+      status: status || 'Active',
+      description: description || ''
+    };
 
     if (this.isBackendOnline) {
       try {
+        const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch('/api/products', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, name, category, price: parseFloat(price), cost: parseFloat(cost), shelf_life_days: parseInt(shelfLifeDays), repurpose_recipe: repurposeRecipe })
+          headers,
+          body: JSON.stringify({
+            id,
+            name,
+            category,
+            price: parseFloat(price),
+            cost: parseFloat(cost),
+            shelf_life_days: parseInt(shelfLifeDays),
+            repurpose_recipe: repurposeRecipe,
+            branch_id: bId,
+            unit: unit || 'pcs',
+            status: status || 'Active',
+            description: description || '',
+            initial_stock: parseInt(initialStock) || 0
+          })
         });
         if (res.ok) {
           const newP = await res.json();
@@ -800,11 +856,19 @@ class BakeWiseStore {
             category: newP.category || category,
             price: parseFloat(newP.price || price),
             cost: parseFloat(newP.cost || cost),
-            shelfLifeDays: newP.shelfLifeDays !== undefined ? newP.shelfLifeDays : (newP.shelf_life_days !== undefined ? newP.shelf_life_days : parseInt(shelfLifeDays)),
-            repurposeRecipe: newP.repurposeRecipe !== undefined ? newP.repurposeRecipe : (newP.repurpose_recipe !== undefined ? newP.repurpose_recipe : repurposeRecipe)
+            shelfLifeDays: newP.shelf_life_days !== undefined ? newP.shelf_life_days : parseInt(shelfLifeDays),
+            repurposeRecipe: newP.repurpose_recipe !== undefined ? newP.repurpose_recipe : repurposeRecipe,
+            branchId: newP.branch_id || bId,
+            unit: newP.unit || unit || 'pcs',
+            status: newP.status || status || 'Active',
+            description: newP.description || description || ''
           };
           this.products.push(pToAdd);
-          this.commitAll();
+          if (parseInt(initialStock) > 0 && bId) {
+            await this.syncWithBackend();
+          } else {
+            this.commitAll();
+          }
           return true;
         }
       } catch (e) { console.error(e); }
@@ -819,16 +883,24 @@ class BakeWiseStore {
   async updateProduct(id, productData) {
     if (this.isBackendOnline) {
       try {
+        const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`/api/products/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             name: productData.name,
             category: productData.category,
             price: productData.price,
             cost: productData.cost,
             shelf_life_days: productData.shelfLifeDays,
-            repurpose_recipe: productData.repurposeRecipe
+            repurpose_recipe: productData.repurposeRecipe,
+            branch_id: productData.branchId,
+            unit: productData.unit,
+            status: productData.status,
+            description: productData.description
           })
         });
         if (res.ok) {
@@ -842,7 +914,11 @@ class BakeWiseStore {
               price: parseFloat(u.price),
               cost: parseFloat(u.cost),
               shelfLifeDays: u.shelf_life_days,
-              repurposeRecipe: u.repurpose_recipe
+              repurposeRecipe: u.repurpose_recipe,
+              branchId: u.branch_id,
+              unit: u.unit,
+              status: u.status,
+              description: u.description
             };
           }
           this.commitAll();
@@ -864,7 +940,11 @@ class BakeWiseStore {
   async deleteProduct(id) {
     if (this.isBackendOnline) {
       try {
-        await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        await fetch(`/api/products/${id}`, { method: 'DELETE', headers });
       } catch (e) { console.error(e); }
     }
     this.products = this.products.filter(p => p.id !== id);
@@ -901,7 +981,7 @@ class BakeWiseStore {
     return true;
   }
 
-  async addInventory(productId, stockQty, prodDate, expDate, targetBranchId) {
+  async addInventory(productId, stockQty, prodDate, expDate, targetBranchId, unit = 'pcs', prodTime = '06:00:00', expTime = '18:00:00') {
     const parsedQty = parseInt(stockQty);
     if (isNaN(parsedQty) || parsedQty <= 0) return false;
     const defaultBranchId = (this.branches && this.branches.length > 0) ? parseInt(this.branches[0].id) : 1;
@@ -909,11 +989,29 @@ class BakeWiseStore {
 
     if (this.isBackendOnline) {
       try {
-        await fetch('/api/inventory', {
+        const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/inventory', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_id: productId, stock_level: parsedQty, production_date: prodDate, expiry_date: expDate, branch_id: branchId })
+          headers,
+          body: JSON.stringify({
+            product_id: productId,
+            stock_level: parsedQty,
+            production_date: prodDate,
+            expiry_date: expDate,
+            branch_id: branchId,
+            unit,
+            production_time: prodTime,
+            expiry_time: expTime,
+            performed_by: this.currentUser ? this.currentUser.name : 'Staff'
+          })
         });
+        if (res.ok) {
+          await this.syncWithBackend();
+          return true;
+        }
       } catch (e) { console.error(e); }
     }
 
@@ -923,12 +1021,96 @@ class BakeWiseStore {
       this._inventory[existingIndex].productionDate = prodDate;
       this._inventory[existingIndex].expiryDate = expDate;
     } else {
-      this._inventory.push({ id: "i_" + Date.now(), productId, stockLevel: parsedQty, productionDate: prodDate, expiryDate: expDate, branchId });
+      this._inventory.push({ id: "i_" + Date.now(), productId, stockLevel: parsedQty, productionDate: prodDate, expiryDate: expDate, branchId, unit });
     }
 
     this.commitAll();
     this.logActivity(`Added inventory: ${parsedQty} pcs (Product ID: ${productId})`);
     return true;
+  }
+
+  async adjustInventory({ branch_id, product_id, adjustment_type, quantity, reason, notes, performed_by, authorized_by }) {
+    if (this.isBackendOnline) {
+      const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          branch_id: parseInt(branch_id),
+          product_id,
+          adjustment_type,
+          quantity: parseInt(quantity),
+          reason,
+          notes,
+          performed_by: performed_by || (this.currentUser ? this.currentUser.name : 'Staff'),
+          authorized_by: authorized_by || 'Branch Manager'
+        })
+      });
+      if (res.ok) {
+        await this.syncWithBackend();
+        return await res.json();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to adjust inventory');
+      }
+    }
+    return { success: true };
+  }
+
+  async transferInventory({ from_branch_id, to_branch_id, product_id, quantity, notes, performed_by, authorized_by }) {
+    if (this.isBackendOnline) {
+      const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/inventory/transfer', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          from_branch_id: parseInt(from_branch_id),
+          to_branch_id: parseInt(to_branch_id),
+          product_id,
+          quantity: parseInt(quantity),
+          notes,
+          performed_by: performed_by || (this.currentUser ? this.currentUser.name : 'Staff'),
+          authorized_by: authorized_by || 'Branch Manager'
+        })
+      });
+      if (res.ok) {
+        await this.syncWithBackend();
+        return await res.json();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to transfer inventory');
+      }
+    }
+    return { success: true };
+  }
+
+  async fetchMovements(filters = {}) {
+    if (!this.isBackendOnline) return this.movements || [];
+    try {
+      const token = localStorage.getItem('bakewise_token') || sessionStorage.getItem('bakewise_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const queryParams = new URLSearchParams();
+      if (filters.branch_id && filters.branch_id !== 'all') queryParams.append('branch_id', filters.branch_id);
+      if (filters.product_id) queryParams.append('product_id', filters.product_id);
+      if (filters.movement_type && filters.movement_type !== 'all') queryParams.append('movement_type', filters.movement_type);
+      if (filters.limit) queryParams.append('limit', filters.limit);
+
+      const res = await fetch(`/api/inventory/movements?${queryParams.toString()}`, { headers });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.error("fetchMovements error:", e);
+    }
+    return [];
   }
 
   async addProduction(productId, planned, actual, date, baker) {
@@ -1261,6 +1443,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFormSubmissions();
   setupAllPasswordToggles();
   setupInventoryModal();
+  setupInventoryTransferModal();
+  setupInventoryAdjustModal();
+  setupInventoryMovementsModal();
   setupProductModal();
   setupShelfLifeModule();
   setupNotifications();
@@ -2744,6 +2929,22 @@ function setupProductModal() {
   const form = document.getElementById("product-form");
 
   const openModal = (product = null) => {
+    const branchSel = document.getElementById("prod-branch-select");
+    if (branchSel) {
+      const branches = store.branches || [];
+      branchSel.innerHTML = `<option value="all">All Branches (Global Master)</option>` + 
+        branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+      if (store.currentUser && store.currentUser.role !== 'admin') {
+        branchSel.value = store.currentUser.branch_id || store.currentUser.branchId || 'all';
+        branchSel.disabled = true;
+      } else {
+        branchSel.disabled = false;
+      }
+    }
+
+    const initStockGroup = document.getElementById("prod-initial-stock-group");
+
     if (product) {
       document.getElementById("product-modal-title").textContent = "Edit Bakery Product";
       document.getElementById("product-id-hidden").value = product.id;
@@ -2753,10 +2954,18 @@ function setupProductModal() {
       document.getElementById("prod-cost-input").value = product.cost;
       document.getElementById("prod-shelflife-input").value = product.shelfLifeDays;
       document.getElementById("prod-repurpose-input").value = product.repurposeRecipe || "";
+      if (document.getElementById("prod-unit-select")) document.getElementById("prod-unit-select").value = product.unit || "pcs";
+      if (document.getElementById("prod-status-select")) document.getElementById("prod-status-select").value = product.status || "Active";
+      if (branchSel) branchSel.value = product.branchId || "all";
+      if (initStockGroup) initStockGroup.style.display = "none";
     } else {
       document.getElementById("product-modal-title").textContent = "Add Bakery Product";
       if (form) form.reset();
       document.getElementById("product-id-hidden").value = "";
+      if (branchSel && store.getSelectedBranchId() !== 'all') {
+        branchSel.value = store.getSelectedBranchId();
+      }
+      if (initStockGroup) initStockGroup.style.display = "block";
     }
     if (modal) {
       modal.style.display = "block";
@@ -2796,12 +3005,17 @@ function setupProductModal() {
       const cost = parseFloat(document.getElementById("prod-cost-input").value);
       const shelfLifeDays = parseInt(document.getElementById("prod-shelflife-input").value);
       const repurposeRecipe = document.getElementById("prod-repurpose-input").value;
+      const branchSelVal = document.getElementById("prod-branch-select")?.value || 'all';
+      const branchId = (branchSelVal && branchSelVal !== 'all') ? parseInt(branchSelVal) : null;
+      const unit = document.getElementById("prod-unit-select")?.value || 'pcs';
+      const status = document.getElementById("prod-status-select")?.value || 'Active';
+      const initialStock = parseInt(document.getElementById("prod-initial-stock-input")?.value || 0);
 
       if (pId) {
-        await store.updateProduct(pId, { name, category, price, cost, shelfLifeDays, repurposeRecipe });
+        await store.updateProduct(pId, { name, category, price, cost, shelfLifeDays, repurposeRecipe, branchId, unit, status });
         showToast("Product details updated.", "success");
       } else {
-        await store.addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe);
+        await store.addProduct(name, category, price, cost, shelfLifeDays, repurposeRecipe, branchId, unit, status, '', initialStock);
         showToast("New product added to catalog.", "success");
       }
       populateSelectDropdowns();
@@ -2809,6 +3023,285 @@ function setupProductModal() {
       refreshProductsPane();
     });
   }
+}
+
+function setupInventoryTransferModal() {
+  const modal = document.getElementById("inventory-transfer-modal");
+  const overlay = document.getElementById("modal-overlay");
+  const openBtn = document.getElementById("btn-transfer-inventory-modal");
+  const closeBtn = document.getElementById("btn-transfer-modal-close");
+  const cancelBtn = document.getElementById("btn-transfer-modal-cancel");
+  const form = document.getElementById("inventory-transfer-form");
+  const fromBranchSel = document.getElementById("transfer-from-branch");
+  const toBranchSel = document.getElementById("transfer-to-branch");
+  const prodSel = document.getElementById("transfer-product-select");
+  const availNote = document.getElementById("transfer-avail-stock-note");
+
+  const updateAvailStock = () => {
+    if (!fromBranchSel || !prodSel || !availNote) return;
+    const bId = parseInt(fromBranchSel.value);
+    const pId = prodSel.value;
+    const inv = (store.inventory || []).find(i => parseInt(i.branchId) === bId && i.productId === pId);
+    const stock = inv ? inv.stockLevel : 0;
+    availNote.textContent = `Available stock in source branch: ${stock} pcs`;
+  };
+
+  const populateTransferDropdowns = (preSelectedBranch = null, preSelectedProduct = null) => {
+    if (!fromBranchSel || !toBranchSel || !prodSel) return;
+    const branches = store.branches || [];
+    fromBranchSel.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    toBranchSel.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    prodSel.innerHTML = (store.products || []).map(p => `<option value="${p.id}">${p.name} (${p.category})</option>`).join('');
+
+    if (store.currentUser && store.currentUser.role !== 'admin') {
+      fromBranchSel.value = store.currentUser.branch_id || store.currentUser.branchId || branches[0]?.id;
+      fromBranchSel.disabled = true;
+    } else {
+      fromBranchSel.disabled = false;
+      if (preSelectedBranch) fromBranchSel.value = preSelectedBranch;
+      else if (store.getSelectedBranchId() !== 'all') fromBranchSel.value = store.getSelectedBranchId();
+    }
+
+    if (branches.length > 1) {
+      const other = branches.find(b => parseInt(b.id) !== parseInt(fromBranchSel.value));
+      if (other) toBranchSel.value = other.id;
+    }
+
+    if (preSelectedProduct) prodSel.value = preSelectedProduct;
+    updateAvailStock();
+  };
+
+  fromBranchSel?.addEventListener("change", updateAvailStock);
+  prodSel?.addEventListener("change", updateAvailStock);
+
+  window.openTransferModal = (branchId = null, productId = null) => {
+    populateTransferDropdowns(branchId, productId);
+    if (modal) modal.style.display = "block";
+    if (overlay) {
+      overlay.style.display = "block";
+      overlay.classList.add("visible");
+    }
+  };
+
+  const closeModal = () => {
+    if (modal) modal.style.display = "none";
+    if (overlay) {
+      overlay.style.display = "none";
+      overlay.classList.remove("visible");
+    }
+    if (form) form.reset();
+  };
+
+  if (openBtn) openBtn.addEventListener("click", () => window.openTransferModal());
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fromBranch = fromBranchSel.value;
+      const toBranch = toBranchSel.value;
+      const prodId = prodSel.value;
+      const qty = parseInt(document.getElementById("transfer-quantity-input").value);
+      const notes = document.getElementById("transfer-notes-input").value;
+
+      if (parseInt(fromBranch) === parseInt(toBranch)) {
+        showToast("Source and destination branch cannot be the same.", "error");
+        return;
+      }
+
+      if (!(await showConfirmModal(`Transfer ${qty} units of this product to destination branch?`))) return;
+
+      try {
+        await store.transferInventory({
+          from_branch_id: fromBranch,
+          to_branch_id: toBranch,
+          product_id: prodId,
+          quantity: qty,
+          notes,
+          performed_by: store.currentUser ? store.currentUser.name : 'Staff',
+          authorized_by: store.currentUser ? store.currentUser.name : 'Branch Manager'
+        });
+        showToast("Stock transfer completed successfully.", "success");
+        closeModal();
+        refreshInventoryPane();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+}
+
+function setupInventoryAdjustModal() {
+  const modal = document.getElementById("inventory-adjust-modal");
+  const overlay = document.getElementById("modal-overlay");
+  const closeBtn = document.getElementById("btn-adjust-modal-close");
+  const cancelBtn = document.getElementById("btn-adjust-modal-cancel");
+  const form = document.getElementById("inventory-adjust-form");
+  const branchSel = document.getElementById("adjust-branch-select");
+  const prodSel = document.getElementById("adjust-product-select");
+  const stockNote = document.getElementById("adjust-current-stock-note");
+
+  const updateCurrentStock = () => {
+    if (!branchSel || !prodSel || !stockNote) return;
+    const bId = parseInt(branchSel.value);
+    const pId = prodSel.value;
+    const inv = (store.inventory || []).find(i => parseInt(i.branchId) === bId && i.productId === pId);
+    const stock = inv ? inv.stockLevel : 0;
+    stockNote.textContent = `Current branch stock: ${stock} pcs`;
+  };
+
+  const populateAdjustDropdowns = (preSelectedBranch = null, preSelectedProduct = null) => {
+    if (!branchSel || !prodSel) return;
+    const branches = store.branches || [];
+    branchSel.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    prodSel.innerHTML = (store.products || []).map(p => `<option value="${p.id}">${p.name} (${p.category})</option>`).join('');
+
+    if (store.currentUser && store.currentUser.role !== 'admin') {
+      branchSel.value = store.currentUser.branch_id || store.currentUser.branchId || branches[0]?.id;
+      branchSel.disabled = true;
+    } else {
+      branchSel.disabled = false;
+      if (preSelectedBranch) branchSel.value = preSelectedBranch;
+      else if (store.getSelectedBranchId() !== 'all') branchSel.value = store.getSelectedBranchId();
+    }
+
+    if (preSelectedProduct) prodSel.value = preSelectedProduct;
+    updateCurrentStock();
+  };
+
+  branchSel?.addEventListener("change", updateCurrentStock);
+  prodSel?.addEventListener("change", updateCurrentStock);
+
+  window.openAdjustModal = (branchId = null, productId = null) => {
+    populateAdjustDropdowns(branchId, productId);
+    if (modal) modal.style.display = "block";
+    if (overlay) {
+      overlay.style.display = "block";
+      overlay.classList.add("visible");
+    }
+  };
+
+  const closeModal = () => {
+    if (modal) modal.style.display = "none";
+    if (overlay) {
+      overlay.style.display = "none";
+      overlay.classList.remove("visible");
+    }
+    if (form) form.reset();
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const bId = branchSel.value;
+      const pId = prodSel.value;
+      const adjType = document.getElementById("adjust-type-select").value;
+      const qty = parseInt(document.getElementById("adjust-quantity-input").value);
+      const reason = document.getElementById("adjust-reason-input").value;
+
+      if (!(await showConfirmModal(`Apply ${adjType} of ${qty} units?`))) return;
+
+      try {
+        await store.adjustInventory({
+          branch_id: bId,
+          product_id: pId,
+          adjustment_type: adjType,
+          quantity: qty,
+          reason,
+          notes: reason,
+          performed_by: store.currentUser ? store.currentUser.name : 'Staff',
+          authorized_by: store.currentUser ? store.currentUser.name : 'Branch Manager'
+        });
+        showToast("Stock adjustment saved successfully.", "success");
+        closeModal();
+        refreshInventoryPane();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+}
+
+function setupInventoryMovementsModal() {
+  const modal = document.getElementById("inventory-movements-modal");
+  const overlay = document.getElementById("modal-overlay");
+  const openBtn = document.getElementById("btn-inventory-movements-modal");
+  const closeBtn = document.getElementById("btn-movements-modal-close");
+  const branchFilter = document.getElementById("movements-branch-filter");
+  const typeFilter = document.getElementById("movements-type-filter");
+  const tbody = document.getElementById("movements-tbody");
+
+  const loadMovements = async () => {
+    if (!tbody) return;
+    const bId = branchFilter ? branchFilter.value : 'all';
+    const type = typeFilter ? typeFilter.value : 'all';
+
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Loading movement history...</td></tr>`;
+
+    const movements = await store.fetchMovements({ branch_id: bId, movement_type: type, limit: 100 });
+    if (!movements || movements.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">No stock movement records found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = movements.map(m => {
+      const typeBadgeClass = (m.movement_type || '').includes('In') || (m.movement_type || '').includes('Adjustment') ? 'success' : ((m.movement_type || '').includes('Damaged') || (m.movement_type || '').includes('Expired') ? 'danger' : 'info');
+      const formattedDate = formatDateTimeDisplay(m.created_at);
+      const qtySign = m.quantity > 0 ? `+${m.quantity}` : `${m.quantity}`;
+      const qtyColor = m.quantity > 0 ? 'var(--color-success)' : 'var(--color-error)';
+
+      return `
+        <tr>
+          <td style="font-size: 0.82rem; color: var(--text-secondary);">${formattedDate}</td>
+          <td><span class="badge ${typeBadgeClass}">${m.movement_type}</span></td>
+          <td style="font-weight: 600;">${m.branch_name || ('Branch ' + m.branch_id)}</td>
+          <td style="font-weight: 700;">${m.product_name || m.product_id}</td>
+          <td style="font-weight: 700; color: ${qtyColor};">${qtySign} ${m.unit || 'pcs'}</td>
+          <td style="font-size: 0.85rem;">${m.previous_stock} &rarr; <b>${m.new_stock}</b></td>
+          <td style="font-size: 0.82rem; color: var(--text-secondary);">${m.notes || m.reason || m.reference_id || 'N/A'}</td>
+          <td style="font-size: 0.82rem;">${m.performed_by || 'Staff'}</td>
+        </tr>
+      `;
+    }).join('');
+  };
+
+  window.openMovementsModal = () => {
+    if (branchFilter) {
+      const branches = store.branches || [];
+      branchFilter.innerHTML = `<option value="all">All Branches</option>` + branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+      if (store.currentUser && store.currentUser.role !== 'admin') {
+        branchFilter.value = store.currentUser.branch_id || store.currentUser.branchId || 'all';
+        branchFilter.disabled = true;
+      } else {
+        branchFilter.disabled = false;
+        if (store.getSelectedBranchId() !== 'all') branchFilter.value = store.getSelectedBranchId();
+      }
+    }
+
+    loadMovements();
+    if (modal) modal.style.display = "block";
+    if (overlay) {
+      overlay.style.display = "block";
+      overlay.classList.add("visible");
+    }
+  };
+
+  const closeModal = () => {
+    if (modal) modal.style.display = "none";
+    if (overlay) {
+      overlay.style.display = "none";
+      overlay.classList.remove("visible");
+    }
+  };
+
+  if (openBtn) openBtn.addEventListener("click", () => window.openMovementsModal());
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  branchFilter?.addEventListener("change", loadMovements);
+  typeFilter?.addEventListener("change", loadMovements);
 }
 
 function showConfirmModal(message, title = "Confirm Action", iconType = "alert-triangle", confirmBtnText = null, cancelBtnText = null) {
@@ -4759,22 +5252,72 @@ function setupPOSModule() {
 function refreshInventoryPane() {
   const tbody = document.getElementById("inventory-tbody");
   if (!tbody) return;
-  const branchIdStr = store.getSelectedBranchId();
-  const branchId = branchIdStr === 'all' ? 'all' : parseInt(branchIdStr);
 
-  const searchInput = document.getElementById('inventory-search-input')?.value.toLowerCase() || '';
-  const dateFilter = document.getElementById('inventory-date-filter')?.value || '';
-  const localBranchFilter = document.getElementById('inventory-branch-filter')?.value || 'all';
-  const effectiveBranchId = localBranchFilter !== 'all' ? parseInt(localBranchFilter) : branchId;
+  const branchFilterEl = document.getElementById("inventory-branch-filter");
+  const searchInputEl = document.getElementById("inventory-search-input");
+  const categoryFilterEl = document.getElementById("inventory-category-filter");
+  const dateFilterEl = document.getElementById("inventory-date-filter");
+  const expiryFilterEl = document.getElementById("inventory-expiry-filter");
+  const statusFilterEl = document.getElementById("inventory-status-filter");
 
-  const filteredInventory = store.inventory
-    .filter(i => effectiveBranchId === 'all' || i.branchId === effectiveBranchId)
-    .filter(i => {
-      const p = store.products.find(x => x.id === i.productId);
-      const nameMatch = p ? p.name.toLowerCase().includes(searchInput) : true;
-      const dateMatch = dateFilter ? i.productionDate.startsWith(dateFilter) : true;
-      return nameMatch && dateMatch;
-    });
+  if (branchFilterEl && branchFilterEl.options.length <= 1) {
+    const branches = store.branches || [];
+    branchFilterEl.innerHTML = `<option value="all">All Branches</option>` + 
+      branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+    if (store.currentUser && store.currentUser.role !== 'admin') {
+      branchFilterEl.value = store.currentUser.branch_id || store.currentUser.branchId || 'all';
+      branchFilterEl.disabled = true;
+    }
+
+    if (!branchFilterEl.dataset.listening) {
+      branchFilterEl.dataset.listening = "true";
+      branchFilterEl.addEventListener("change", () => {
+        inventoryCurrentPage = 1;
+        refreshInventoryPane();
+      });
+    }
+  }
+
+  [searchInputEl, categoryFilterEl, dateFilterEl, expiryFilterEl, statusFilterEl].forEach(el => {
+    if (el && !el.dataset.listening) {
+      el.dataset.listening = "true";
+      el.addEventListener(el.tagName === 'INPUT' && el.type === 'text' ? 'input' : 'change', () => {
+        inventoryCurrentPage = 1;
+        refreshInventoryPane();
+      });
+    }
+  });
+
+  const branchVal = branchFilterEl ? branchFilterEl.value : 'all';
+  const searchVal = searchInputEl ? searchInputEl.value.toLowerCase().trim() : '';
+  const categoryVal = categoryFilterEl ? categoryFilterEl.value : 'all';
+  const dateVal = dateFilterEl ? dateFilterEl.value : '';
+  const expiryVal = expiryFilterEl ? expiryFilterEl.value : '';
+  const statusVal = statusFilterEl ? statusFilterEl.value : 'all';
+
+  const filteredInventory = (store.inventory || []).filter(item => {
+    if (branchVal !== 'all' && parseInt(item.branchId) !== parseInt(branchVal)) return false;
+
+    const p = (store.products || []).find(x => x.id === item.productId);
+    const pName = p ? p.name.toLowerCase() : String(item.productId).toLowerCase();
+    const pCat = p ? p.category.toUpperCase() : 'BREAD';
+
+    if (searchVal && !pName.includes(searchVal)) return false;
+    if (categoryVal !== 'all' && pCat !== categoryVal.toUpperCase()) return false;
+    if (dateVal && !item.productionDate.startsWith(dateVal)) return false;
+    if (expiryVal && !item.expiryDate.startsWith(expiryVal)) return false;
+
+    const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
+    let shelfStatus = 'Fresh';
+    if (fIndex === 0) shelfStatus = 'Expired';
+    else if (fIndex <= 30) shelfStatus = 'Near Expiry';
+    else if (item.stockLevel <= 10) shelfStatus = 'Low Stock';
+
+    if (statusVal !== 'all' && shelfStatus.toLowerCase() !== statusVal.toLowerCase()) return false;
+
+    return true;
+  });
 
   const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE) || 1;
   if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
@@ -4783,9 +5326,11 @@ function refreshInventoryPane() {
 
   setSafeHtml(tbody, pagedInventory.map(item => {
     const p = store.products.find(x => x.id === item.productId);
-    if (!p) return '';
+    const pName = p ? p.name : item.productId;
+    const pCategory = p ? p.category : 'Bread';
 
     const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
+    const degradation = 100 - fIndex;
     let statusClass = "success";
     let statusText = "Fresh";
     let barColor = "var(--color-success)";
@@ -4798,29 +5343,38 @@ function refreshInventoryPane() {
       statusClass = "warning";
       statusText = "Near Expiry";
       barColor = "var(--color-warning)";
+    } else if (item.stockLevel <= 10) {
+      statusClass = "warning";
+      statusText = "Low Stock";
     }
 
     const prodFormatted = formatDateTimeDisplay(item.productionDate);
     const expFormatted = formatDateTimeDisplay(item.expiryDate);
-    const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(item.branchId || item.branch_id)) || (store.branches.length > 0 ? store.branches[0] : { name: "Main Branch" });
+    const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(item.branchId)) || { name: `Branch ${item.branchId}` };
 
     return `
       <tr>
-        <td style="font-weight: 700;">${p.name}</td>
-        <td style="color: var(--text-secondary); font-size: 0.85rem;">${b.name}</td>
-        <td>${p.category}</td>
-        <td>${item.stockLevel} pcs</td>
+        <td style="font-weight: 700;">${pName}</td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">${b.name}</td>
+        <td><span class="badge info">${pCategory}</span></td>
+        <td style="font-weight: 700;">${item.stockLevel} ${item.unit || 'pcs'}</td>
         <td style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600;">${prodFormatted}</td>
         <td style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600;">${expFormatted}</td>
         <td>
           <div class="freshness-indicator">
-            <div class="freshness-bar-outer">
-              <div class="freshness-bar-inner" style="width: ${fIndex}%; background-color: ${barColor};"></div>
+            <div class="freshness-bar-outer" title="${degradation}% Degradation">
+              <div class="freshness-bar-inner" style="width: ${degradation}%; background-color: ${barColor};"></div>
             </div>
-            <span class="freshness-value">${fIndex}%</span>
+            <span class="freshness-value" style="font-size: 0.8rem; font-weight: 600;">${degradation}%</span>
           </div>
         </td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
+        <td>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="btn-secondary inv-row-adjust-btn" data-pid="${item.productId}" data-branch="${item.branchId}" style="padding: 4px 8px; font-size: 0.78rem;" title="Adjust Stock">Adjust</button>
+            <button class="btn-secondary inv-row-transfer-btn" data-pid="${item.productId}" data-branch="${item.branchId}" style="padding: 4px 8px; font-size: 0.78rem;" title="Transfer Stock">Transfer</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join(''));
@@ -4850,6 +5404,24 @@ function refreshInventoryPane() {
       }
     };
   }
+
+  document.querySelectorAll(".inv-row-adjust-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pid = btn.getAttribute("data-pid");
+      const branchId = btn.getAttribute("data-branch");
+      if (window.openAdjustModal) window.openAdjustModal(branchId, pid);
+    });
+  });
+
+  document.querySelectorAll(".inv-row-transfer-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pid = btn.getAttribute("data-pid");
+      const branchId = btn.getAttribute("data-branch");
+      if (window.openTransferModal) window.openTransferModal(branchId, pid);
+    });
+  });
+
+  lucide.createIcons();
 }
 
 // 4. PRODUCTION LOGS VIEW REFRESHER
@@ -5414,6 +5986,10 @@ function refreshProductsPane() {
   populateShelfBreadTypeDropdown();
   const tbody = document.getElementById("products-tbody");
   const addBtn = document.getElementById("btn-add-product-modal");
+  const branchFilterEl = document.getElementById("products-branch-filter");
+  const searchInputEl = document.getElementById("products-search-input");
+  const categoryFilterEl = document.getElementById("products-category-filter");
+  const statusFilterEl = document.getElementById("products-status-filter");
 
   if (addBtn && !addBtn.dataset.listening) {
     addBtn.dataset.listening = "true";
@@ -5423,29 +5999,97 @@ function refreshProductsPane() {
     });
   }
 
+  if (branchFilterEl && branchFilterEl.options.length <= 1) {
+    const branches = store.branches || [];
+    branchFilterEl.innerHTML = `<option value="all">All Branches</option>` + 
+      branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+    if (store.currentUser && store.currentUser.role !== 'admin') {
+      branchFilterEl.value = store.currentUser.branch_id || store.currentUser.branchId || 'all';
+      branchFilterEl.disabled = true;
+    }
+
+    if (!branchFilterEl.dataset.listening) {
+      branchFilterEl.dataset.listening = "true";
+      branchFilterEl.addEventListener("change", () => {
+        productsCurrentPage = 1;
+        refreshProductsPane();
+      });
+    }
+  }
+
+  if (searchInputEl && !searchInputEl.dataset.listening) {
+    searchInputEl.dataset.listening = "true";
+    searchInputEl.addEventListener("input", () => {
+      productsCurrentPage = 1;
+      refreshProductsPane();
+    });
+  }
+
+  if (categoryFilterEl && !categoryFilterEl.dataset.listening) {
+    categoryFilterEl.dataset.listening = "true";
+    categoryFilterEl.addEventListener("change", () => {
+      productsCurrentPage = 1;
+      refreshProductsPane();
+    });
+  }
+
+  if (statusFilterEl && !statusFilterEl.dataset.listening) {
+    statusFilterEl.dataset.listening = "true";
+    statusFilterEl.addEventListener("change", () => {
+      productsCurrentPage = 1;
+      refreshProductsPane();
+    });
+  }
+
   if (!tbody) return;
 
-  const totalPages = Math.ceil(store.products.length / ITEMS_PER_PAGE) || 1;
+  const branchFilterVal = branchFilterEl ? branchFilterEl.value : 'all';
+  const searchVal = searchInputEl ? searchInputEl.value.trim().toLowerCase() : '';
+  const categoryVal = categoryFilterEl ? categoryFilterEl.value : 'all';
+  const statusVal = statusFilterEl ? statusFilterEl.value : 'all';
+
+  const filteredProducts = (store.products || []).filter(p => {
+    if (branchFilterVal !== 'all') {
+      const bId = parseInt(branchFilterVal);
+      if (p.branchId != null && parseInt(p.branchId) !== bId) return false;
+    }
+    if (searchVal && !p.name.toLowerCase().includes(searchVal)) return false;
+    if (categoryVal !== 'all' && p.category.toUpperCase() !== categoryVal.toUpperCase()) return false;
+    if (statusVal !== 'all' && (p.status || 'Active').toLowerCase() !== statusVal.toLowerCase()) return false;
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) || 1;
   if (productsCurrentPage > totalPages) productsCurrentPage = totalPages;
   const startIndex = (productsCurrentPage - 1) * ITEMS_PER_PAGE;
-  const pagedProducts = store.products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const pagedProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  setSafeHtml(tbody, pagedProducts.map(p => `
-    <tr>
-      <td style="font-weight: 700;">${p.name}</td>
-      <td><span class="badge info">${p.category}</span></td>
-      <td style="font-weight: 700; color: var(--primary-color);">₱${p.price.toFixed(2)}</td>
-      <td>₱${p.cost.toFixed(2)}</td>
-      <td>${p.shelfLifeDays} Days</td>
-      <td style="font-size: 0.85rem; color: var(--text-secondary);">${p.repurposeRecipe}</td>
-      <td style="vertical-align: middle;">
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <button class="kanban-action-btn edit-product-btn" data-id="${p.id}" title="Edit Product"><i data-lucide="edit-3" style="width: 14px; height: 14px;"></i></button>
-          <button class="kanban-action-btn delete-product-btn" data-id="${p.id}" title="Delete Product" style="color: var(--color-error);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
-        </div>
-      </td>
-    </tr>
-  `).join(''));
+  setSafeHtml(tbody, pagedProducts.map(p => {
+    const branchObj = p.branchId ? (store.branches || []).find(b => parseInt(b.id) === parseInt(p.branchId)) : null;
+    const branchLabel = branchObj ? branchObj.name : 'All Branches (Global)';
+    const statusClass = (p.status || 'Active') === 'Active' ? 'success' : 'danger';
+
+    return `
+      <tr>
+        <td style="font-weight: 700;">${p.name}</td>
+        <td style="font-size: 0.85rem; color: var(--text-secondary);">${branchLabel}</td>
+        <td><span class="badge info">${p.category}</span></td>
+        <td style="font-weight: 700; color: var(--primary-color);">₱${p.price.toFixed(2)}</td>
+        <td>₱${p.cost.toFixed(2)}</td>
+        <td>${p.shelfLifeDays} Days</td>
+        <td style="font-size: 0.85rem;">${p.unit || 'pcs'}</td>
+        <td><span class="badge ${statusClass}">${p.status || 'Active'}</span></td>
+        <td style="font-size: 0.85rem; color: var(--text-secondary);">${p.repurposeRecipe || 'N/A'}</td>
+        <td style="vertical-align: middle;">
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="kanban-action-btn edit-product-btn" data-id="${p.id}" title="Edit Product"><i data-lucide="edit-3" style="width: 14px; height: 14px;"></i></button>
+            <button class="kanban-action-btn delete-product-btn" data-id="${p.id}" title="Delete Product" style="color: var(--color-error);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join(''));
 
   const prevBtn = document.getElementById("products-prev-page");
   const nextBtn = document.getElementById("products-next-page");

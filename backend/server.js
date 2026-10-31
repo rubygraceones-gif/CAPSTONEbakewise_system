@@ -78,19 +78,34 @@ function authenticateToken(req, res, next) {
   // Allow OPTIONS preflight requests
   if (req.method === 'OPTIONS') return next();
 
-  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, /api/branches, and /api/users without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/users')) return next();
-
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) return res.status(401).json({ error: 'No token provided' });
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (err) {
+      if (!req.path.startsWith('/auth/login') && !req.path.startsWith('/status') && !req.path.startsWith('/sync')) {
+        return res.status(403).json({ error: 'Token is invalid or expired' });
+      }
+    }
+  }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token is invalid or expired' });
-    req.user = user;
-    next();
-  });
+  // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, /api/branches, and /api/users without strict JWT header check
+  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/users')) return next();
+
+  if (token == null) return res.status(401).json({ error: 'No token provided' });
+  if (!req.user) return res.status(403).json({ error: 'Token is invalid or expired' });
+  next();
+}
+
+// Helper to verify role and branch access
+function checkBranchAccess(req, targetBranchId) {
+  if (!req.user) return true;
+  if (req.user.role === 'admin') return true;
+  if (!targetBranchId || targetBranchId === 'all') return true;
+  return parseInt(targetBranchId) === parseInt(req.user.branchId);
 }
 
 app.use('/api/', authenticateToken);
@@ -286,8 +301,8 @@ async function queryDb(sql, params = []) {
         if (tableMatch) {
           const tableName = tableMatch[1];
           const ALLOWED_TABLES = [
-            'bw_branches', 'bw_users', 'bw_products', 'bw_sales',
-            'bw_inventory', 'bw_production', 'bw_waste',
+            'bw_branches', 'bw_users', 'bw_products', 'bw_branch_products', 'bw_sales',
+            'bw_inventory', 'bw_inventory_movements', 'bw_inventory_batches', 'bw_production', 'bw_waste',
             'bw_pos_transactions', 'bw_pos_transaction_items', 'bw_repurpose_logs'
           ];
           if (ALLOWED_TABLES.includes(tableName)) {
@@ -503,6 +518,69 @@ async function initializeMysqlSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // MySQL Branch & Inventory extensions
+  try {
+    await mysqlPool.query(`
+      CREATE TABLE IF NOT EXISTS bw_branch_products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        branch_id INT NOT NULL,
+        product_id VARCHAR(50) NOT NULL,
+        custom_name VARCHAR(255),
+        category VARCHAR(100),
+        price DECIMAL(10,2) NOT NULL,
+        cost DECIMAL(10,2) NOT NULL,
+        shelf_life_days INT DEFAULT 2,
+        repurpose_recipe TEXT,
+        unit VARCHAR(50) DEFAULT 'pcs',
+        status VARCHAR(50) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_branch_product (branch_id, product_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await mysqlPool.query(`
+      CREATE TABLE IF NOT EXISTS bw_inventory_movements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        movement_type VARCHAR(50) NOT NULL,
+        branch_id INT NOT NULL,
+        product_id VARCHAR(50) NOT NULL,
+        quantity INT NOT NULL,
+        previous_stock INT DEFAULT 0,
+        new_stock INT DEFAULT 0,
+        unit VARCHAR(50) DEFAULT 'pcs',
+        batch_id VARCHAR(100),
+        source_branch_id INT DEFAULT NULL,
+        dest_branch_id INT DEFAULT NULL,
+        reference_id VARCHAR(100) DEFAULT NULL,
+        reason VARCHAR(255) DEFAULT NULL,
+        notes TEXT,
+        performed_by VARCHAR(255) DEFAULT 'Staff',
+        authorized_by VARCHAR(255) DEFAULT 'System',
+        status VARCHAR(50) DEFAULT 'Completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await mysqlPool.query(`
+      CREATE TABLE IF NOT EXISTS bw_inventory_batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_code VARCHAR(100) NOT NULL,
+        branch_id INT NOT NULL,
+        product_id VARCHAR(50) NOT NULL,
+        initial_quantity INT NOT NULL,
+        current_quantity INT NOT NULL,
+        production_date DATE NOT NULL,
+        production_time VARCHAR(20) DEFAULT '06:00:00',
+        expiry_date DATE NOT NULL,
+        expiry_time VARCHAR(20) DEFAULT '18:00:00',
+        status VARCHAR(50) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch (err) {
+    console.warn("MySQL branch extensions notice:", err.message);
+  }
+
   // Seed initial stock levels into bw_inventory ONLY on empty database
   try {
     const [invRows] = await mysqlPool.query("SELECT COUNT(*) as count FROM bw_inventory");
@@ -652,6 +730,71 @@ async function initializePgSchema() {
         quantity INTEGER NOT NULL,
         unit_price NUMERIC(10, 2) NOT NULL,
         subtotal NUMERIC(10, 2) NOT NULL
+      );
+
+      -- PostgreSQL Branch & Inventory extensions
+      ALTER TABLE bw_products ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES bw_branches(id) ON DELETE CASCADE;
+      ALTER TABLE bw_products ADD COLUMN IF NOT EXISTS unit VARCHAR(50) DEFAULT 'pcs';
+      ALTER TABLE bw_products ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+      ALTER TABLE bw_products ADD COLUMN IF NOT EXISTS description TEXT;
+
+      CREATE TABLE IF NOT EXISTS bw_branch_products (
+        id SERIAL PRIMARY KEY,
+        branch_id INTEGER NOT NULL REFERENCES bw_branches(id) ON DELETE CASCADE,
+        product_id VARCHAR(50) NOT NULL REFERENCES bw_products(id) ON DELETE CASCADE,
+        custom_name VARCHAR(255),
+        category VARCHAR(100),
+        price NUMERIC(10, 2) NOT NULL,
+        cost NUMERIC(10, 2) NOT NULL,
+        shelf_life_days INTEGER DEFAULT 2,
+        repurpose_recipe TEXT,
+        unit VARCHAR(50) DEFAULT 'pcs',
+        status VARCHAR(50) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_branch_product UNIQUE (branch_id, product_id)
+      );
+
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS unit VARCHAR(50) DEFAULT 'pcs';
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'In Stock';
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS batch_id VARCHAR(100);
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS production_time VARCHAR(20) DEFAULT '06:00:00';
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS expiry_time VARCHAR(20) DEFAULT '18:00:00';
+      ALTER TABLE bw_inventory ADD COLUMN IF NOT EXISTS degradation_percent INTEGER DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS bw_inventory_movements (
+        id SERIAL PRIMARY KEY,
+        movement_type VARCHAR(50) NOT NULL,
+        branch_id INTEGER NOT NULL REFERENCES bw_branches(id) ON DELETE CASCADE,
+        product_id VARCHAR(50) NOT NULL,
+        quantity INTEGER NOT NULL,
+        previous_stock INTEGER DEFAULT 0,
+        new_stock INTEGER DEFAULT 0,
+        unit VARCHAR(50) DEFAULT 'pcs',
+        batch_id VARCHAR(100),
+        source_branch_id INTEGER DEFAULT NULL,
+        dest_branch_id INTEGER DEFAULT NULL,
+        reference_id VARCHAR(100) DEFAULT NULL,
+        reason VARCHAR(255) DEFAULT NULL,
+        notes TEXT,
+        performed_by VARCHAR(255) DEFAULT 'Staff',
+        authorized_by VARCHAR(255) DEFAULT 'System',
+        status VARCHAR(50) DEFAULT 'Completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bw_inventory_batches (
+        id SERIAL PRIMARY KEY,
+        batch_code VARCHAR(100) NOT NULL,
+        branch_id INTEGER NOT NULL REFERENCES bw_branches(id) ON DELETE CASCADE,
+        product_id VARCHAR(50) NOT NULL,
+        initial_quantity INTEGER NOT NULL,
+        current_quantity INTEGER NOT NULL,
+        production_date DATE NOT NULL,
+        production_time VARCHAR(20) DEFAULT '06:00:00',
+        expiry_date DATE NOT NULL,
+        expiry_time VARCHAR(20) DEFAULT '18:00:00',
+        status VARCHAR(50) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
   } catch (err) {
@@ -886,14 +1029,21 @@ app.get('/api/sync', async (req, res) => {
     const wasteParams = bId ? [bId] : [];
     const wastePromise = queryDb(wasteSql, wasteParams);
 
-    const [branchesRes, usersRes, productsRes, salesRes, inventoryRes, prodRes, wasteRes] = await Promise.all([
+    const movSql = bId
+      ? "SELECT * FROM bw_inventory_movements WHERE branch_id = $1 ORDER BY created_at DESC LIMIT 300"
+      : "SELECT * FROM bw_inventory_movements ORDER BY created_at DESC LIMIT 500";
+    const movParams = bId ? [bId] : [];
+    const movementsPromise = queryDb(movSql, movParams);
+
+    const [branchesRes, usersRes, productsRes, salesRes, inventoryRes, prodRes, wasteRes, movementsRes] = await Promise.all([
       branchesPromise,
       usersPromise,
       productsPromise,
       salesPromise,
       inventoryPromise,
       prodPromise,
-      wastePromise
+      wastePromise,
+      movementsPromise
     ]);
 
     res.json({
@@ -905,7 +1055,8 @@ app.get('/api/sync', async (req, res) => {
       sales: salesRes.rows || [],
       inventory: inventoryRes.rows || [],
       production: prodRes.rows || [],
-      waste: wasteRes.rows || []
+      waste: wasteRes.rows || [],
+      movements: movementsRes.rows || []
     });
   } catch (err) {
     console.error("[SYNC API ERROR]", err);
@@ -1286,26 +1437,143 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// 5. PRODUCTS API
+// 5. PRODUCTS API (BRANCH-SPECIFIC & GLOBAL CATALOG)
 app.get('/api/products', async (req, res) => {
+  const { branch_id, category, status, search } = req.query;
   try {
-    const result = await queryDb("SELECT * FROM bw_products ORDER BY id ASC");
-    res.json(result.rows);
+    if (req.user && req.user.role !== 'admin') {
+      if (branch_id && branch_id !== 'all' && parseInt(branch_id) !== parseInt(req.user.branchId)) {
+        return res.status(403).json({ error: "Forbidden: You do not have permission to view products for this branch." });
+      }
+    }
+
+    const effectiveBranchId = (req.user && req.user.role !== 'admin')
+      ? req.user.branchId
+      : (branch_id && branch_id !== 'all' ? parseInt(branch_id) : null);
+
+    let query = `
+      SELECT p.*, b.name as branch_name 
+      FROM bw_products p
+      LEFT JOIN bw_branches b ON p.branch_id = b.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (effectiveBranchId) {
+      params.push(effectiveBranchId);
+      query += ` AND (p.branch_id = $${params.length} OR p.branch_id IS NULL)`;
+    }
+
+    if (category && category !== 'all') {
+      params.push(category);
+      query += ` AND LOWER(p.category) = LOWER($${params.length})`;
+    }
+
+    if (status && status !== 'all') {
+      params.push(status);
+      query += ` AND LOWER(p.status) = LOWER($${params.length})`;
+    }
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim().toLowerCase()}%`);
+      query += ` AND LOWER(p.name) LIKE $${params.length}`;
+    }
+
+    query += " ORDER BY p.name ASC, p.id ASC";
+    const result = await queryDb(query, params);
+
+    // Apply branch product overrides if branch is specified
+    if (effectiveBranchId && result.rows) {
+      const overrides = await queryDb("SELECT * FROM bw_branch_products WHERE branch_id = $1", [effectiveBranchId]);
+      if (overrides.rows && overrides.rows.length > 0) {
+        const overrideMap = new Map();
+        overrides.rows.forEach(o => overrideMap.set(String(o.product_id), o));
+
+        result.rows = result.rows.map(prod => {
+          const ov = overrideMap.get(String(prod.id));
+          if (!ov) return prod;
+          return {
+            ...prod,
+            name: ov.custom_name || prod.name,
+            category: ov.category || prod.category,
+            price: ov.price !== undefined ? parseFloat(ov.price) : prod.price,
+            cost: ov.cost !== undefined ? parseFloat(ov.cost) : prod.cost,
+            shelf_life_days: ov.shelf_life_days !== undefined ? ov.shelf_life_days : prod.shelf_life_days,
+            repurpose_recipe: ov.repurpose_recipe !== undefined ? ov.repurpose_recipe : prod.repurpose_recipe,
+            unit: ov.unit || prod.unit,
+            status: ov.status || prod.status
+          };
+        }).filter(p => p.status !== 'Inactive' || status === 'Inactive' || status === 'all');
+      }
+    }
+
+    res.json(result.rows || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/products', async (req, res) => {
-  const { id, name, category, price, cost, shelf_life_days, repurpose_recipe } = req.body;
+  const { id, name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id, unit, status, description, initial_stock } = req.body;
+  if (!name || price == null) {
+    return res.status(400).json({ error: "Product name and price are required." });
+  }
+
+  let targetBranchId = (branch_id && branch_id !== 'all') ? parseInt(branch_id) : null;
+  if (req.user && req.user.role !== 'admin') {
+    if (targetBranchId && targetBranchId !== parseInt(req.user.branchId)) {
+      return res.status(403).json({ error: "Forbidden: You cannot create products for other branches." });
+    }
+    targetBranchId = req.user.branchId;
+  }
+
   try {
-    const prodId = id || "p_" + Date.now();
+    const prodId = id || "p" + Date.now();
+    const prodUnit = unit || 'pcs';
+    const prodStatus = status || 'Active';
+    const shelfDays = parseInt(shelf_life_days) || 2;
+    const numPrice = parseFloat(price);
+    const numCost = parseFloat(cost) || 0;
+
     await queryDb(
-      "INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [prodId, name, category, parseFloat(price), parseFloat(cost), parseInt(shelf_life_days), repurpose_recipe]
+      `INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id, unit, status, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [prodId, name, category, numPrice, numCost, shelfDays, repurpose_recipe || '', targetBranchId, prodUnit, prodStatus, description || '']
     );
+
+    // Initial stock injection if provided
+    const initQty = parseInt(initial_stock) || 0;
+    if (initQty > 0 && targetBranchId) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const expDateStr = new Date(Date.now() + shelfDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      await queryDb(
+        `INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id, unit, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'In Stock')`,
+        [prodId, initQty, todayStr, expDateStr, targetBranchId, prodUnit]
+      );
+
+      await queryDb(
+        `INSERT INTO bw_inventory_movements (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, performed_by, status)
+         VALUES ('Stock In', $1, $2, $3, 0, $3, $4, 'Initial Product Stock', $5, 'Completed')`,
+        [targetBranchId, prodId, initQty, prodUnit, req.user ? (req.user.name || req.user.email) : 'System']
+      );
+    }
+
     clearApiCache();
-    res.status(201).json({ id: prodId, name, category, price, cost, shelf_life_days, repurpose_recipe });
+    res.status(201).json({
+      id: prodId,
+      name,
+      category,
+      price: numPrice,
+      cost: numCost,
+      shelf_life_days: shelfDays,
+      repurpose_recipe: repurpose_recipe || '',
+      branch_id: targetBranchId,
+      unit: prodUnit,
+      status: prodStatus,
+      description: description || ''
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1313,14 +1581,46 @@ app.post('/api/products', async (req, res) => {
 
 app.put('/api/products/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, category, price, cost, shelf_life_days, repurpose_recipe } = req.body;
+  const { name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id, unit, status, description } = req.body;
   try {
+    const existing = await queryDb("SELECT * FROM bw_products WHERE id = $1", [id]);
+    if (!existing.rows || existing.rows.length === 0) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    const curProd = existing.rows[0];
+    if (req.user && req.user.role !== 'admin') {
+      if (curProd.branch_id && parseInt(curProd.branch_id) !== parseInt(req.user.branchId)) {
+        return res.status(403).json({ error: "Forbidden: You cannot modify products belonging to another branch." });
+      }
+    }
+
+    const targetBranchId = branch_id !== undefined ? (branch_id && branch_id !== 'all' ? parseInt(branch_id) : null) : curProd.branch_id;
+    const prodUnit = unit || curProd.unit || 'pcs';
+    const prodStatus = status || curProd.status || 'Active';
+
     await queryDb(
-      "UPDATE bw_products SET name = $1, category = $2, price = $3, cost = $4, shelf_life_days = $5, repurpose_recipe = $6 WHERE id = $7",
-      [name, category, parseFloat(price), parseFloat(cost), parseInt(shelf_life_days), repurpose_recipe, id]
+      `UPDATE bw_products SET 
+        name = $1, category = $2, price = $3, cost = $4, shelf_life_days = $5, 
+        repurpose_recipe = $6, branch_id = $7, unit = $8, status = $9, description = $10 
+       WHERE id = $11`,
+      [
+        name !== undefined ? name : curProd.name,
+        category !== undefined ? category : curProd.category,
+        price !== undefined ? parseFloat(price) : curProd.price,
+        cost !== undefined ? parseFloat(cost) : curProd.cost,
+        shelf_life_days !== undefined ? parseInt(shelf_life_days) : curProd.shelf_life_days,
+        repurpose_recipe !== undefined ? repurpose_recipe : curProd.repurpose_recipe,
+        targetBranchId,
+        prodUnit,
+        prodStatus,
+        description !== undefined ? description : curProd.description,
+        id
+      ]
     );
+
     clearApiCache();
-    res.json({ id, name, category, price, cost, shelf_life_days, repurpose_recipe });
+    res.json({ id, name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id: targetBranchId, unit: prodUnit, status: prodStatus });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1329,6 +1629,15 @@ app.put('/api/products/:id', async (req, res) => {
 app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    const existing = await queryDb("SELECT * FROM bw_products WHERE id = $1", [id]);
+    if (existing.rows && existing.rows.length > 0) {
+      const curProd = existing.rows[0];
+      if (req.user && req.user.role !== 'admin') {
+        if (curProd.branch_id && parseInt(curProd.branch_id) !== parseInt(req.user.branchId)) {
+          return res.status(403).json({ error: "Forbidden: You cannot delete products belonging to another branch." });
+        }
+      }
+    }
     await queryDb("DELETE FROM bw_products WHERE id = $1", [id]);
     clearApiCache();
     res.json({ success: true });
@@ -1599,15 +1908,19 @@ app.post('/api/pos/checkout', async (req, res) => {
 
       // B. Deduct Inventory Stock strictly from this branch's inventory records
       const invRows = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
+        "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
         [pIdStr, altPid, bId]
       );
 
       let remainingToDeduct = qty;
       let totalRemainingStock = 0;
+      let initialTotalStock = 0;
+      let itemUnit = 'pcs';
 
       for (const row of (invRows.rows || [])) {
         const rowStock = parseInt(row.stock_level) || 0;
+        if (row.unit) itemUnit = row.unit;
+        initialTotalStock += rowStock;
         if (remainingToDeduct > 0 && rowStock > 0) {
           const deductNow = Math.min(rowStock, remainingToDeduct);
           const newLevel = rowStock - deductNow;
@@ -1622,6 +1935,14 @@ app.post('/api/pos/checkout', async (req, res) => {
       if (totalRemainingStock <= 10) {
         lowStockWarnings.push({ product_id: pIdStr, product_name: pName, remaining_stock: totalRemainingStock });
       }
+
+      // Record in bw_inventory_movements (Stock movement audit trail)
+      await queryDb(
+        `INSERT INTO bw_inventory_movements 
+         (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status)
+         VALUES ('Sale Deduction', $1, $2, $3, $4, $5, $6, $7, 'POS Sale', $8, 'Completed')`,
+        [bId, pIdStr, -qty, initialTotalStock, totalRemainingStock, itemUnit, txNumber, activeCashier]
+      );
 
       // C. Record in bw_sales (Preserving legacy analytics)
       await queryDb(
@@ -1674,12 +1995,22 @@ app.post('/api/pos/void/:id', async (req, res) => {
       const pIdStr = String(item.product_id).trim();
       const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : ('p' + pIdStr);
       const invCheck = await queryDb(
-        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC LIMIT 1",
+        "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC LIMIT 1",
         [pIdStr, altPid, tx.branch_id]
       );
       if (invCheck.rows && invCheck.rows.length > 0) {
-        const restoredStock = parseInt(invCheck.rows[0].stock_level) + parseInt(item.quantity);
+        const curStock = parseInt(invCheck.rows[0].stock_level);
+        const restoredStock = curStock + parseInt(item.quantity);
+        const itemUnit = invCheck.rows[0].unit || 'pcs';
         await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [restoredStock, invCheck.rows[0].id]);
+
+        // Log movement for void restoration
+        await queryDb(
+          `INSERT INTO bw_inventory_movements 
+           (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reference_id, reason, performed_by, status)
+           VALUES ('Manual Adjustment', $1, $2, $3, $4, $5, $6, $7, 'POS Void Restoration', 'Manager', 'Completed')`,
+          [tx.branch_id, pIdStr, parseInt(item.quantity), curStock, restoredStock, itemUnit, tx.transaction_number]
+        );
       }
     }
 
@@ -1777,46 +2108,420 @@ app.get('/api/repurpose/logs', async (req, res) => {
   }
 });
 
-// 7. INVENTORY API
+// 7. INVENTORY API (BRANCH-ISOLATED INVENTORY & STOCK MOVEMENTS)
 app.get('/api/inventory', async (req, res) => {
-  const { branch_id } = req.query;
+  const { branch_id, category, status, search, date, expiry } = req.query;
   try {
-    let query = "SELECT * FROM bw_inventory";
-    let params = [];
-    if (branch_id) {
-      query += " WHERE branch_id = $1";
-      params.push(parseInt(branch_id));
+    // Role-based branch authorization check
+    if (req.user && req.user.role !== 'admin') {
+      if (branch_id && branch_id !== 'all' && parseInt(branch_id) !== parseInt(req.user.branchId)) {
+        return res.status(403).json({ error: "Forbidden: You do not have permission to access inventory for this branch." });
+      }
     }
+
+    const effectiveBranchId = (req.user && req.user.role !== 'admin')
+      ? req.user.branchId
+      : (branch_id && branch_id !== 'all' ? parseInt(branch_id) : null);
+
+    let query = `
+      SELECT 
+        i.id,
+        i.product_id,
+        COALESCE(p.name, i.product_id) as product_name,
+        i.branch_id,
+        COALESCE(b.name, 'Branch ' || i.branch_id) as branch_name,
+        COALESCE(p.category, 'Bread') as category,
+        i.stock_level,
+        COALESCE(i.unit, p.unit, 'pcs') as unit,
+        i.production_date,
+        COALESCE(i.production_time, '06:00:00') as production_time,
+        i.expiry_date,
+        COALESCE(i.expiry_time, '18:00:00') as expiry_time,
+        COALESCE(p.shelf_life_days, 2) as shelf_life_days,
+        COALESCE(i.status, 'In Stock') as status,
+        i.batch_id,
+        i.created_at
+      FROM bw_inventory i
+      LEFT JOIN bw_products p ON i.product_id = p.id
+      LEFT JOIN bw_branches b ON i.branch_id = b.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (effectiveBranchId) {
+      params.push(effectiveBranchId);
+      query += ` AND i.branch_id = $${params.length}`;
+    }
+
+    if (category && category !== 'all') {
+      params.push(category);
+      query += ` AND LOWER(p.category) = LOWER($${params.length})`;
+    }
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim().toLowerCase()}%`);
+      query += ` AND LOWER(p.name) LIKE $${params.length}`;
+    }
+
+    if (date) {
+      params.push(date);
+      query += ` AND i.production_date = $${params.length}`;
+    }
+
+    if (expiry) {
+      params.push(expiry);
+      query += ` AND i.expiry_date = $${params.length}`;
+    }
+
+    // Maintain separate records per branch (never aggregate into one row)
+    query += " ORDER BY b.name ASC, p.name ASC, i.id ASC";
     const result = await queryDb(query, params);
-    res.json(result.rows);
+
+    // Compute dynamic freshness degradation % and shelf status
+    const enrichedRows = (result.rows || []).map(row => {
+      const prodTime = new Date(`${row.production_date}T${row.production_time || '00:00:00'}`).getTime();
+      const expTime = new Date(`${row.expiry_date}T${row.expiry_time || '23:59:59'}`).getTime();
+      const now = Date.now();
+
+      let degradationPercent = 0;
+      let shelfStatus = 'Fresh';
+
+      if (expTime > prodTime) {
+        const totalDuration = expTime - prodTime;
+        const elapsed = now - prodTime;
+        degradationPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+      } else {
+        degradationPercent = 100;
+      }
+
+      if (now >= expTime) {
+        shelfStatus = 'Expired';
+      } else if (degradationPercent >= 70) {
+        shelfStatus = 'Near Expiry';
+      } else if (parseInt(row.stock_level) <= 10) {
+        shelfStatus = 'Low Stock';
+      } else {
+        shelfStatus = 'Fresh';
+      }
+
+      return {
+        ...row,
+        degradation_percent: degradationPercent,
+        shelf_status: shelfStatus
+      };
+    });
+
+    let finalRows = enrichedRows;
+    if (status && status !== 'all') {
+      finalRows = enrichedRows.filter(r => 
+        r.shelf_status.toLowerCase() === status.toLowerCase() ||
+        r.status.toLowerCase() === status.toLowerCase()
+      );
+    }
+
+    res.json(finalRows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/inventory', async (req, res) => {
-  const { product_id, stock_level, production_date, expiry_date, branch_id } = req.body;
+  const { product_id, stock_level, production_date, expiry_date, branch_id, unit, batch_id, production_time, expiry_time, performed_by } = req.body;
+  if (!product_id || stock_level == null || !branch_id) {
+    return res.status(400).json({ error: "product_id, stock_level, and branch_id are required." });
+  }
+
+  const bId = parseInt(branch_id);
+  if (req.user && req.user.role !== 'admin') {
+    if (bId !== parseInt(req.user.branchId)) {
+      return res.status(403).json({ error: "Forbidden: You cannot modify inventory for this branch." });
+    }
+  }
+
+  const qty = parseInt(stock_level);
+  const prodDate = production_date || new Date().toISOString().split('T')[0];
+  const expDate = expiry_date || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const prodTime = production_time || '06:00:00';
+  const expTime = expiry_time || '18:00:00';
+  const unitStr = unit || 'pcs';
+  const performer = performed_by || (req.user ? (req.user.name || req.user.email) : 'Inventory Staff');
+
   try {
-    const bId = branch_id ? parseInt(branch_id) : 1;
+    const pIdStr = String(product_id).trim();
+    const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+
     const check = await queryDb(
-      "SELECT id, stock_level FROM bw_inventory WHERE product_id = $1 AND branch_id = $2",
-      [product_id, bId]
+      "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+      [pIdStr, altPid, bId]
     );
+
     let result;
+    let prevStock = 0;
+    let newStock = qty;
+
     if (check.rows && check.rows.length > 0) {
-      const newStock = check.rows[0].stock_level + parseInt(stock_level);
+      prevStock = parseInt(check.rows[0].stock_level) || 0;
+      newStock = prevStock + qty;
       result = await queryDb(
-        "UPDATE bw_inventory SET stock_level = $1, production_date = $2, expiry_date = $3 WHERE id = $4 RETURNING *",
-        [newStock, production_date, expiry_date, check.rows[0].id]
+        `UPDATE bw_inventory 
+         SET stock_level = $1, production_date = $2, expiry_date = $3, unit = $4, production_time = $5, expiry_time = $6, status = 'In Stock' 
+         WHERE id = $7 RETURNING *`,
+        [newStock, prodDate, expDate, unitStr, prodTime, expTime, check.rows[0].id]
       );
     } else {
       result = await queryDb(
-        "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-        [product_id, parseInt(stock_level), production_date, expiry_date, bId]
+        `INSERT INTO bw_inventory 
+         (product_id, stock_level, production_date, expiry_date, branch_id, unit, production_time, expiry_time, status, batch_id) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'In Stock', $9) RETURNING *`,
+        [pIdStr, qty, prodDate, expDate, bId, unitStr, prodTime, expTime, batch_id || null]
       );
     }
+
+    // Log Stock Movement
+    await queryDb(
+      `INSERT INTO bw_inventory_movements 
+       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, performed_by, status)
+       VALUES ('Stock In', $1, $2, $3, $4, $5, $6, 'Inventory Addition', $7, 'Completed')`,
+      [bId, pIdStr, qty, prevStock, newStock, unitStr, performer]
+    );
+
     clearApiCache();
-    res.json(result.rows[0] || { product_id, stock_level, production_date, expiry_date, branch_id: bId });
+    res.json(result.rows[0] || { product_id: pIdStr, stock_level: newStock, branch_id: bId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual Stock Adjustments, Damage & Expiry
+app.post('/api/inventory/adjust', async (req, res) => {
+  const { branch_id, product_id, adjustment_type, quantity, reason, notes, performed_by, authorized_by } = req.body;
+  if (!branch_id || !product_id || quantity == null) {
+    return res.status(400).json({ error: "branch_id, product_id, and quantity are required." });
+  }
+
+  const bId = parseInt(branch_id);
+  if (req.user && req.user.role !== 'admin') {
+    if (bId !== parseInt(req.user.branchId)) {
+      return res.status(403).json({ error: "Forbidden: You cannot adjust inventory for another branch." });
+    }
+  }
+
+  const adjType = adjustment_type || 'Manual Adjustment';
+  const adjQty = parseInt(quantity);
+  const pIdStr = String(product_id).trim();
+  const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+  const performer = performed_by || (req.user ? (req.user.name || req.user.email) : 'Staff');
+  const authorizer = authorized_by || (req.user ? (req.user.name || req.user.email) : 'Branch Manager');
+
+  try {
+    const invCheck = await queryDb(
+      "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+      [pIdStr, altPid, bId]
+    );
+
+    if (!invCheck.rows || invCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Inventory record not found for this product and branch." });
+    }
+
+    const currentStock = parseInt(invCheck.rows[0].stock_level) || 0;
+    const newStock = Math.max(0, currentStock + adjQty);
+    const unitStr = invCheck.rows[0].unit || 'pcs';
+
+    await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newStock, invCheck.rows[0].id]);
+
+    const movementRes = await queryDb(
+      `INSERT INTO bw_inventory_movements 
+       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, notes, performed_by, authorized_by, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Completed') RETURNING *`,
+      [adjType, bId, pIdStr, adjQty, currentStock, newStock, unitStr, reason || adjType, notes || '', performer, authorizer]
+    );
+
+    if (adjType === 'Damaged' || adjType === 'Expired') {
+      const pRes = await queryDb("SELECT cost FROM bw_products WHERE id = $1 OR id = $2", [pIdStr, altPid]);
+      const cost = (pRes.rows && pRes.rows[0]) ? parseFloat(pRes.rows[0].cost) : 10.00;
+      const wasteQty = Math.abs(adjQty);
+      await queryDb(
+        `INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [pIdStr, wasteQty, wasteQty * cost, reason || adjType, new Date().toISOString().split('T')[0], bId]
+      );
+    }
+
+    clearApiCache();
+    res.json({
+      success: true,
+      message: "Inventory adjusted successfully",
+      previous_stock: currentStock,
+      new_stock: newStock,
+      movement: movementRes.rows[0]
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Branch-to-Branch Transfers
+app.post('/api/inventory/transfer', async (req, res) => {
+  const { from_branch_id, to_branch_id, product_id, quantity, notes, performed_by, authorized_by } = req.body;
+  if (!from_branch_id || !to_branch_id || !product_id || !quantity) {
+    return res.status(400).json({ error: "from_branch_id, to_branch_id, product_id, and quantity are required." });
+  }
+
+  const srcBranchId = parseInt(from_branch_id);
+  const destBranchId = parseInt(to_branch_id);
+  const transferQty = parseInt(quantity);
+
+  if (srcBranchId === destBranchId) {
+    return res.status(400).json({ error: "Source and destination branch cannot be the same." });
+  }
+
+  if (transferQty <= 0) {
+    return res.status(400).json({ error: "Transfer quantity must be greater than zero." });
+  }
+
+  if (req.user && req.user.role !== 'admin') {
+    if (srcBranchId !== parseInt(req.user.branchId)) {
+      return res.status(403).json({ error: "Forbidden: You are only authorized to initiate transfers from your assigned branch." });
+    }
+  }
+
+  const pIdStr = String(product_id).trim();
+  const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : `p${pIdStr}`;
+  const performer = performed_by || (req.user ? (req.user.name || req.user.email) : 'Staff');
+  const authorizer = authorized_by || (req.user ? (req.user.name || req.user.email) : 'Branch Manager');
+
+  try {
+    const srcInv = await queryDb(
+      "SELECT * FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+      [pIdStr, altPid, srcBranchId]
+    );
+
+    if (!srcInv.rows || srcInv.rows.length === 0 || parseInt(srcInv.rows[0].stock_level) < transferQty) {
+      const avail = (srcInv.rows && srcInv.rows.length > 0) ? srcInv.rows[0].stock_level : 0;
+      return res.status(400).json({
+        error: `Insufficient stock in source branch. Available: ${avail}, Requested: ${transferQty}`
+      });
+    }
+
+    const srcRow = srcInv.rows[0];
+    const srcPrevStock = parseInt(srcRow.stock_level);
+    const srcNewStock = srcPrevStock - transferQty;
+    const unitStr = srcRow.unit || 'pcs';
+
+    const destInv = await queryDb(
+      "SELECT * FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+      [pIdStr, altPid, destBranchId]
+    );
+
+    let destPrevStock = 0;
+    let destNewStock = transferQty;
+    let destRowId = null;
+
+    if (destInv.rows && destInv.rows.length > 0) {
+      destPrevStock = parseInt(destInv.rows[0].stock_level) || 0;
+      destNewStock = destPrevStock + transferQty;
+      destRowId = destInv.rows[0].id;
+    }
+
+    const transferRef = `TRF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [srcNewStock, srcRow.id]);
+
+    if (destRowId) {
+      await queryDb(
+        `UPDATE bw_inventory 
+         SET stock_level = $1, production_date = $2, expiry_date = $3, status = 'In Stock' 
+         WHERE id = $4`,
+        [destNewStock, srcRow.production_date, srcRow.expiry_date, destRowId]
+      );
+    } else {
+      await queryDb(
+        `INSERT INTO bw_inventory 
+         (product_id, stock_level, production_date, expiry_date, branch_id, unit, production_time, expiry_time, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'In Stock')`,
+        [pIdStr, destNewStock, srcRow.production_date, srcRow.expiry_date, destBranchId, unitStr, srcRow.production_time, srcRow.expiry_time]
+      );
+    }
+
+    // Source: Transfer Out
+    await queryDb(
+      `INSERT INTO bw_inventory_movements 
+       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, source_branch_id, dest_branch_id, reference_id, reason, notes, performed_by, authorized_by, status)
+       VALUES ('Transfer Out', $1, $2, $3, $4, $5, $6, $1, $7, $8, 'Branch transfer out', $9, $10, $11, 'Completed')`,
+      [srcBranchId, pIdStr, -transferQty, srcPrevStock, srcNewStock, unitStr, destBranchId, transferRef, notes || '', performer, authorizer]
+    );
+
+    // Destination: Transfer In
+    await queryDb(
+      `INSERT INTO bw_inventory_movements 
+       (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, source_branch_id, dest_branch_id, reference_id, reason, notes, performed_by, authorized_by, status)
+       VALUES ('Transfer In', $1, $2, $3, $4, $5, $6, $7, $1, $8, 'Branch transfer in', $9, $10, $11, 'Completed')`,
+      [destBranchId, pIdStr, transferQty, destPrevStock, destNewStock, unitStr, srcBranchId, transferRef, notes || '', performer, authorizer]
+    );
+
+    clearApiCache();
+    res.json({
+      success: true,
+      message: "Branch stock transfer completed successfully",
+      reference_id: transferRef,
+      source: { branch_id: srcBranchId, previous_stock: srcPrevStock, new_stock: srcNewStock },
+      destination: { branch_id: destBranchId, previous_stock: destPrevStock, new_stock: destNewStock }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Audit Movements Log
+app.get('/api/inventory/movements', async (req, res) => {
+  const { branch_id, product_id, movement_type, limit } = req.query;
+  try {
+    if (req.user && req.user.role !== 'admin') {
+      if (branch_id && branch_id !== 'all' && parseInt(branch_id) !== parseInt(req.user.branchId)) {
+        return res.status(403).json({ error: "Forbidden: You cannot view movements for another branch." });
+      }
+    }
+
+    const effectiveBranchId = (req.user && req.user.role !== 'admin')
+      ? req.user.branchId
+      : (branch_id && branch_id !== 'all' ? parseInt(branch_id) : null);
+
+    let query = `
+      SELECT 
+        m.*,
+        COALESCE(p.name, m.product_id) as product_name,
+        COALESCE(b.name, 'Branch ' || m.branch_id) as branch_name,
+        sb.name as source_branch_name,
+        db.name as dest_branch_name
+      FROM bw_inventory_movements m
+      LEFT JOIN bw_products p ON m.product_id = p.id
+      LEFT JOIN bw_branches b ON m.branch_id = b.id
+      LEFT JOIN bw_branches sb ON m.source_branch_id = sb.id
+      LEFT JOIN bw_branches db ON m.dest_branch_id = db.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (effectiveBranchId) {
+      params.push(effectiveBranchId);
+      query += ` AND m.branch_id = $${params.length}`;
+    }
+
+    if (product_id) {
+      params.push(product_id);
+      query += ` AND m.product_id = $${params.length}`;
+    }
+
+    if (movement_type && movement_type !== 'all') {
+      params.push(movement_type);
+      query += ` AND m.movement_type = $${params.length}`;
+    }
+
+    const maxLimit = parseInt(limit) || 100;
+    query += ` ORDER BY m.created_at DESC, m.id DESC LIMIT ${maxLimit}`;
+
+    const result = await queryDb(query, params);
+    res.json(result.rows || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
