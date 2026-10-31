@@ -948,20 +948,143 @@ app.delete('/api/branches/:id', async (req, res) => {
   }
 
   try {
-    // Preserve staff accounts by updating their assigned branch to NULL
-    await queryDb("UPDATE bw_users SET branch_id = NULL WHERE branch_id = $1", [branchId]);
+    // 1. Verify branch exists
+    const checkBranch = await queryDb("SELECT id, name FROM bw_branches WHERE id = $1", [branchId]);
+    if (!checkBranch || !checkBranch.rows || checkBranch.rows.length === 0) {
+      return res.status(404).json({ error: `Branch ID ${branchId} does not exist.` });
+    }
 
-    // Delete the branch record while preserving historical sales, inventory, production, and waste transactions
-    await queryDb("DELETE FROM bw_branches WHERE id = $1", [branchId]);
+    if (activeDbDriver === 'pg' && pgPool) {
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Delete POS transaction items belonging to POS transactions of this branch
+        await client.query(`
+          DELETE FROM bw_pos_transaction_items 
+          WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id = $1)
+        `, [branchId]);
+
+        // 2. Delete POS transactions belonging to this branch
+        await client.query('DELETE FROM bw_pos_transactions WHERE branch_id = $1', [branchId]);
+
+        // 3. Delete Sales records belonging to this branch
+        await client.query('DELETE FROM bw_sales WHERE branch_id = $1', [branchId]);
+
+        // 4. Delete Inventory / Stock records belonging to this branch
+        await client.query('DELETE FROM bw_inventory WHERE branch_id = $1', [branchId]);
+
+        // 5. Delete Production batches and records belonging to this branch
+        await client.query('DELETE FROM bw_production WHERE branch_id = $1', [branchId]);
+
+        // 6. Delete Waste records belonging to this branch
+        await client.query('DELETE FROM bw_waste WHERE branch_id = $1', [branchId]);
+
+        // 7. Delete Repurpose logs belonging to this branch (if table exists)
+        await client.query('DELETE FROM bw_repurpose_logs WHERE branch_id = $1', [branchId]).catch(() => {});
+
+        // 8. Delete all staff accounts assigned to this branch, strictly excluding the System Administrator
+        await client.query(`
+          DELETE FROM bw_users 
+          WHERE branch_id = $1 
+            AND role != 'admin' 
+            AND email != 'admin@bakewise.com'
+        `, [branchId]);
+
+        // Clear branch_id for any admin accounts that were associated with this branch
+        await client.query(`
+          UPDATE bw_users 
+          SET branch_id = NULL 
+          WHERE branch_id = $1
+        `, [branchId]);
+
+        // 9. Delete the branch itself
+        await client.query('DELETE FROM bw_branches WHERE id = $1', [branchId]);
+
+        await client.query('COMMIT');
+      } catch (dbErr) {
+        await client.query('ROLLBACK');
+        throw dbErr;
+      } finally {
+        client.release();
+      }
+    } else if (activeDbDriver === 'mysql' && mysqlPool) {
+      const conn = await mysqlPool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        // 1. Delete POS transaction items
+        await conn.query(`
+          DELETE FROM bw_pos_transaction_items 
+          WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id = ?)
+        `, [branchId]);
+
+        // 2. Delete POS transactions
+        await conn.query('DELETE FROM bw_pos_transactions WHERE branch_id = ?', [branchId]);
+
+        // 3. Delete Sales
+        await conn.query('DELETE FROM bw_sales WHERE branch_id = ?', [branchId]);
+
+        // 4. Delete Inventory / Stock
+        await conn.query('DELETE FROM bw_inventory WHERE branch_id = ?', [branchId]);
+
+        // 5. Delete Production
+        await conn.query('DELETE FROM bw_production WHERE branch_id = ?', [branchId]);
+
+        // 6. Delete Waste
+        await conn.query('DELETE FROM bw_waste WHERE branch_id = ?', [branchId]);
+
+        // 7. Delete Repurpose logs
+        await conn.query('DELETE FROM bw_repurpose_logs WHERE branch_id = ?', [branchId]).catch(() => {});
+
+        // 8. Delete staff accounts, strictly protecting System Administrator
+        await conn.query(`
+          DELETE FROM bw_users 
+          WHERE branch_id = ? 
+            AND role != 'admin' 
+            AND email != 'admin@bakewise.com'
+        `, [branchId]);
+
+        // Clear branch_id for any admin
+        await conn.query(`
+          UPDATE bw_users 
+          SET branch_id = NULL 
+          WHERE branch_id = ?
+        `, [branchId]);
+
+        // 9. Delete the branch itself
+        await conn.query('DELETE FROM bw_branches WHERE id = ?', [branchId]);
+
+        await conn.commit();
+      } catch (dbErr) {
+        await conn.rollback();
+        throw dbErr;
+      } finally {
+        conn.release();
+      }
+    } else {
+      // Fallback driver execution
+      await queryDb('DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id = $1)', [branchId]);
+      await queryDb('DELETE FROM bw_pos_transactions WHERE branch_id = $1', [branchId]);
+      await queryDb('DELETE FROM bw_sales WHERE branch_id = $1', [branchId]);
+      await queryDb('DELETE FROM bw_inventory WHERE branch_id = $1', [branchId]);
+      await queryDb('DELETE FROM bw_production WHERE branch_id = $1', [branchId]);
+      await queryDb('DELETE FROM bw_waste WHERE branch_id = $1', [branchId]);
+      await queryDb('DELETE FROM bw_repurpose_logs WHERE branch_id = $1', [branchId]).catch(() => {});
+      await queryDb("DELETE FROM bw_users WHERE branch_id = $1 AND role != 'admin' AND email != 'admin@bakewise.com'", [branchId]);
+      await queryDb("UPDATE bw_users SET branch_id = NULL WHERE branch_id = $1", [branchId]);
+      await queryDb('DELETE FROM bw_branches WHERE id = $1', [branchId]);
+    }
 
     clearApiCache();
+    console.log(`[BRANCH DELETION] Permanently deleted branch ID ${branchId} and all associated data.`);
     res.json({
       success: true,
-      message: `Branch ID ${branchId} deleted successfully.`
+      message: "Branch and all associated data have been successfully deleted."
     });
   } catch (err) {
-    console.error("Branch deletion error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Complete branch deletion error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete branch and associated records." });
   }
 });
 

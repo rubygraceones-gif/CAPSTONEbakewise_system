@@ -919,26 +919,65 @@ class BakeWiseStore {
     }
 
     // 1. Remove branch itself from local memory
-    this.branches = this.branches.filter(b => b.id.toString() !== branchIdStr);
+    this.branches = (this.branches || []).filter(b => b.id.toString() !== branchIdStr);
     this.save("bakewise_v2_branches", this.branches);
 
-    // 2. Clear branch assignment on users without deleting accounts
-    this.users.forEach(u => {
-      if (u.branch_id !== null && u.branch_id !== undefined && u.branch_id.toString() === branchIdStr) {
-        u.branch_id = null;
+    // 2. Delete staff accounts assigned to this branch, strictly protecting System Administrator
+    this.users = (this.users || []).filter(u => {
+      const isBranchUser = u.branch_id !== null && u.branch_id !== undefined && u.branch_id.toString() === branchIdStr;
+      const isSysAdmin = u.role === 'admin' || (u.email && u.email.toLowerCase() === 'admin@bakewise.com');
+      if (isBranchUser && isSysAdmin) {
+        u.branch_id = null; // Admin accounts are global; clear branch association if present
+        return true;
       }
+      return !isBranchUser;
     });
     this.save("bakewise_v2_users", this.users);
 
-    // Historical sales, inventory, production, and waste transactions are preserved
+    // 3. Delete inventory records associated with this branch
+    this._inventory = (this._inventory || []).filter(inv => {
+      return inv.branch_id === null || inv.branch_id === undefined || inv.branch_id.toString() !== branchIdStr;
+    });
+    this.save("bakewise_v2_inventory", this._inventory);
 
-    // Commit all local changes and re-sync with backend
+    // 4. Delete sales records associated with this branch
+    this._sales = (this._sales || []).filter(s => {
+      return s.branch_id === null || s.branch_id === undefined || s.branch_id.toString() !== branchIdStr;
+    });
+    this.save("bakewise_v2_sales", this._sales);
+
+    // 5. Delete production records associated with this branch
+    this._production = (this._production || []).filter(p => {
+      return p.branch_id === null || p.branch_id === undefined || p.branch_id.toString() !== branchIdStr;
+    });
+    this.save("bakewise_v2_production", this._production);
+
+    // 6. Delete waste records associated with this branch
+    this._waste = (this._waste || []).filter(w => {
+      return w.branch_id === null || w.branch_id === undefined || w.branch_id.toString() !== branchIdStr;
+    });
+    this.save("bakewise_v2_waste", this._waste);
+
+    // 7. Delete POS transactions associated with this branch
+    if (Array.isArray(this._posTransactions)) {
+      this._posTransactions = this._posTransactions.filter(tx => {
+        return tx.branch_id === null || tx.branch_id === undefined || tx.branch_id.toString() !== branchIdStr;
+      });
+      this.save("bakewise_v2_pos_transactions", this._posTransactions);
+    }
+
+    // 8. If active selected branch was this branch, reset to 'all'
+    if (this.getSelectedBranchId() === branchIdStr) {
+      this.setSelectedBranchId('all');
+    }
+
+    // Commit all local changes and re-sync with backend if online
     this.commitAll();
     if (this.isBackendOnline) {
       await this.syncWithBackend();
     }
 
-    this.logActivity(`Deleted branch ID ${id}`);
+    this.logActivity(`Permanently deleted branch ID ${id} and all associated data.`);
     return true;
   }
 
@@ -2534,7 +2573,7 @@ function setupProductModal() {
   }
 }
 
-function showConfirmModal(message, title = "Confirm Action", iconType = "alert-triangle") {
+function showConfirmModal(message, title = "Confirm Action", iconType = "alert-triangle", confirmBtnText = null, cancelBtnText = null) {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirm-modal");
     const overlay = document.getElementById("confirm-modal-overlay");
@@ -2545,7 +2584,7 @@ function showConfirmModal(message, title = "Confirm Action", iconType = "alert-t
     const cancelBtn = document.getElementById("btn-confirm-cancel");
 
     if (titleEl) titleEl.textContent = title;
-    msgEl.textContent = message;
+    if (msgEl) msgEl.textContent = message;
     
     if (iconContainer) {
       const color = iconType === "alert-triangle" ? "var(--color-error)" : "var(--primary-color)";
@@ -2553,12 +2592,24 @@ function showConfirmModal(message, title = "Confirm Action", iconType = "alert-t
       if (window.lucide) window.lucide.createIcons({ root: iconContainer });
     }
     
-    if (message.toLowerCase().includes("delete") || message.toLowerCase().includes("remove")) {
+    if (confirmBtnText) {
+      okBtn.textContent = confirmBtnText;
+    } else if (message.toLowerCase().includes("delete") || message.toLowerCase().includes("remove")) {
       okBtn.textContent = "Delete";
-      okBtn.style.backgroundColor = "var(--color-error)";
     } else {
       okBtn.textContent = "Confirm";
+    }
+
+    if (cancelBtnText && cancelBtn) {
+      cancelBtn.textContent = cancelBtnText;
+    }
+
+    if ((confirmBtnText && confirmBtnText.toLowerCase().includes("delete")) || message.toLowerCase().includes("delete") || message.toLowerCase().includes("remove")) {
+      okBtn.style.backgroundColor = "var(--color-error)";
+      okBtn.style.color = "#ffffff";
+    } else {
       okBtn.style.backgroundColor = "var(--primary-color)";
+      okBtn.style.color = "#ffffff";
     }
 
     modal.style.display = "block";
@@ -5419,7 +5470,10 @@ async function refreshAdminBranchesPane() {
         const bObj = (store.branches || []).find(b => b.id.toString() === id.toString());
         const bName = bObj ? bObj.name : `Branch #${id}`;
 
-        if (await showConfirmModal(`Are you sure you want to delete branch "${bName}"? This action cannot be undone.`)) {
+        const confirmTitle = "Delete Branch?";
+        const confirmMsg = "Are you sure you want to delete this branch? This will permanently delete the branch and all its associated staff accounts, inventory, sales, production, waste records, and other branch data. This action cannot be undone.";
+
+        if (await showConfirmModal(confirmMsg, confirmTitle, "alert-triangle", "Delete Branch", "Cancel")) {
           try {
             await store.deleteBranch(id);
             populateSelectDropdowns();
@@ -5427,8 +5481,13 @@ async function refreshAdminBranchesPane() {
             if (typeof refreshAdminUsersPane === 'function') await refreshAdminUsersPane();
             if (typeof refreshInventoryPane === 'function') await refreshInventoryPane();
             if (typeof refreshSalesPane === 'function') await refreshSalesPane();
+            if (typeof refreshProductionPane === 'function') await refreshProductionPane();
+            if (typeof refreshWastePane === 'function') await refreshWastePane();
+            if (typeof refreshReportsPane === 'function') await refreshReportsPane();
+            if (typeof refreshPosHistory === 'function') await refreshPosHistory();
             if (typeof refreshDashboardPane === 'function') await refreshDashboardPane();
-            showToast(`Branch "${bName}" deleted successfully.`, "success");
+            if (typeof refreshDashboard === 'function') await refreshDashboard();
+            showToast("Branch and all associated data have been successfully deleted.", "success");
           } catch (err) {
             console.error("Branch deletion error:", err);
             showToast(err.message || "Failed to delete branch.", "error");
