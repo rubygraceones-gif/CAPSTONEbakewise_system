@@ -973,11 +973,10 @@ async function initializePgSchema() {
 // Auto-heal orphaned branch IDs pointing to deleted branches and synchronize financial totals
 async function healOrphanedBranchRecords() {
   try {
-    // 0. Ensure EXACTLY 2 target branches exist: Lasang and Tibungco 2
+    // 0. Ensure EXACTLY 1 sole branch exists: Lasang
     let allBr = await queryDb("SELECT id, name FROM bw_branches");
     let brRows = allBr.rows || [];
     let bLasang = brRows.find(b => b.name && b.name.toLowerCase().includes('lasang'));
-    let bTibungco = brRows.find(b => b.name && b.name.toLowerCase().includes('tibungco'));
 
     if (!bLasang) {
       try {
@@ -990,54 +989,74 @@ async function healOrphanedBranchRecords() {
       bLasang = res.rows[0];
     }
 
-    if (!bTibungco) {
-      try {
-        await queryDb(
-          "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-          ['Tibungco 2', 130, 230, 'Along National Highway, Tibungco', '5:00 AM – 9:00 PM', '09929888211', 'Active']
-        );
-      } catch (e) {}
-      const res = await queryDb("SELECT id, name FROM bw_branches WHERE name LIKE '%Tibungco%' ORDER BY id DESC LIMIT 1");
-      bTibungco = res.rows[0];
-    }
-
-    if (!bLasang || !bTibungco) return;
+    if (!bLasang) return;
 
     const lasangId = parseInt(bLasang.id);
-    const tibungcoId = parseInt(bTibungco.id);
-    const validBranchIds = [lasangId, tibungcoId];
-    const idList = validBranchIds.join(',');
 
-    // Delete any stray non-target branches
+    // 1. Permanently remove Tibungco and any non-Lasang branches
     try {
-      await queryDb(`DELETE FROM bw_branches WHERE id NOT IN (${idList})`);
-    } catch (e) { console.warn("Notice: stray branch cleanup:", e.message); }
+      await queryDb(`DELETE FROM bw_branches WHERE id != $1 OR LOWER(name) LIKE '%tibungco%'`, [lasangId]);
+    } catch (e) { console.warn("Notice: Tibungco branch deletion:", e.message); }
 
-    // Reassign any orphaned records with invalid branch_id to Lasang as default
-    await queryDb(`UPDATE bw_inventory SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
-    await queryDb(`UPDATE bw_production SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
-    await queryDb(`UPDATE bw_waste SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
-    await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
-
-    // 1. Clean up stray POS transactions and movements from non-existent branches (e.g. branch 1)
+    // 2. Permanently remove all accounts belonging to Tibungco / other branches
     try {
-      await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id NOT IN (${idList}))`);
-      await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id NOT IN (${idList})`);
-      await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id NOT IN (${idList})`);
-    } catch (e) { console.warn("Notice: orphan cleanup:", e.message); }
+      await queryDb(
+        `DELETE FROM bw_users WHERE (branch_id IS NOT NULL AND branch_id != $1) OR LOWER(email) IN ('roberto.gomez@bakewise.com', 'lorna.villanueva@bakewise.com', 'arnel.mendoza@bakewise.com', 'patricia.dizon@bakewise.com', 'kristine.ramos@bakewise.com')`,
+        [lasangId]
+      );
+    } catch (e) { console.warn("Notice: Tibungco users deletion:", e.message); }
 
-    // 2. Remove legacy duplicate test product 'p11' ('pandesal')
+    // 3. Ensure Catalina Kato is registered in bw_users as Sales Staff for Lasang
+    const catalinaHash = bcrypt.hashSync('password123', 10);
+    const emailsToEnsure = ['catalina.kato@bakewise.com', 'catalinekato@bakewise.com'];
+    for (const em of emailsToEnsure) {
+      try {
+        await queryDb(
+          "INSERT INTO bw_users (email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5) ON DUPLICATE KEY UPDATE name = 'Catalina Kato', role = 'sales', branch_id = $6",
+          [em, catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
+        );
+      } catch (e) {
+        try {
+          await queryDb(
+            "INSERT INTO bw_users (email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO UPDATE SET name = 'Catalina Kato', role = 'sales', branch_id = $6",
+            [em, catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
+          );
+        } catch (e2) {}
+      }
+    }
+
+    // 4. Permanently delete all Tibungco data across all database tables
+    try {
+      await queryDb(`DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id != $1)`, [lasangId]);
+      await queryDb(`DELETE FROM bw_pos_transactions WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_sales WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_inventory WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_production WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_waste WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_inventory_batches WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_inventory_movements WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_repurpose_logs WHERE branch_id != $1`, [lasangId]);
+      await queryDb(`DELETE FROM bw_branch_products WHERE branch_id != $1`, [lasangId]);
+    } catch (e) { console.warn("Notice: Tibungco tables data purge:", e.message); }
+
+    // 5. Ensure Catalina Kato is the Cashier across all Lasang POS transactions & sales records
+    try {
+      await queryDb(`UPDATE bw_pos_transactions SET cashier = 'Catalina Kato' WHERE branch_id = $1`, [lasangId]);
+      await queryDb(`UPDATE bw_sales SET cashier = 'Catalina Kato' WHERE branch_id = $1`, [lasangId]);
+    } catch (e) { console.warn("Notice: set cashier Catalina Kato:", e.message); }
+
+    // 6. Remove legacy duplicate test product 'p11' ('pandesal')
     try {
       await queryDb(`DELETE FROM bw_products WHERE id = 'p11' OR (LOWER(name) = 'pandesal' AND id != 'p1')`);
     } catch (e) { console.warn("Notice: p11 cleanup:", e.message); }
 
-    // 3. Synchronize bw_waste cost to standard product unit costs so UI accurately calculates total loss
+    // 7. Synchronize bw_waste cost to standard product unit costs
     try {
       await queryDb(`UPDATE bw_waste SET cost = 25.00 WHERE product_id = 'p1' AND cost = 50.00`);
       await queryDb(`UPDATE bw_waste SET cost = 18.00 WHERE product_id = 'p2' AND cost = 36.00`);
     } catch (e) { console.warn("Notice: waste cost sync:", e.message); }
 
-    // 4. Consolidate bw_inventory to keep exactly 1 active current stock row per product per branch (avoid duplication)
+    // 8. Consolidate bw_inventory to keep exactly 1 active stock row per product for Lasang
     try {
       await queryDb(`
         DELETE FROM bw_inventory 
@@ -1051,7 +1070,7 @@ async function healOrphanedBranchRecords() {
       `);
     } catch (e) { console.warn("Notice: inventory consolidation:", e.message); }
 
-    // 5. Normalize SIM-POS- to POS- transaction numbers
+    // 9. Normalize SIM-POS- to POS- transaction numbers
     try {
       await queryDb(`
         UPDATE bw_pos_transactions
@@ -1060,7 +1079,7 @@ async function healOrphanedBranchRecords() {
       `);
     } catch (e) { console.warn("Notice: transaction number normalization:", e.message); }
 
-    // 6. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
+    // 10. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
     try {
       await queryDb(`
         UPDATE bw_pos_transactions
@@ -1069,15 +1088,15 @@ async function healOrphanedBranchRecords() {
       `);
     } catch (e) { console.warn("Notice: pos timestamp update:", e.message); }
 
-    // 7. Auto-seed Tibungco 2 & Lasang if missing completed transaction target (15,500 total, 7,750 per branch)
+    // 11. Verify full transaction population for Lasang (target: 7,750 total across 31 days, 250/day, Cashier: Catalina Kato)
     try {
       const countRes = await queryDb(
-        "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id IN ($1, $2) AND date >= '2026-10-14' AND date <= '2026-11-13'",
-        [lasangId, tibungcoId]
+        "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id = $1 AND date >= '2026-10-14' AND date <= '2026-11-13' AND cashier = 'Catalina Kato'",
+        [lasangId]
       );
       const totalCount = parseInt(countRes.rows[0]?.count || 0);
-      if (totalCount < 15000) {
-        console.log(`[DATA HEALING] POS transactions count (${totalCount}) is below target 15,500. Seeding demo transactions now...`);
+      if (totalCount < 7500) {
+        console.log(`[DATA HEALING] POS transactions count (${totalCount}) for Lasang with Cashier Catalina Kato is below target 7,750. Seeding now...`);
         runAutoSeeder(queryDb, true).catch(err => console.error("Auto-seeder run error:", err.message));
       }
     } catch (e) { console.warn("Notice: transaction count verification:", e.message); }
@@ -1970,7 +1989,7 @@ app.post('/api/pos/checkout', async (req, res) => {
 
   const bId = branch_id ? parseInt(branch_id) : 1;
   const txDate = date || new Date().toISOString().split('T')[0];
-  const activeCashier = cashier_name || cashier || 'Staff';
+  const activeCashier = cashier_name || cashier || 'Catalina Kato';
   const payMethod = payment_method || 'Cash';
   const numSubtotal = parseFloat(subtotal || 0);
   const numDiscount = parseFloat(discount || 0);

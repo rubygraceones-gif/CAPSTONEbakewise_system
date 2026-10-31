@@ -332,13 +332,13 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v37')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v38')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
-      localStorage.setItem('bakewise_v2_data_cleared_v37', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v38', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -4352,7 +4352,7 @@ function updatePosCartUI() {
     branchCtxElem.textContent = `Branch: ${branchName}`;
   }
 
-  const cashierName = store.currentUser ? store.currentUser.name : 'System Administrator';
+  const cashierName = (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato';
   if (cashierCtxElem) cashierCtxElem.textContent = `Cashier: ${cashierName}`;
 
   const totalItemCount = posCart.reduce((acc, item) => acc + item.qty, 0);
@@ -4491,7 +4491,7 @@ async function handlePosCheckout() {
   const payload = {
     branch_id: effBranchId,
     cashier_id: store.currentUser ? store.currentUser.id : 1,
-    cashier_name: store.currentUser ? store.currentUser.name : 'System Administrator',
+    cashier_name: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato', cashier: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato',
     subtotal: subtotal,
     discount: discount,
     total: total,
