@@ -560,11 +560,30 @@
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="br-hours-input" class="form-label">Store Hours</label>
-                  <div class="input-container">
-                    <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="br-hours-input" class="form-input" placeholder="e.g. 5 AM to 8 PM">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="form-label" style="margin-bottom: 0;">Store Hours</label>
+                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                      <input type="checkbox" id="br-24hours-checkbox" style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
+                      <span>24 Hours Open</span>
+                    </label>
                   </div>
+                  <div id="br-time-picker-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                      <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening Time</span>
+                      <div class="input-container">
+                        <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
+                        <input type="time" id="br-open-time" class="form-input" required value="05:00">
+                      </div>
+                    </div>
+                    <div>
+                      <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing Time</span>
+                      <div class="input-container">
+                        <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
+                        <input type="time" id="br-close-time" class="form-input" required value="20:00">
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" id="br-hours-input" value="5:00 AM – 8:00 PM">
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="br-contact-input" class="form-label">Contact Number</label>
@@ -1683,8 +1702,30 @@
         <input type="text" id="edit-br-address" class="form-input" style="padding-left: 14px;" required>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-br-hours" class="form-label">Store Hours</label>
-        <input type="text" id="edit-br-hours" class="form-input" style="padding-left: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="margin-bottom: 0;">Store Hours</label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="edit-br-24hours-checkbox" style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
+            <span>24 Hours Open</span>
+          </label>
+        </div>
+        <div id="edit-br-time-picker-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening Time</span>
+            <div class="input-container">
+              <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
+              <input type="time" id="edit-br-open-time" class="form-input" required value="05:00">
+            </div>
+          </div>
+          <div>
+            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing Time</span>
+            <div class="input-container">
+              <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
+              <input type="time" id="edit-br-close-time" class="form-input" required value="20:00">
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="edit-br-hours" value="5:00 AM – 8:00 PM">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-br-contact" class="form-label">Contact Number</label>

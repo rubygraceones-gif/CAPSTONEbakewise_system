@@ -47,6 +47,110 @@ function bindContactNumberSanitizer(inputId) {
   }
 }
 
+// --- STORE HOURS TIME PICKER HELPERS (AM/PM FORMAT & 24 HOURS) ---
+function formatTimeToAmPm(timeStr) {
+  if (!timeStr) return "";
+  const parts = String(timeStr).trim().split(":");
+  if (parts.length < 2) return timeStr;
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1].padStart(2, "0");
+  if (isNaN(hours)) return timeStr;
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+function parseAmPmTo24H(ampmStr) {
+  if (!ampmStr) return "";
+  const match = String(ampmStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) {
+    const simpleMatch = String(ampmStr).trim().match(/^(\d{1,2})\s*(AM|PM)$/i);
+    if (simpleMatch) {
+      let h = parseInt(simpleMatch[1], 10);
+      const isPm = simpleMatch[2].toUpperCase() === "PM";
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      return `${String(h).padStart(2, "0")}:00`;
+    }
+    return "";
+  }
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const isPm = match[3].toUpperCase() === "PM";
+  if (isPm && hours < 12) hours += 12;
+  if (!isPm && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
+
+function parseStoreHoursString(hoursStr) {
+  if (!hoursStr) return { is24Hours: false, openTime: "05:00", closeTime: "20:00" };
+  const trimmed = String(hoursStr).trim();
+  if (/^24\s*hours?$/i.test(trimmed) || /24\/7/i.test(trimmed)) {
+    return { is24Hours: true, openTime: "05:00", closeTime: "20:00" };
+  }
+  const parts = trimmed.split(/\s*[\u2013\u2014\-]|(?:\s+to\s+)\s*/i);
+  if (parts.length >= 2) {
+    const open24 = parseAmPmTo24H(parts[0].trim());
+    const close24 = parseAmPmTo24H(parts[1].trim());
+    return {
+      is24Hours: false,
+      openTime: open24 || "05:00",
+      closeTime: close24 || "20:00"
+    };
+  }
+  return { is24Hours: false, openTime: "05:00", closeTime: "20:00" };
+}
+
+function buildStoreHoursString(is24Hours, openTime, closeTime) {
+  if (is24Hours) {
+    return "24 Hours";
+  }
+  const formattedOpen = formatTimeToAmPm(openTime);
+  const formattedClose = formatTimeToAmPm(closeTime);
+  return `${formattedOpen} – ${formattedClose}`;
+}
+
+function setupStoreHoursPickers() {
+  const bindGroup = (prefix) => {
+    const isRegister = prefix === "br";
+    const cb = document.getElementById(isRegister ? "br-24hours-checkbox" : "edit-br-24hours-checkbox");
+    const openInput = document.getElementById(isRegister ? "br-open-time" : "edit-br-open-time");
+    const closeInput = document.getElementById(isRegister ? "br-close-time" : "edit-br-close-time");
+    const row = document.getElementById(isRegister ? "br-time-picker-row" : "edit-br-time-picker-row");
+    const hidden = document.getElementById(isRegister ? "br-hours-input" : "edit-br-hours");
+
+    if (!cb || !openInput || !closeInput || cb.dataset.hoursBound) return;
+    cb.dataset.hoursBound = "true";
+
+    const updateState = () => {
+      const is24 = cb.checked;
+      if (row) {
+        row.style.opacity = is24 ? "0.45" : "1";
+        row.style.pointerEvents = is24 ? "none" : "auto";
+      }
+      openInput.required = !is24;
+      closeInput.required = !is24;
+
+      if (hidden) {
+        hidden.value = buildStoreHoursString(is24, openInput.value, closeInput.value);
+      }
+    };
+
+    cb.addEventListener("change", updateState);
+    openInput.addEventListener("input", updateState);
+    closeInput.addEventListener("input", updateState);
+    openInput.addEventListener("change", updateState);
+    closeInput.addEventListener("change", updateState);
+    updateState();
+  };
+
+  bindGroup("br");
+  bindGroup("edit");
+}
+
+
+
 /* ==========================================================================
    BAKEWISE APPLICATION LOGIC
    Advanced Bakery Management System Client Code
@@ -2346,6 +2450,7 @@ function setupFormSubmissions() {
 
   bindContactNumberSanitizer("br-contact-input");
   bindContactNumberSanitizer("edit-br-contact");
+  setupStoreHoursPickers();
 
   const branchForm = document.getElementById("admin-branch-form");
   if (branchForm) {
@@ -2362,11 +2467,27 @@ function setupFormSubmissions() {
 
       if (!(await showConfirmModal("Are you sure you want to register this new branch?"))) return;
 
+      const is24Hours = document.getElementById("br-24hours-checkbox")?.checked;
+      const openTime = document.getElementById("br-open-time")?.value;
+      const closeTime = document.getElementById("br-close-time")?.value;
+
+      if (!is24Hours) {
+        if (!openTime || !closeTime) {
+          showToast("Please select both opening and closing times.", "error");
+          return;
+        }
+        if (openTime === closeTime) {
+          showToast("Opening and closing times cannot be identical. Select 24 Hours Open for round-the-clock operations.", "error");
+          return;
+        }
+      }
+
+      const storeHours = buildStoreHoursString(is24Hours, openTime, closeTime);
+
       const name = document.getElementById("br-name-input").value;
       const lat = document.getElementById("br-lat-input")?.value || 14.5995;
       const lng = document.getElementById("br-lng-input")?.value || 120.9842;
       const address = document.getElementById("br-address-input").value;
-      const storeHours = document.getElementById("br-hours-input").value;
 
       try {
         const success = await store.addBranch(name, lat, lng, address, storeHours, contactNo);
@@ -2399,11 +2520,27 @@ function setupFormSubmissions() {
 
       if (!(await showConfirmModal("Are you sure you want to save changes to this branch?"))) return;
 
+      const is24Hours = document.getElementById("edit-br-24hours-checkbox")?.checked;
+      const openTime = document.getElementById("edit-br-open-time")?.value;
+      const closeTime = document.getElementById("edit-br-close-time")?.value;
+
+      if (!is24Hours) {
+        if (!openTime || !closeTime) {
+          showToast("Please select both opening and closing times.", "error");
+          return;
+        }
+        if (openTime === closeTime) {
+          showToast("Opening and closing times cannot be identical. Select 24 Hours Open for round-the-clock operations.", "error");
+          return;
+        }
+      }
+
+      const storeHours = buildStoreHoursString(is24Hours, openTime, closeTime);
+
       const id = document.getElementById("edit-branch-id").value;
       const name = document.getElementById("edit-br-name").value;
       const status = document.getElementById("edit-br-status").value;
       const address = document.getElementById("edit-br-address").value;
-      const storeHours = document.getElementById("edit-br-hours").value;
       const branch = store.branches.find(b => b.id === parseInt(id));
       const lat = branch ? branch.latitude : 300;
       const lng = branch ? branch.longitude : 200;
@@ -5535,8 +5672,26 @@ async function refreshAdminBranchesPane() {
           document.getElementById("edit-br-name").value = branch.name;
           document.getElementById("edit-br-status").value = branch.status || 'Active';
           document.getElementById("edit-br-address").value = branch.address || '';
-          document.getElementById("edit-br-hours").value = branch.store_hours || '';
           document.getElementById("edit-br-contact").value = branch.contact_no || '';
+
+          const parsedHours = parseStoreHoursString(branch.store_hours || '');
+          const edit24Cb = document.getElementById("edit-br-24hours-checkbox");
+          const editOpenEl = document.getElementById("edit-br-open-time");
+          const editCloseEl = document.getElementById("edit-br-close-time");
+          const editTimeRow = document.getElementById("edit-br-time-picker-row");
+          const editHoursHidden = document.getElementById("edit-br-hours");
+
+          if (edit24Cb) edit24Cb.checked = parsedHours.is24Hours;
+          if (editOpenEl) editOpenEl.value = parsedHours.openTime || "05:00";
+          if (editCloseEl) editCloseEl.value = parsedHours.closeTime || "20:00";
+          if (editHoursHidden) editHoursHidden.value = branch.store_hours || (parsedHours.is24Hours ? "24 Hours" : "5:00 AM – 8:00 PM");
+
+          if (editTimeRow) {
+            editTimeRow.style.opacity = parsedHours.is24Hours ? "0.45" : "1";
+            editTimeRow.style.pointerEvents = parsedHours.is24Hours ? "none" : "auto";
+          }
+          if (editOpenEl) editOpenEl.required = !parsedHours.is24Hours;
+          if (editCloseEl) editCloseEl.required = !parsedHours.is24Hours;
           document.getElementById("branch-edit-modal").style.display = "block";
           document.getElementById("modal-overlay").classList.add("visible");
         }
