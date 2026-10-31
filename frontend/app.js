@@ -3887,9 +3887,13 @@ async function handlePosCheckout() {
 
     // Prepare receipt object
     currentReceiptTxData = {
+      isNewCheckout: true,
       transaction_number: data.transaction.transaction_number,
       transaction_date: data.transaction.transaction_date,
+      branch_id: branch_id,
       branch_name: branchObj ? branchObj.name : 'Main Branch',
+      branch_address: branchObj && branchObj.address ? branchObj.address : 'Commercial Center, Poblacion, Davao City',
+      branch_contact: branchObj && branchObj.contact_no ? branchObj.contact_no : '0917-123-4567',
       cashier_name: payload.cashier_name,
       items: payload.items,
       subtotal: subtotal,
@@ -3897,7 +3901,7 @@ async function handlePosCheckout() {
       total: total,
       payment_amount: payload.payment_amount,
       change_amount: payload.change_amount,
-      payment_method: 'Cash'
+      payment_method: payload.payment_method || 'Cash'
     };
 
     // Show thermal receipt modal
@@ -3917,70 +3921,174 @@ async function handlePosCheckout() {
 window.handlePosCheckout = handlePosCheckout;
 
 function showPosReceiptModal(tx) {
+  if (!tx) return;
+  currentReceiptTxData = tx;
+
   const container = document.getElementById("pos-receipt-printable");
   const overlay = document.getElementById("pos-receipt-overlay");
   const modal = document.getElementById("pos-receipt-modal");
   if (!container || !modal) return;
 
-  const dateFormatted = new Date(tx.transaction_date || Date.now()).toLocaleString();
+  // 1. Transaction Date & Time Separation
+  const rawDate = tx.transaction_date || tx.created_at || tx.date || Date.now();
+  const dateObj = new Date(rawDate);
+  const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
+
+  const formattedDate = validDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  });
+
+  const formattedTime = validDate.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+
+  // 2. Resolve Accurate Branch Details (Name, Address, Contact No)
+  let branchName = tx.branch_name;
+  let branchAddress = tx.branch_address;
+  let branchContact = tx.branch_contact || tx.branch_contact_no;
+
+  const bId = parseInt(tx.branch_id || (store.currentUser?.branch_id));
+  const foundBranch = (store.branches || []).find(b => parseInt(b.id) === bId);
+  if (foundBranch) {
+    if (!branchName || branchName === 'Main Branch') branchName = foundBranch.name;
+    if (!branchAddress) branchAddress = foundBranch.address;
+    if (!branchContact) branchContact = foundBranch.contact_no;
+  }
+
+  branchName = branchName || 'Rose Bakeshop - Central Branch';
+  branchAddress = branchAddress || 'Commercial Center, Poblacion, Davao City';
+  branchContact = branchContact || '0917-123-4567';
+
+  // 3. Cashier Details
+  const cashierName = tx.cashier_name || tx.cashier || (store.currentUser ? store.currentUser.name : 'System Administrator');
+
+  // 4. Normalized Items List
+  let items = tx.items;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch(e) { items = []; }
+  }
+  if (!Array.isArray(items)) items = [];
+
+  // 5. Payment & Financial Calculations
+  const subtotal = parseFloat(tx.subtotal != null ? tx.subtotal : items.reduce((sum, i) => sum + (parseFloat(i.subtotal) || (parseInt(i.quantity || 1) * parseFloat(i.unit_price || 0))), 0));
+  const discount = parseFloat(tx.discount || 0);
+  const total = parseFloat(tx.total != null ? tx.total : Math.max(0, subtotal - discount));
+  const paymentMethod = tx.payment_method || 'Cash';
+  const cashReceived = parseFloat(tx.payment_amount != null ? tx.payment_amount : total);
+  const changeAmount = parseFloat(tx.change_amount != null ? tx.change_amount : Math.max(0, cashReceived - total));
 
   setSafeHtml(container, `
-    <div class="receipt-logo-header">
-      <h2>ROSE BAKESHOP</h2>
-      <p style="color: #666; font-size: 0.75rem;">BakeWise POS Receipt</p>
+    <div class="receipt-header">
+      <div class="receipt-brand-row">
+        <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="receipt-logo-primary">
+        <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="receipt-logo-badge">
+      </div>
+      <h1 class="receipt-brand-name">ROSE BAKESHOP</h1>
+      <div class="receipt-brand-sub">Rose Bakeshop x BakeWise System</div>
+      <div class="receipt-store-info">
+        <div class="receipt-branch-name">${branchName}</div>
+        <div class="receipt-branch-addr">${branchAddress}</div>
+        <div class="receipt-branch-contact">Contact No: ${branchContact}</div>
+      </div>
+      <div class="receipt-title-banner">SALES RECEIPT</div>
     </div>
-    <div style="margin-bottom: 8px; font-size: 0.8rem;">
-      <div><strong>Tx #:</strong> ${tx.transaction_number}</div>
-      <div><strong>Date:</strong> ${dateFormatted}</div>
-      <div><strong>Branch:</strong> ${tx.branch_name}</div>
-      <div><strong>Cashier:</strong> ${tx.cashier_name}</div>
-    </div>
-    <div class="receipt-divider"></div>
-    <div style="margin-bottom: 8px;">
-      ${tx.items.map(item => `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <div>
-            <div style="font-weight: bold;">${item.product_name}</div>
-            <div style="font-size: 0.75rem; color: #555;">${item.quantity} × ₱${parseFloat(item.unit_price).toFixed(2)}</div>
-          </div>
-          <div style="font-weight: bold;">₱${parseFloat(item.subtotal).toFixed(2)}</div>
-        </div>
-      `).join('')}
-    </div>
-    <div class="receipt-divider"></div>
-    <div style="font-size: 0.82rem; margin-bottom: 6px;">
-      <div style="display: flex; justify-content: space-between;">
-        <span>Subtotal:</span>
-        <span>₱${parseFloat(tx.subtotal).toFixed(2)}</span>
+
+    <div class="receipt-meta">
+      <div class="receipt-meta-row">
+        <span>Receipt Number:</span>
+        <strong>${tx.transaction_number || 'POS-' + Date.now()}</strong>
       </div>
-      <div style="display: flex; justify-content: space-between;">
-        <span>Discount:</span>
-        <span>₱${parseFloat(tx.discount).toFixed(2)}</span>
+      <div class="receipt-meta-row">
+        <span>Transaction Date:</span>
+        <span>${formattedDate}</span>
       </div>
-      <div class="receipt-total-row" style="margin-top: 4px; font-size: 1rem;">
-        <span>TOTAL:</span>
-        <span>₱${parseFloat(tx.total).toFixed(2)}</span>
+      <div class="receipt-meta-row">
+        <span>Transaction Time:</span>
+        <span>${formattedTime}</span>
       </div>
-    </div>
-    <div class="receipt-divider"></div>
-    <div style="font-size: 0.82rem;">
-      <div style="display: flex; justify-content: space-between;">
-        <span>Payment Method:</span>
-        <span>${tx.payment_method || 'Cash'}</span>
+      <div class="receipt-meta-row">
+        <span>Cashier Name:</span>
+        <span>${cashierName}</span>
       </div>
-      <div style="display: flex; justify-content: space-between;">
-        <span>Payment Amount:</span>
-        <span>₱${parseFloat(tx.payment_amount).toFixed(2)}</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-weight: bold;">
-        <span>Change:</span>
-        <span>₱${parseFloat(tx.change_amount).toFixed(2)}</span>
+      <div class="receipt-meta-row">
+        <span>Branch Name:</span>
+        <span>${branchName}</span>
       </div>
     </div>
-    <div class="receipt-divider"></div>
-    <div style="text-align: center; font-size: 0.78rem; margin-top: 10px;">
-      <p style="margin: 0; font-weight: bold;">Thank You for Choosing Rose Bakeshop!</p>
-      <p style="margin: 2px 0 0 0; color: #666;">Please come again!</p>
+
+    <table class="receipt-items-table">
+      <thead>
+        <tr>
+          <th style="text-align: left;">Product Name</th>
+          <th style="text-align: center;">Quantity</th>
+          <th style="text-align: right;">Unit Price</th>
+          <th style="text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.length === 0 ? `
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 8px 0; color: #64748b;">No items recorded</td>
+          </tr>
+        ` : items.map(item => {
+          const name = item.product_name || item.name || `Product #${item.product_id}`;
+          const qty = parseInt(item.quantity || item.qty || 1);
+          const unitPrice = parseFloat(item.unit_price || item.price || 0);
+          const itemSubtotal = parseFloat(item.subtotal != null ? item.subtotal : (qty * unitPrice));
+          return `
+            <tr>
+              <td class="receipt-col-product">${name}</td>
+              <td class="receipt-col-qty">${qty}</td>
+              <td class="receipt-col-price">&#8369;${unitPrice.toFixed(2)}</td>
+              <td class="receipt-col-subtotal">&#8369;${itemSubtotal.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+
+    <div class="receipt-payment-summary">
+      <div class="receipt-summary-line">
+        <span>Subtotal</span>
+        <span>&#8369;${subtotal.toFixed(2)}</span>
+      </div>
+      <div class="receipt-summary-line">
+        <span>Discount</span>
+        <span>${discount > 0 ? `-&#8369;${discount.toFixed(2)}` : `&#8369;0.00`}</span>
+      </div>
+      <div class="receipt-summary-total">
+        <span>TOTAL AMOUNT</span>
+        <span class="receipt-total-val">&#8369;${total.toFixed(2)}</span>
+      </div>
+      <div class="receipt-divider-dashed"></div>
+      <div class="receipt-summary-line">
+        <span>Payment Method</span>
+        <span>${paymentMethod}</span>
+      </div>
+      <div class="receipt-summary-line">
+        <span>Cash Received</span>
+        <span>&#8369;${cashReceived.toFixed(2)}</span>
+      </div>
+      <div class="receipt-summary-line receipt-change-highlight">
+        <span>Change</span>
+        <span>&#8369;${changeAmount.toFixed(2)}</span>
+      </div>
+    </div>
+
+    <div class="receipt-footer">
+      <div class="receipt-divider-dashed"></div>
+      <p class="receipt-footer-title">Thank you for purchasing at Rose Bakeshop!</p>
+      <p class="receipt-footer-subtitle">Please come again!</p>
+      <p class="receipt-footer-msg">This serves as your Official Sales Receipt.<br>Please keep this receipt for your records.</p>
+      <div class="receipt-barcode-stub">
+        <div class="receipt-barcode-lines">||| | | |||| | || ||||| | ||| || ||| | ||</div>
+        <div class="receipt-barcode-num">${tx.transaction_number || ''}</div>
+      </div>
     </div>
   `);
 
@@ -3993,16 +4101,46 @@ function closePosReceiptModal() {
   const modal = document.getElementById("pos-receipt-modal");
   if (overlay) overlay.style.display = 'none';
   if (modal) modal.style.display = 'none';
-  clearPosCart();
+  if (currentReceiptTxData && currentReceiptTxData.isNewCheckout) {
+    clearPosCart();
+  }
 }
 window.closePosReceiptModal = closePosReceiptModal;
 
 function printPosReceipt() {
+  const container = document.getElementById("pos-receipt-printable");
+  if (!container || !container.innerHTML.trim()) {
+    showToast("No receipt available to print", "warning");
+    return;
+  }
+
   document.body.classList.add('printing-pos-receipt');
-  window.print();
-  setTimeout(() => {
+
+  // Enforce 80mm thermal receipt sizing during print dialog
+  let styleEl = document.getElementById('pos-print-page-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'pos-print-page-style';
+    styleEl.textContent = '@page { size: 80mm auto; margin: 0; }';
+    document.head.appendChild(styleEl);
+  }
+
+  const cleanup = () => {
     document.body.classList.remove('printing-pos-receipt');
-  }, 1000);
+    const s = document.getElementById('pos-print-page-style');
+    if (s) s.remove();
+    window.removeEventListener('afterprint', cleanup);
+  };
+
+  window.addEventListener('afterprint', cleanup);
+
+  // Trigger browser print dialog
+  setTimeout(() => {
+    window.print();
+  }, 100);
+
+  // Fallback cleanup if afterprint is cancelled or not fired
+  setTimeout(cleanup, 3000);
 }
 window.printPosReceipt = printPosReceipt;
 
@@ -4097,9 +4235,14 @@ async function refreshPosHistory() {
           <td>${tx.payment_method || 'Cash'}</td>
           <td>${statusBadge}</td>
           <td>
-            <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="viewPosTransactionDetails(${tx.id})">
-              <i data-lucide="eye" style="width: 14px; height: 14px;"></i> View
-            </button>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;" onclick="viewPosTransactionDetails(${tx.id})">
+                <i data-lucide="eye" style="width: 14px; height: 14px;"></i> View
+              </button>
+              <button type="button" class="btn-primary-gold" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;" onclick="reprintPosTransaction(${tx.id})">
+                <i data-lucide="printer" style="width: 14px; height: 14px;"></i> Print
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -4229,23 +4372,68 @@ function closePosDetailsModal() {
 window.closePosDetailsModal = closePosDetailsModal;
 
 function printPosReceiptFromDetails() {
-  if (currentDetailsTxData) {
-    showPosReceiptModal({
-      transaction_number: currentDetailsTxData.transaction_number,
-      transaction_date: currentDetailsTxData.transaction_date,
-      branch_name: currentDetailsTxData.branch_name,
-      cashier_name: currentDetailsTxData.cashier_name,
-      items: currentDetailsTxData.items,
-      subtotal: currentDetailsTxData.subtotal,
-      discount: currentDetailsTxData.discount,
-      total: currentDetailsTxData.total,
-      payment_amount: currentDetailsTxData.payment_amount,
-      change_amount: currentDetailsTxData.change_amount,
-      payment_method: currentDetailsTxData.payment_method
-    });
+  if (!currentDetailsTxData) {
+    showToast("No transaction selected for printing", "warning");
+    return;
   }
+
+  const tx = currentDetailsTxData;
+  const bId = parseInt(tx.branch_id);
+  const branchObj = (store.branches || []).find(b => parseInt(b.id) === bId);
+
+  closePosDetailsModal();
+
+  showPosReceiptModal({
+    transaction_number: tx.transaction_number,
+    transaction_date: tx.created_at || tx.transaction_date || tx.date,
+    branch_id: tx.branch_id,
+    branch_name: branchObj ? branchObj.name : (tx.branch_name || 'Main Branch'),
+    branch_address: branchObj && branchObj.address ? branchObj.address : 'Commercial Center, Poblacion, Davao City',
+    branch_contact: branchObj && branchObj.contact_no ? branchObj.contact_no : '0917-123-4567',
+    cashier_name: tx.cashier_name || tx.cashier || 'System Administrator',
+    items: tx.items || [],
+    subtotal: tx.subtotal,
+    discount: tx.discount,
+    total: tx.total,
+    payment_amount: tx.payment_amount != null ? tx.payment_amount : tx.total,
+    change_amount: tx.change_amount || 0,
+    payment_method: tx.payment_method || 'Cash'
+  });
 }
 window.printPosReceiptFromDetails = printPosReceiptFromDetails;
+
+async function reprintPosTransaction(txId) {
+  try {
+    const res = await fetch(`/api/pos/transactions/${txId}`);
+    if (!res.ok) throw new Error("Could not load transaction details");
+    const data = await res.json();
+    const tx = (data && data.transaction) ? data.transaction : data;
+    if (!tx) throw new Error("Transaction not found");
+
+    const bId = parseInt(tx.branch_id);
+    const branchObj = (store.branches || []).find(b => parseInt(b.id) === bId);
+
+    showPosReceiptModal({
+      transaction_number: tx.transaction_number,
+      transaction_date: tx.created_at || tx.transaction_date || tx.date,
+      branch_id: tx.branch_id,
+      branch_name: branchObj ? branchObj.name : (tx.branch_name || 'Main Branch'),
+      branch_address: branchObj && branchObj.address ? branchObj.address : 'Commercial Center, Poblacion, Davao City',
+      branch_contact: branchObj && branchObj.contact_no ? branchObj.contact_no : '0917-123-4567',
+      cashier_name: tx.cashier_name || tx.cashier || 'System Administrator',
+      items: tx.items || [],
+      subtotal: tx.subtotal,
+      discount: tx.discount,
+      total: tx.total,
+      payment_amount: tx.payment_amount != null ? tx.payment_amount : tx.total,
+      change_amount: tx.change_amount || 0,
+      payment_method: tx.payment_method || 'Cash'
+    });
+  } catch (err) {
+    showToast(`Error loading receipt: ${err.message}`, "danger");
+  }
+}
+window.reprintPosTransaction = reprintPosTransaction;
 
 async function voidPosTransaction(txId) {
   const confirmed = await showConfirmModal(

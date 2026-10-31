@@ -3495,57 +3495,277 @@ body.dark-mode .dashboard-ai-insight {
   border-color: var(--primary-color);
 }
 
-/* Thermal Receipt Styling */
+/* ==========================================================================
+   PROFESSIONAL THERMAL SALES RECEIPT (80mm) - ROSE BAKESHOP x BAKEWISE
+   ========================================================================== */
 .thermal-receipt-preview {
-  font-family: 'Courier New', Courier, monospace;
-  background: #ffffff;
-  color: #000000;
-  padding: 24px 20px;
+  background: #ffffff !important;
+  color: #111827 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  padding: 16px 14px !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  max-width: 80mm !important;
+  box-sizing: border-box !important;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  font-size: 0.85rem;
-  line-height: 1.4;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
-.receipt-logo-header {
+.receipt-header {
   text-align: center;
-  margin-bottom: 12px;
-  border-bottom: 1px dashed #000;
-  padding-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.receipt-logo-header h2 {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 900;
-  margin: 0;
-  color: #000;
+.receipt-brand-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.receipt-logo-primary {
+  height: 44px;
+  max-width: 110px;
+  object-fit: contain;
+}
+
+.receipt-logo-badge {
+  height: 36px;
+  max-width: 90px;
+  object-fit: contain;
+}
+
+.receipt-brand-name {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.8px;
+  color: #111827 !important;
+  margin: 4px 0 2px 0 !important;
+  text-transform: uppercase;
+}
+
+.receipt-brand-sub {
+  font-size: 9px !important;
+  font-weight: 600;
+  color: #64748b !important;
+  text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
 
-.receipt-logo-header p {
-  margin: 2px 0 0 0;
-  font-size: 0.8rem;
+.receipt-store-info {
+  font-size: 9.5px !important;
+  color: #334155 !important;
+  line-height: 1.3 !important;
+  margin-bottom: 6px;
+}
+
+.receipt-branch-name {
+  font-weight: 700 !important;
+  font-size: 10.5px !important;
+  color: #0f172a !important;
+}
+
+.receipt-branch-addr {
+  font-weight: 500;
+}
+
+.receipt-branch-contact {
+  font-weight: 500;
+}
+
+.receipt-title-banner {
+  margin: 8px 0 !important;
+  padding: 4px 0 !important;
+  border-top: 1.5px dashed #d97706 !important;
+  border-bottom: 1.5px dashed #d97706 !important;
+  color: #d97706 !important;
+  font-weight: 900 !important;
+  font-size: 12px !important;
+  letter-spacing: 1.2px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Metadata Section */
+.receipt-meta {
+  font-size: 10px !important;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.receipt-meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.receipt-meta-row span:first-child {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.receipt-meta-row span:last-child,
+.receipt-meta-row strong {
+  color: #0f172a;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Order Details Table */
+.receipt-items-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 10px !important;
+  margin: 6px 0 !important;
+}
+
+.receipt-items-table th {
+  border-top: 1px solid #111827 !important;
+  border-bottom: 1px solid #111827 !important;
+  padding: 4px 2px !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  color: #111827 !important;
+  background: transparent !important;
+}
+
+.receipt-items-table td {
+  padding: 4px 2px !important;
+  border-bottom: 1px dotted #e2e8f0 !important;
+  vertical-align: top;
+  color: #111827 !important;
+}
+
+.receipt-items-table tr:last-child td {
+  border-bottom: 1px solid #111827 !important;
+}
+
+.receipt-col-product {
+  font-weight: 600;
+  max-width: 110px;
+  word-break: break-word;
+}
+
+.receipt-col-qty {
+  text-align: center;
   font-weight: 600;
 }
 
-.receipt-divider {
-  border-top: 1px dashed #000;
-  margin: 10px 0;
+.receipt-col-price {
+  text-align: right;
+  white-space: nowrap;
 }
 
-.receipt-item-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
+.receipt-col-subtotal {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.receipt-total-row {
+/* Payment Summary */
+.receipt-payment-summary {
+  margin-top: 6px;
+  font-size: 10px !important;
+}
+
+.receipt-summary-line {
   display: flex;
   justify-content: space-between;
-  font-weight: bold;
-  font-size: 0.95rem;
+  margin-bottom: 2px;
+  color: #334155;
+}
+
+.receipt-summary-line span:last-child {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.receipt-summary-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+  padding: 5px 0;
+  border-top: 1.5px solid #111827;
+  border-bottom: 1.5px solid #111827;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  color: #111827;
+}
+
+.receipt-total-val {
+  color: #c2410c !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+}
+
+.receipt-change-highlight {
+  font-weight: 700;
+  color: #166534 !important;
+}
+
+.receipt-divider-dashed {
+  border-top: 1px dashed #94a3b8;
+  margin: 6px 0;
+}
+
+.receipt-divider-solid {
+  border-top: 1px solid #111827;
+  margin: 5px 0;
+}
+
+/* Footer */
+.receipt-footer {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 9.5px !important;
+  color: #475569;
+}
+
+.receipt-footer-title {
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  font-size: 10.5px !important;
+  margin: 3px 0 2px 0 !important;
+}
+
+.receipt-footer-subtitle {
+  font-weight: 600 !important;
+  color: #d97706 !important;
+  margin: 0 0 3px 0 !important;
+}
+
+.receipt-footer-msg {
+  font-size: 8px !important;
+  color: #64748b;
+  margin: 3px 0 !important;
+  line-height: 1.25;
+}
+
+.receipt-barcode-stub {
+  margin-top: 6px;
+}
+
+.receipt-barcode-lines {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 2px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.receipt-barcode-num {
+  font-family: monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #64748b;
 }
 
 /* ==========================================================================
@@ -3555,41 +3775,113 @@ body.dark-mode .dashboard-ai-insight {
 /* 1. POS THERMAL RECEIPT PRINT (Single Page 80mm Format) - Scoped ONLY to receipt printing */
 @media print {
   body.printing-pos-receipt {
-    background: white !important;
-    color: black !important;
-    height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 80mm !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* Completely hide all elements on the page by default */
   body.printing-pos-receipt * {
     visibility: hidden !important;
   }
-  body.printing-pos-receipt #pos-receipt-printable,
-  body.printing-pos-receipt #pos-receipt-printable * {
+
+  /* Completely remove other views, app layout, sidebars, modals and overlays from layout flow */
+  body.printing-pos-receipt > *:not(#pos-receipt-modal),
+  body.printing-pos-receipt .app-layout,
+  body.printing-pos-receipt .app-sidebar,
+  body.printing-pos-receipt .app-topbar,
+  body.printing-pos-receipt .main-panel,
+  body.printing-pos-receipt #landing-page,
+  body.printing-pos-receipt #login-page,
+  body.printing-pos-receipt .modal-overlay,
+  body.printing-pos-receipt #toast-container,
+  body.printing-pos-receipt .modal-dialog:not(#pos-receipt-modal),
+  body.printing-pos-receipt #pos-receipt-modal .modal-actions {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Make POS receipt modal and its printable content visible */
+  body.printing-pos-receipt #pos-receipt-modal,
+  body.printing-pos-receipt #pos-receipt-modal * {
     visibility: visible !important;
   }
-  body.printing-pos-receipt #pos-receipt-printable {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 76mm !important;
-    box-shadow: none !important;
+
+  body.printing-pos-receipt #pos-receipt-modal {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
     border: none !important;
-    padding: 4px !important;
-    margin: 0 !important;
-    font-size: 11px !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable {
+    display: block !important;
+    position: static !important;
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 10px !important;
     line-height: 1.3 !important;
     page-break-inside: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
     break-inside: avoid !important;
   }
-  body.printing-pos-receipt .modal-overlay,
-  body.printing-pos-receipt .modal-dialog,
-  body.printing-pos-receipt .modal-actions {
-    background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    display: none !important;
+
+  body.printing-pos-receipt #pos-receipt-printable img {
+    max-height: 40px !important;
+    display: inline-block !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable .receipt-title-banner {
+    border-top: 1.5px dashed #d97706 !important;
+    border-bottom: 1.5px dashed #d97706 !important;
+    color: #d97706 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable .receipt-items-table th {
+    border-top: 1px solid #000000 !important;
+    border-bottom: 1px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable .receipt-items-table td {
+    color: #000000 !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable .receipt-summary-total {
+    border-top: 1.5px solid #000000 !important;
+    border-bottom: 1.5px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  body.printing-pos-receipt #pos-receipt-printable .receipt-total-val {
+    color: #c2410c !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
