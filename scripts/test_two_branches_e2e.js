@@ -97,7 +97,7 @@ async function runTests() {
     assert('GET /api/sales?branch_id=3 returns 200 OK', salesB3.status === 200);
     assert('Lasang has sales records (> 50 transactions)', Array.isArray(salesB3.body) && salesB3.body.length >= 50);
     const datesB3 = new Set(salesB3.body.map(s => s.date ? s.date.split('T')[0] : null));
-    assert(`Lasang covers exactly 33 distinct calendar days (${datesB3.size} days)`, datesB3.size === 33);
+    assert(`Lasang covers exactly 31 distinct calendar days (${datesB3.size} days)`, datesB3.size === 31);
 
     // Test 2: Tibungco 2 Sales API
     console.log('\n--- TEST 2: Tibungco 2 (Branch 5) Sales API ---');
@@ -105,7 +105,7 @@ async function runTests() {
     assert('GET /api/sales?branch_id=5 returns 200 OK', salesB5.status === 200);
     assert('Tibungco 2 has sales records (> 50 transactions)', Array.isArray(salesB5.body) && salesB5.body.length >= 50);
     const datesB5 = new Set(salesB5.body.map(s => s.date ? s.date.split('T')[0] : null));
-    assert(`Tibungco 2 covers exactly 33 distinct calendar days (${datesB5.size} days)`, datesB5.size === 33);
+    assert(`Tibungco 2 covers exactly 31 distinct calendar days (${datesB5.size} days)`, datesB5.size === 31);
 
     // Test 3: Lasang Production API
     console.log('\n--- TEST 3: Lasang (Branch 3) Production API ---');

@@ -1,6 +1,6 @@
 /**
  * Comprehensive Validation Suite for Rose Bakeshop x BakeWise:
- * 250 Completed POS Sales per Branch per Day (Oct 14 - Nov 15, 2026)
+ * 250 Completed POS Sales per Branch per Day (Oct 14 - Nov 13, 2026)
  */
 
 const { Pool } = require('pg');
@@ -14,13 +14,13 @@ async function runValidation() {
   console.log('========================================================================');
   console.log('MANDATORY FINAL VALIDATION: 250 SALES / BRANCH / DAY AUDIT');
   console.log('Branches: Lasang (3) and Tibungco 2 (5)');
-  console.log('Coverage: October 14, 2026 to November 15, 2026 (33 calendar days)');
+  console.log('Coverage: October 14, 2026 to November 13, 2026 (31 calendar days)');
   console.log('========================================================================\n');
 
   let hasErrors = false;
 
   // 1. Daily POS Transaction Counts for Each Date
-  console.log('--- 1. DAILY COMPLETED POS TRANSACTION COUNTS AUDIT (33 DATES) ---');
+  console.log('--- 1. DAILY COMPLETED POS TRANSACTION COUNTS AUDIT (31 DATES) ---');
   const dailyQuery = await pool.query(`
     SELECT 
       date,
@@ -28,7 +28,7 @@ async function runValidation() {
       COUNT(*) FILTER (WHERE branch_id = 5 AND status = 'Completed') as tibungco_completed,
       COUNT(*) FILTER (WHERE branch_id IN (3, 5) AND status = 'Completed') as combined_completed
     FROM bw_pos_transactions
-    WHERE date >= '2026-10-14' AND date <= '2026-11-15'
+    WHERE date >= '2026-10-14' AND date <= '2026-11-13'
     GROUP BY date
     ORDER BY date ASC
   `);
@@ -56,12 +56,12 @@ async function runValidation() {
     }
   }
 
-  console.log(`\n  Total Lasang Completed POS Sales: ${totalLasang.toLocaleString()} (Target: 8,250)`);
-  console.log(`  Total Tibungco 2 Completed POS Sales: ${totalTibungco.toLocaleString()} (Target: 8,250)`);
-  console.log(`  Total Combined Completed POS Sales: ${totalCombined.toLocaleString()} (Target: 16,500)`);
+  console.log(`\n  Total Lasang Completed POS Sales: ${totalLasang.toLocaleString()} (Target: 7,750)`);
+  console.log(`  Total Tibungco 2 Completed POS Sales: ${totalTibungco.toLocaleString()} (Target: 7,750)`);
+  console.log(`  Total Combined Completed POS Sales: ${totalCombined.toLocaleString()} (Target: 15,500)`);
 
-  if (totalLasang === 8250 && totalTibungco === 8250 && totalCombined === 16500) {
-    console.log('  ✓ PASS: Perfect match of 250 sales/branch/day across all 33 dates (16,500 total)!');
+  if (totalLasang === 7750 && totalTibungco === 7750 && totalCombined === 15500) {
+    console.log('  ✓ PASS: Perfect match of 250 sales/branch/day across all 31 dates (15,500 total)!');
   } else {
     console.error('  ❌ FAIL: Total transaction count discrepancy!');
     hasErrors = true;
@@ -72,13 +72,13 @@ async function runValidation() {
   const uniqueReceipts = await pool.query(`
     SELECT COUNT(DISTINCT transaction_number) as distinct_receipts, COUNT(*) as total_records
     FROM bw_pos_transactions
-    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-15'
+    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-13'
   `);
   const distinct = parseInt(uniqueReceipts.rows[0].distinct_receipts);
   const total = parseInt(uniqueReceipts.rows[0].total_records);
   console.log(`  Distinct Receipt Numbers: ${distinct.toLocaleString()} / Total Records: ${total.toLocaleString()}`);
-  if (distinct === total && total === 16500) {
-    console.log('  ✓ PASS: 100% of the 16,500 receipts are strictly unique!');
+  if (distinct === total && total === 15500) {
+    console.log('  ✓ PASS: 100% of the 15,500 receipts are strictly unique!');
   } else {
     console.error('  ❌ FAIL: Duplicate receipt numbers found!');
     hasErrors = true;
@@ -131,7 +131,7 @@ async function runValidation() {
       COUNT(*) FILTER (WHERE payment_amount < total) as underpaid,
       COUNT(*) FILTER (WHERE payment_method = 'Cash' AND ABS(change_amount - (payment_amount - total)) > 0.01) as bad_change
     FROM bw_pos_transactions
-    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-15'
+    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-13'
     GROUP BY payment_method
   `);
   console.table(paymentCheck.rows);
@@ -174,7 +174,7 @@ async function runValidation() {
   const contamCheck = await pool.query(`
     SELECT branch_id, COUNT(*) as pos_tx_count, SUM(total) as revenue
     FROM bw_pos_transactions
-    WHERE date >= '2026-10-14' AND date <= '2026-11-15'
+    WHERE date >= '2026-10-14' AND date <= '2026-11-13'
     GROUP BY branch_id
     ORDER BY branch_id
   `);
@@ -188,7 +188,7 @@ async function runValidation() {
       COUNT(*) as total_sales_tx,
       SUM(total) as total_revenue
     FROM bw_pos_transactions
-    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-15'
+    WHERE branch_id IN (3, 5) AND date >= '2026-10-14' AND date <= '2026-11-13'
     GROUP BY branch_id
     ORDER BY branch_id
   `);

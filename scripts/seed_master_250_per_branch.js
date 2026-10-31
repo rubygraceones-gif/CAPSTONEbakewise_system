@@ -7,21 +7,21 @@
  *  - Tibungco 2, Davao City (ID: 5)
  * 
  * Date Coverage:
- *  - October 14, 2026 to November 15, 2026 (33 calendar days)
+ *  - October 14, 2026 to November 13, 2026 (31 calendar days)
  *  - Oct 14–31: Historical operational sales (18 days x 250 = 4,500/branch)
- *  - Nov 1–15: Future simulation sales (15 days x 250 = 3,750/branch)
+ *  - Nov 1–13: Future simulation sales (13 days x 250 = 3,250/branch)
  * 
  * TOTAL EXPECTED COMPLETED POS TRANSACTIONS:
- *  - Lasang: 8,250
- *  - Tibungco 2: 8,250
- *  - Grand Total: 16,500 completed transactions
+ *  - Lasang: 7,750
+ *  - Tibungco 2: 7,750
+ *  - Grand Total: 15,500 completed transactions
  * 
- * Seed Identifier: ROSE_BAKEWISE_250_PER_BRANCH_20261014_20261115
+ * Seed Identifier: ROSE_BAKEWISE_250_PER_BRANCH_20261014_20261113
  */
 
 const { Pool } = require('pg');
 
-const SEED_IDENTIFIER = 'ROSE_BAKEWISE_250_PER_BRANCH_20261014_20261115';
+const SEED_IDENTIFIER = 'ROSE_BAKEWISE_250_PER_BRANCH_20261014_20261113';
 
 const pool = new Pool({
   connectionString: 'postgresql://postgres.ewgebrbrgftbsljjgkwr:BakeWise2026!Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres',
@@ -69,15 +69,15 @@ async function batchInsert(table, columns, rows, chunkSize = 150) {
   return allResults;
 }
 
-// Generate the 33 calendar dates: Oct 14 to Nov 15, 2026
+// Generate the 31 calendar dates: Oct 14 to Nov 13, 2026
 const DATES = [];
 // Oct 14 to 31 (18 days)
 for (let d = 14; d <= 31; d++) {
   const dayStr = d < 10 ? `0${d}` : `${d}`;
   DATES.push({ dateStr: `2026-10-${dayStr}`, isFuture: false });
 }
-// Nov 1 to 15 (15 days)
-for (let d = 1; d <= 15; d++) {
+// Nov 1 to 13 (13 days)
+for (let d = 1; d <= 13; d++) {
   const dayStr = d < 10 ? `0${d}` : `${d}`;
   DATES.push({ dateStr: `2026-11-${dayStr}`, isFuture: true });
 }
@@ -758,7 +758,7 @@ async function runMasterSeeder() {
     for (const pId of b.productIds) {
       const finalBal = runningStock[b.branchId][pId];
       const p = PRODUCTS_MASTER[pId];
-      const batchCode = `BAT-B${b.branchId}-${pId}-20261115`;
+      const batchCode = `BAT-B${b.branchId}-${pId}-20261113`;
 
       if (finalBal <= 0) {
         throw new Error(`CRITICAL INVENTORY VIOLATION: Final stock for ${pId} in Branch ${b.branchId} is ${finalBal}`);
@@ -773,9 +773,9 @@ async function runMasterSeeder() {
         await queryWithRetry(`
           UPDATE bw_inventory
           SET stock_level = $1,
-              production_date = '2026-11-15',
+              production_date = '2026-11-13',
               production_time = '06:00:00',
-              expiry_date = '2026-11-17',
+              expiry_date = '2026-11-15',
               expiry_time = '18:00:00',
               unit = $2,
               status = 'In Stock',
@@ -785,7 +785,7 @@ async function runMasterSeeder() {
       } else {
         await queryWithRetry(`
           INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id, unit, status, batch_id, production_time, expiry_time)
-          VALUES ($1, $2, '2026-11-15', '2026-11-17', $3, $4, 'In Stock', $5, '06:00:00', '18:00:00')
+          VALUES ($1, $2, '2026-11-13', '2026-11-15', $3, $4, 'In Stock', $5, '06:00:00', '18:00:00')
         `, [pId, finalBal, b.branchId, p.unit, batchCode]);
       }
     }
