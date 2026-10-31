@@ -1730,6 +1730,10 @@ class SearchableCombobox {
     const existingElement = document.getElementById(this.targetId);
     if (!existingElement) return;
 
+    if (!this.selectedValue && existingElement.value) {
+      this.selectedValue = existingElement.value;
+    }
+
     if (!this.items && existingElement.tagName === 'SELECT') {
       this.items = Array.from(existingElement.options).map(opt => ({
         id: opt.value,
@@ -2319,7 +2323,15 @@ function populateSelectDropdowns() {
   initCombobox("shelf-storage", {
     icon: "box",
     placeholder: "Search storage...",
-    items: [{ id: 'Ambient Room Temp (25°C)', name: 'Ambient Room Temp (25°C)' }, { id: 'Refrigerated (4°C)', name: 'Refrigerated (4°C)' }, { id: 'High Humidity / Display Showcase', name: 'High Humidity / Display Showcase' }]
+    defaultValue: "Covered Room-Temperature Storage",
+    items: [
+      { id: 'Uncovered Storage', name: 'Uncovered Storage' },
+      { id: 'Sealed Packaging', name: 'Sealed Packaging' },
+      { id: 'Refrigerated Storage', name: 'Refrigerated Storage' },
+      { id: 'Frozen Storage', name: 'Frozen Storage' },
+      { id: 'Display Case Storage', name: 'Display Case Storage' },
+      { id: 'Covered Room-Temperature Storage', name: 'Covered Room-Temperature Storage' }
+    ]
   });
 
   initCombobox("edit-br-status", {
@@ -5364,6 +5376,23 @@ function populateShelfBreadTypeDropdown() {
 function refreshShelfLifePane() {
   populateShelfBreadTypeDropdown();
   renderRepurposingAlerts();
+
+  try {
+    const saved = localStorage.getItem("bakewise_v2_last_shelf_prediction");
+    if (saved) {
+      const pred = JSON.parse(saved);
+      if (pred && (pred.breadName || pred.breadType)) {
+        if (pred.storageCondition) {
+          pred.storageCondition = normalizeStorageCondition(pred.storageCondition);
+        }
+        if (typeof applyShelfLifePredictionResult === 'function') {
+          applyShelfLifePredictionResult(pred);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not restore last shelf prediction:", e);
+  }
 }
 
 // 7. PRODUCT CATALOG VIEW REFRESHER
@@ -6085,11 +6114,302 @@ async function refreshAdminBranchesPane() {
 }
 
 // --- SHELF LIFE PREDICTION MODULE ---
+function normalizeStorageCondition(rawStorage) {
+  if (!rawStorage) return 'Covered Room-Temperature Storage';
+  const s = String(rawStorage).trim().toLowerCase();
+  
+  if (s === 'uncovered storage' || s === 'open' || s.includes('uncover') || s.includes('exposed')) {
+    return 'Uncovered Storage';
+  }
+  if (s === 'sealed packaging' || s === 'sealed' || s.includes('sealed') || s.includes('airtight')) {
+    return 'Sealed Packaging';
+  }
+  if (s === 'frozen storage' || s === 'frozen' || s.includes('froz')) {
+    return 'Frozen Storage';
+  }
+  if (s === 'refrigerated storage' || s === 'refrigerated' || s.includes('refrigerat') || s.includes('chilled') || s.includes('4°c')) {
+    return 'Refrigerated Storage';
+  }
+  if (s === 'display case storage' || s.includes('display') || s.includes('showcase')) {
+    return 'Display Case Storage';
+  }
+  if (s === 'covered room-temperature storage' || s.includes('ambient') || s.includes('room') || s.includes('covered') || s.includes('25°c')) {
+    return 'Covered Room-Temperature Storage';
+  }
+  return 'Covered Room-Temperature Storage';
+}
+window.normalizeStorageCondition = normalizeStorageCondition;
+
+function calculateShelfLifePrediction({ breadType, breadName, storage, temp, humid, prodDate }) {
+  const normalizedStorage = normalizeStorageCondition(storage);
+
+  // 1. Dynamic Base Shelf Life Lookup from Product Catalog
+  const targetProduct = (store.products || []).find(p => 
+    String(p.id) === String(breadType) || 
+    p.name === breadName || 
+    String(p.name).toLowerCase() === String(breadType).toLowerCase() ||
+    String(p.name).toLowerCase() === String(breadName).toLowerCase()
+  );
+
+  let baseShelfLife = 3;
+  if (targetProduct && targetProduct.shelfLifeDays) {
+    baseShelfLife = parseInt(targetProduct.shelfLifeDays, 10);
+  } else if (targetProduct) {
+    const pNameLower = targetProduct.name.toLowerCase();
+    const pCatLower = (targetProduct.category || '').toLowerCase();
+    if (pNameLower.includes('sliced') || pNameLower.includes('loaf')) baseShelfLife = 7;
+    else if (pCatLower.includes('cake') || pNameLower.includes('cake')) baseShelfLife = 5;
+    else if (pCatLower.includes('pastr') || pNameLower.includes('ensaymada') || pNameLower.includes('croissant') || pNameLower.includes('muffin')) baseShelfLife = 4;
+    else baseShelfLife = 3;
+  } else {
+    const bLower = (breadType || breadName || '').toLowerCase();
+    if (bLower.includes("sliced") || bLower.includes("loaf")) baseShelfLife = 7;
+    else if (bLower.includes("cake")) baseShelfLife = 5;
+    else if (bLower.includes("ensaymada") || bLower.includes("pastr")) baseShelfLife = 4;
+    else baseShelfLife = 3;
+  }
+
+  const isDairyOrFilled = (breadName || breadType || '').toLowerCase().match(/(ensaymada|cake|custard|cream|cheese|pastry)/i);
+
+  // 2. Storage Condition Multiplier & Informative Guidance
+  let storageMultiplier = 1.0;
+  let storageMsg = "";
+  let storageColor = "var(--text-secondary)";
+
+  switch (normalizedStorage) {
+    case 'Uncovered Storage':
+      storageMultiplier = 0.50;
+      storageMsg = "Uncovered storage: Direct air exposure accelerates moisture loss, crumb staling, and airborne mold spore deposition.";
+      storageColor = "#ef4444";
+      break;
+
+    case 'Sealed Packaging':
+      storageMultiplier = 1.25;
+      storageMsg = "Sealed packaging: Airtight barrier prevents moisture loss and blocks airborne fungal spores.";
+      storageColor = "#22c55e";
+      break;
+
+    case 'Refrigerated Storage':
+      // Refrigeration (4°C) suppresses mold significantly, especially vital for dairy/cream fillings
+      storageMultiplier = isDairyOrFilled ? 1.75 : 1.60;
+      storageMsg = "Refrigerated storage (4°C): Significantly suppresses microbial and mold growth; ideal for filled and dairy-rich pastries.";
+      storageColor = "#3b82f6";
+      break;
+
+    case 'Frozen Storage':
+      // Freezing (-18°C) halts water activity and fungal growth
+      storageMultiplier = 3.50;
+      storageMsg = "Frozen storage (-18°C): Halts microbial activity and staling; preserves bread structure until thawed.";
+      storageColor = "#06b6d4";
+      break;
+
+    case 'Display Case Storage':
+      storageMultiplier = 0.85;
+      storageMsg = "Display case storage: Provides display protection, but showcase warmth and frequent opening gradually reduce freshness.";
+      storageColor = "#f59e0b";
+      break;
+
+    case 'Covered Room-Temperature Storage':
+    default:
+      storageMultiplier = 1.00;
+      storageMsg = "Covered room-temperature storage: Standard baseline storage protecting from dust and room drafts.";
+      storageColor = "var(--text-secondary)";
+      break;
+  }
+
+  // 3. Temperature Modifiers
+  let tempModifier = 1.0;
+  let tempMsg = `Optimal room temperature (${temp}°C) is within acceptable bakery standards.`;
+  let tempColor = "var(--text-secondary)";
+
+  if (normalizedStorage === 'Frozen Storage') {
+    tempModifier = 1.0;
+    tempMsg = `Sub-zero freezing maintains preservation independent of ambient room temperature (${temp}°C).`;
+  } else if (normalizedStorage === 'Refrigerated Storage') {
+    if (temp > 32) {
+      tempModifier = 0.95;
+      tempMsg = `Refrigeration (4°C) insulates against ambient heat (${temp}°C) with minimal opening loss.`;
+    } else {
+      tempModifier = 1.0;
+      tempMsg = `Refrigeration (4°C) completely insulates product from ambient temperature (${temp}°C).`;
+    }
+  } else {
+    if (temp > 32) {
+      tempModifier = 0.70; // 30% reduction in high heat
+      tempMsg = `High temperature (${temp}°C) accelerates fungal spore germination and mold growth.`;
+      tempColor = "#ef4444";
+    } else if (temp > 27) {
+      tempModifier = 0.85; // 15% reduction in warm heat
+      tempMsg = `Warm bakery temperature (${temp}°C) moderately speeds up moisture loss and staling.`;
+      tempColor = "#f59e0b";
+    } else if (temp < 18) {
+      tempModifier = 1.15; // 15% extension in cool temperature
+      tempMsg = `Cool temperature (${temp}°C) retards microbial development and prolongs freshness.`;
+      tempColor = "#3b82f6";
+    }
+  }
+
+  // 4. Humidity Modifiers
+  let humidModifier = 1.0;
+  let humidMsg = `Relative humidity (${humid}%) is in the optimal range for bread preservation.`;
+  let humidColor = "var(--text-secondary)";
+
+  if (normalizedStorage === 'Frozen Storage') {
+    humidModifier = 1.0;
+    humidMsg = `Freezer humidity is controlled in deep freeze.`;
+  } else if (normalizedStorage === 'Sealed Packaging') {
+    if (humid > 75) {
+      humidModifier = 0.90;
+      humidMsg = `High ambient humidity (${humid}%); check sealed packaging for internal moisture condensation.`;
+      humidColor = "#f59e0b";
+    } else {
+      humidModifier = 1.05;
+      humidMsg = `Sealed packaging maintains equilibrium moisture content against room humidity (${humid}%).`;
+    }
+  } else {
+    if (humid > 75) {
+      humidModifier = 0.75; // 25% reduction in high humidity
+      humidMsg = `High humidity (${humid}%) creates surface condensation, dramatically elevating mold risk.`;
+      humidColor = "#ef4444";
+    } else if (humid < 40) {
+      humidModifier = 0.85; // 15% reduction in dry air
+      humidMsg = `Low humidity (${humid}%) draws moisture from crumb, causing rapid staling and crust hardening.`;
+      humidColor = "#f59e0b";
+    }
+  }
+
+  // 5. Total Effective Shelf Life
+  const totalShelfLife = baseShelfLife * storageMultiplier * tempModifier * humidModifier;
+
+  // 6. Days Elapsed
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const pDate = new Date(prodDate);
+  pDate.setHours(0, 0, 0, 0);
+  const diffTime = today - pDate;
+  let daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  if (daysSince < 0) daysSince = 0;
+
+  // 7. Remaining Days & Freshness Score
+  const remainingDays = Math.max(0, totalShelfLife - daysSince);
+  let freshnessScore = 0;
+  if (totalShelfLife > 0) {
+    if (daysSince === 0) {
+      freshnessScore = 100;
+    } else {
+      freshnessScore = Math.max(0, Math.min(100, Math.round((remainingDays / totalShelfLife) * 100)));
+    }
+  }
+
+  // 8. Risk Assessment
+  let risk = "Low Risk";
+  let riskColor = "#22c55e"; // green
+  let riskIcon = "check-square";
+
+  if (freshnessScore <= 25 || remainingDays <= 0.5) {
+    risk = "High Risk";
+    riskColor = "#ef4444"; // red
+    riskIcon = "alert-triangle";
+  } else if (freshnessScore <= 70 || remainingDays <= 1.5) {
+    risk = "Moderate Risk";
+    riskColor = "#eab308"; // yellow
+    riskIcon = "alert-circle";
+  }
+
+  return {
+    breadType,
+    breadName,
+    storageCondition: normalizedStorage,
+    storageMultiplier,
+    temp,
+    humid,
+    prodDate,
+    daysSince,
+    baseShelfLife,
+    totalShelfLife: Number(totalShelfLife.toFixed(1)),
+    remainingDays: Number(remainingDays.toFixed(1)),
+    freshnessScore,
+    risk,
+    riskColor,
+    riskIcon,
+    tempMsg,
+    tempColor,
+    humidMsg,
+    humidColor,
+    storageMsg,
+    storageColor
+  };
+}
+window.calculateShelfLifePrediction = calculateShelfLifePrediction;
+
+function applyShelfLifePredictionResult(res) {
+  if (!res) return;
+
+  const breadNameEl = document.getElementById("res-bread-name");
+  if (breadNameEl) breadNameEl.textContent = res.breadName;
+
+  const freshnessEl = document.getElementById("res-freshness");
+  if (freshnessEl) {
+    freshnessEl.textContent = `${res.freshnessScore}%`;
+    freshnessEl.style.color = res.riskColor;
+  }
+
+  const daysEl = document.getElementById("res-days");
+  if (daysEl) {
+    daysEl.textContent = `${Number(res.remainingDays).toFixed(1)} Days`;
+    daysEl.style.color = res.riskColor === "#ef4444" ? "#ef4444" : "#3b82f6";
+  }
+
+  const riskEl = document.getElementById("res-risk");
+  if (riskEl) {
+    riskEl.textContent = res.risk;
+    riskEl.style.color = res.riskColor;
+  }
+
+  const riskIconEl = document.getElementById("res-risk-icon");
+  if (riskIconEl) {
+    riskIconEl.setAttribute("data-lucide", res.riskIcon);
+    riskIconEl.style.color = res.riskColor;
+  }
+
+  const barTextEl = document.getElementById("res-freshness-bar-text");
+  if (barTextEl) {
+    barTextEl.textContent = `${res.freshnessScore}%`;
+    barTextEl.style.color = res.riskColor;
+  }
+
+  const barEl = document.getElementById("res-freshness-bar");
+  if (barEl) {
+    barEl.style.width = `${res.freshnessScore}%`;
+    barEl.style.backgroundColor = res.riskColor;
+  }
+
+  const tempMsgEl = document.getElementById("res-msg-temp");
+  if (tempMsgEl) {
+    tempMsgEl.textContent = res.tempMsg;
+    tempMsgEl.style.color = res.tempColor;
+  }
+
+  const humidMsgEl = document.getElementById("res-msg-humid");
+  if (humidMsgEl) {
+    humidMsgEl.textContent = res.humidMsg;
+    humidMsgEl.style.color = res.humidColor;
+  }
+
+  const storageMsgEl = document.getElementById("res-msg-storage");
+  if (storageMsgEl) {
+    storageMsgEl.textContent = res.storageMsg;
+    storageMsgEl.style.color = res.storageColor;
+  }
+
+  if (window.lucide && window.lucide.createIcons) {
+    window.lucide.createIcons();
+  }
+}
+window.applyShelfLifePredictionResult = applyShelfLifePredictionResult;
+
 function setupShelfLifeModule() {
   populateShelfBreadTypeDropdown();
-
-  const btnPredict = document.getElementById("btn-predict-shelf");
-  if (!btnPredict) return;
 
   const tempSlider = document.getElementById("shelf-temp");
   const humidSlider = document.getElementById("shelf-humidity");
@@ -6098,151 +6418,82 @@ function setupShelfLifeModule() {
   const dateInput = document.getElementById("shelf-date");
   
   // Set default date to today
-  if (dateInput) {
+  if (dateInput && !dateInput.value) {
     const today = new Date();
     dateInput.value = today.toISOString().split('T')[0];
   }
 
   // Update slider values dynamically
-  if (tempSlider && tempVal) {
+  if (tempSlider && tempVal && !tempSlider.dataset.listening) {
+    tempSlider.dataset.listening = "true";
+    tempVal.textContent = tempSlider.value;
     tempSlider.addEventListener("input", (e) => {
       tempVal.textContent = e.target.value;
     });
   }
-  if (humidSlider && humidVal) {
+  if (humidSlider && humidVal && !humidSlider.dataset.listening) {
+    humidSlider.dataset.listening = "true";
+    humidVal.textContent = humidSlider.value;
     humidSlider.addEventListener("input", (e) => {
       humidVal.textContent = e.target.value;
     });
   }
 
+  const btnPredict = document.getElementById("btn-predict-shelf");
+  if (!btnPredict) return;
+
   // Prediction Logic
-  btnPredict.addEventListener("click", () => {
-    const selectEl = document.getElementById("shelf-bread-type");
-    if (!selectEl || selectEl.options.length === 0) {
-      populateShelfBreadTypeDropdown();
-    }
-    const breadTypeVal = selectEl ? selectEl.value : "";
-    const selectedOption = selectEl && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
-    const breadName = selectedOption ? selectedOption.text : "Bread";
-
-    const storage = document.getElementById("shelf-storage").value;
-    const temp = parseInt(tempSlider.value, 10);
-    const humid = parseInt(humidSlider.value, 10);
-    const prodDateStr = dateInput.value;
-
-    if (!prodDateStr) {
-      alert("Please select a production date.");
-      return;
-    }
-
-    // Calculate days since production
-    const prodDate = new Date(prodDateStr);
-    const today = new Date();
-    const diffTime = today - prodDate;
-    let daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    if (daysSince < 0) daysSince = 0;
-
-    // Dynamic Base Shelf Life Lookup from Product Catalog
-    const targetProduct = (store.products || []).find(p => String(p.id) === String(breadTypeVal) || p.name === breadName);
-
-    let baseShelfLife = 3;
-    if (targetProduct) {
-      if (targetProduct.shelfLifeDays) {
-        baseShelfLife = parseInt(targetProduct.shelfLifeDays, 10);
-      } else {
-        const pNameLower = targetProduct.name.toLowerCase();
-        const pCatLower = (targetProduct.category || '').toLowerCase();
-        if (pNameLower.includes('sliced') || pNameLower.includes('loaf')) baseShelfLife = 7;
-        else if (pCatLower.includes('cake') || pNameLower.includes('cake')) baseShelfLife = 5;
-        else if (pCatLower.includes('pastr') || pNameLower.includes('ensaymada') || pNameLower.includes('croissant') || pNameLower.includes('muffin')) baseShelfLife = 4;
-        else baseShelfLife = 3;
+  if (!btnPredict.dataset.listening) {
+    btnPredict.dataset.listening = "true";
+    btnPredict.addEventListener("click", () => {
+      const selectEl = document.getElementById("shelf-bread-type");
+      if (!selectEl || selectEl.options.length === 0) {
+        populateShelfBreadTypeDropdown();
       }
-    } else {
-      if (breadTypeVal === "pandesal") baseShelfLife = 3;
-      else if (breadTypeVal === "sliced_bread") baseShelfLife = 7;
-      else if (breadTypeVal === "ensaymada") baseShelfLife = 4;
-      else if (breadTypeVal === "cake") baseShelfLife = 5;
-    }
+      const breadTypeVal = selectEl ? selectEl.value : "";
+      const selectedOption = selectEl && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+      const breadName = selectedOption ? (selectedOption.text || selectedOption.name || selectedOption.value) : (breadTypeVal || "Bread");
 
-    // Apply storage modifiers
-    let storageMsg = "";
-    if (storage === "refrigerated") {
-      baseShelfLife += 2;
-      storageMsg = "Refrigeration extends shelf life.";
-    } else if (storage === "open") {
-      baseShelfLife -= 1;
-      storageMsg = "Open storage accelerates staling and spoilage.";
-    } else {
-      storageMsg = "Sealed storage is appropriate for this bread type.";
-    }
+      const storageInput = document.getElementById("shelf-storage");
+      const rawStorage = storageInput ? storageInput.value : "Covered Room-Temperature Storage";
+      const storage = normalizeStorageCondition(rawStorage);
 
-    // Apply Temp/Humidity modifiers
-    let tempMsg = `Temperature ${temp}°C is within acceptable range.`;
-    if (temp > 30) {
-      baseShelfLife *= 0.7; // 30% reduction
-      tempMsg = `High temperature (${temp}°C) accelerates mold growth.`;
-    } else if (temp < 15 && storage !== "refrigerated") {
-      tempMsg = `Cooler temperature helps maintain freshness.`;
-    }
+      const temp = parseInt(tempSlider ? tempSlider.value : 27, 10);
+      const humid = parseInt(humidSlider ? humidSlider.value : 60, 10);
+      const prodDateStr = dateInput ? dateInput.value : "";
 
-    let humidMsg = `Humidity ${humid}% is acceptable for bread storage.`;
-    if (humid > 70) {
-      baseShelfLife *= 0.8; // 20% reduction
-      humidMsg = `High humidity (${humid}%) significantly increases spoilage risk.`;
-    } else if (humid < 40) {
-      baseShelfLife *= 0.9;
-      humidMsg = `Low humidity (${humid}%) may cause bread to stale faster.`;
-    }
+      if (!prodDateStr) {
+        if (typeof showToast === 'function') {
+          showToast("Please select a Production Date.", "error");
+        } else {
+          alert("Please select a production date.");
+        }
+        return;
+      }
 
-    // Calculate Final metrics
-    const remainingDays = Math.max(0, baseShelfLife - daysSince);
-    let freshnessScore = 0;
-    if (baseShelfLife > 0) {
-      freshnessScore = Math.max(0, Math.min(100, (remainingDays / baseShelfLife) * 100));
-    }
+      const res = calculateShelfLifePrediction({
+        breadType: breadTypeVal,
+        breadName: breadName,
+        storage: storage,
+        temp: temp,
+        humid: humid,
+        prodDate: prodDateStr
+      });
 
-    // Determine Risk
-    let risk = "Low Risk";
-    let riskColor = "#22c55e"; // green
-    if (freshnessScore <= 25) {
-      risk = "High Risk";
-      riskColor = "#ef4444"; // red
-    } else if (freshnessScore <= 75) {
-      risk = "Moderate Risk";
-      riskColor = "#eab308"; // yellow
-    }
+      applyShelfLifePredictionResult(res);
 
-    // Update UI
-    document.getElementById("res-bread-name").textContent = breadName;
-    document.getElementById("res-freshness").textContent = `${Math.round(freshnessScore)}%`;
-    document.getElementById("res-freshness").style.color = riskColor;
-    
-    document.getElementById("res-days").textContent = `${remainingDays.toFixed(1)} Days`;
-    
-    document.getElementById("res-risk").textContent = risk;
-    document.getElementById("res-risk").style.color = riskColor;
-    document.getElementById("res-risk-icon").style.color = riskColor;
-    
-    if (risk === "High Risk") {
-      document.getElementById("res-risk-icon").setAttribute("data-lucide", "alert-triangle");
-    } else {
-      document.getElementById("res-risk-icon").setAttribute("data-lucide", "check-square");
-    }
-    lucide.createIcons();
-
-    // Update progress bar
-    document.getElementById("res-freshness-bar-text").textContent = `${Math.round(freshnessScore)}%`;
-    document.getElementById("res-freshness-bar-text").style.color = riskColor;
-    const bar = document.getElementById("res-freshness-bar");
-    bar.style.width = `${freshnessScore}%`;
-    bar.style.backgroundColor = riskColor;
-
-    // Update Messages
-    document.getElementById("res-msg-temp").textContent = tempMsg;
-    document.getElementById("res-msg-humid").textContent = humidMsg;
-    document.getElementById("res-msg-storage").textContent = storageMsg;
-
-  });
+      try {
+        localStorage.setItem("bakewise_v2_last_shelf_prediction", JSON.stringify(res));
+        const historyStr = localStorage.getItem("bakewise_v2_shelf_prediction_history");
+        const history = historyStr ? JSON.parse(historyStr) : [];
+        history.unshift({ ...res, predictedAt: new Date().toISOString() });
+        if (history.length > 50) history.pop();
+        localStorage.setItem("bakewise_v2_shelf_prediction_history", JSON.stringify(history));
+      } catch (err) {
+        console.warn("Could not save shelf prediction history:", err);
+      }
+    });
+  }
 }
 
 window.updateNotificationBadge = function() {
@@ -6429,134 +6680,8 @@ function setupNotifications() {
 // SHELF LIFE PREDICTOR UI & LOGIC
 // ==========================================================================
 function setupShelfLifePredictor() {
-  const shelfTemp = document.getElementById("shelf-temp");
-  const shelfTempVal = document.getElementById("shelf-temp-val");
-  const shelfHumid = document.getElementById("shelf-humidity");
-  const shelfHumidVal = document.getElementById("shelf-humidity-val");
-
-  if (shelfTemp && shelfTempVal) {
-    shelfTemp.addEventListener("input", (e) => shelfTempVal.textContent = e.target.value);
-  }
-  if (shelfHumid && shelfHumidVal) {
-    shelfHumid.addEventListener("input", (e) => shelfHumidVal.textContent = e.target.value);
-  }
-
-  const btnPredictShelf = document.getElementById("btn-predict-shelf");
-  if (btnPredictShelf) {
-    btnPredictShelf.addEventListener("click", () => {
-      const breadTypeEl = document.getElementById("shelf-bread-type");
-      const breadType = breadTypeEl.value;
-      const breadName = breadTypeEl.options[breadTypeEl.selectedIndex].text;
-      const storage = document.getElementById("shelf-storage").value;
-      const temp = parseInt(document.getElementById("shelf-temp").value);
-      const humid = parseInt(document.getElementById("shelf-humidity").value);
-      const prodDate = document.getElementById("shelf-date").value;
-
-      if (!prodDate) {
-        if (typeof showToast === 'function') showToast("Please select a Production Date.", "error");
-        return;
-      }
-
-      // Base shelf life in days based on Bread Type
-      let baseShelfLife = 3;
-      if (breadType === "pandesal") baseShelfLife = 3;
-      else if (breadType === "sliced_bread") baseShelfLife = 7;
-      else if (breadType === "ensaymada") baseShelfLife = 5;
-      else if (breadType === "cake") baseShelfLife = 4;
-
-      // Calculate Modifiers
-      let multiplier = 1.0;
-      if (storage === "refrigerated") multiplier *= 1.5;
-      else if (storage === "open") multiplier *= 0.5;
-
-      if (temp > 30) multiplier *= 0.7; 
-      else if (temp < 20) multiplier *= 1.1; 
-
-      if (humid > 70) multiplier *= 0.6; 
-      else if (humid < 40) multiplier *= 0.8; 
-      else multiplier *= 1.1; 
-
-      let totalShelfLife = Math.max(1, Math.round(baseShelfLife * multiplier));
-
-      // Calculate Remaining Days and Freshness
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const pDate = new Date(prodDate);
-      pDate.setHours(0,0,0,0);
-      
-      const diffTime = today - pDate;
-      const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      let remainingDays = totalShelfLife - daysElapsed;
-      let freshnessScore = 0;
-      
-      if (remainingDays <= 0) {
-        remainingDays = 0;
-        freshnessScore = 0;
-      } else if (daysElapsed < 0) {
-        remainingDays = totalShelfLife;
-        freshnessScore = Math.min(100, Math.max(0, Math.round((totalShelfLife / baseShelfLife) * 100)));
-      } else {
-        freshnessScore = Math.min(100, Math.max(0, Math.round((remainingDays / baseShelfLife) * 100)));
-      }
-
-      // Update UI elements
-      document.getElementById("res-bread-name").textContent = breadName;
-      document.getElementById("res-freshness").textContent = freshnessScore + "%";
-      document.getElementById("res-days").textContent = remainingDays + " Days";
-
-      const freshnessBar = document.getElementById("res-freshness-bar");
-      const freshnessBarText = document.getElementById("res-freshness-bar-text");
-      freshnessBar.style.width = freshnessScore + "%";
-      freshnessBarText.textContent = freshnessScore + "%";
-
-      let risk = "Low";
-      let riskColor = "#22c55e"; // Green
-      let riskIcon = "check-square";
-      
-      if (freshnessScore <= 25) {
-        risk = "High";
-        riskColor = "#ef4444"; // Red
-        riskIcon = "alert-triangle";
-        freshnessBar.style.backgroundColor = "#ef4444";
-      } else if (freshnessScore <= 75) {
-        risk = "Moderate";
-        riskColor = "#eab308"; // Yellow
-        riskIcon = "alert-circle";
-        freshnessBar.style.backgroundColor = "#eab308";
-      } else {
-        freshnessBar.style.backgroundColor = "#22c55e";
-      }
-      
-      const resRisk = document.getElementById("res-risk");
-      resRisk.textContent = risk;
-      resRisk.style.color = riskColor;
-      
-      document.getElementById("res-freshness").style.color = riskColor;
-      freshnessBarText.style.color = riskColor;
-
-      const riskIconEl = document.getElementById("res-risk-icon");
-      if (riskIconEl && typeof lucide !== 'undefined') {
-        riskIconEl.setAttribute("data-lucide", riskIcon);
-        riskIconEl.style.color = riskColor;
-        lucide.createIcons();
-      }
-
-      // Generate Analysis Messages
-      let tempMsg = temp > 30 ? `High temp (${temp}°C) accelerates spoilage.` : temp < 20 ? `Cool temp (${temp}°C) extends shelf life.` : `Optimal room temperature (${temp}°C).`;
-      let humidMsg = humid > 70 ? `High humidity (${humid}%) risks rapid mold growth.` : humid < 40 ? `Low humidity (${humid}%) risks rapid staling.` : `Ideal humidity (${humid}%) preserves texture.`;
-      let storageMsg = storage === "sealed" ? "Sealed packaging protects from air." : storage === "refrigerated" ? "Refrigeration slows mold but may cause staling." : "Open storage exposes product to contaminants.";
-
-      document.getElementById("res-msg-temp").textContent = tempMsg;
-      document.getElementById("res-msg-temp").style.color = temp > 30 ? "#ef4444" : "var(--text-secondary)";
-      
-      document.getElementById("res-msg-humid").textContent = humidMsg;
-      document.getElementById("res-msg-humid").style.color = (humid > 70 || humid < 40) ? "#f59e0b" : "var(--text-secondary)";
-      
-      document.getElementById("res-msg-storage").textContent = storageMsg;
-      document.getElementById("res-msg-storage").style.color = storage === "open" ? "#ef4444" : "var(--text-secondary)";
-    });
-  }
+  // Delegate to setupShelfLifeModule to unify prediction engine and prevent duplicate event listeners
+  setupShelfLifeModule();
 }
 
 // Call on load
