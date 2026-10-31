@@ -98,7 +98,10 @@ const scriptContext = {
 };
 vm.createContext(scriptContext);
 
-// Extract helper functions from app.js: normalizeStorageCondition and calculateShelfLifePrediction
+// Extract helper functions from app.js: getTemperatureBand, normalizeStorageCondition and calculateShelfLifePrediction
+const bandMatch = appJsContent.match(/function getTemperatureBand[\s\S]*?window\.getTemperatureBand\s*=\s*getTemperatureBand;/);
+if (bandMatch) vm.runInContext(bandMatch[0], scriptContext);
+
 const normMatch = appJsContent.match(/function normalizeStorageCondition[\s\S]*?window\.normalizeStorageCondition\s*=\s*normalizeStorageCondition;/);
 assert(normMatch, 'normalizeStorageCondition must be defined in app.js');
 vm.runInContext(normMatch[0], scriptContext);
@@ -107,6 +110,7 @@ const calcMatch = appJsContent.match(/function calculateShelfLifePrediction[\s\S
 assert(calcMatch, 'calculateShelfLifePrediction must be defined in app.js');
 vm.runInContext(calcMatch[0], scriptContext);
 
+const getTemperatureBand = scriptContext.window.getTemperatureBand;
 const normalizeStorageCondition = scriptContext.window.normalizeStorageCondition;
 const calculateShelfLifePrediction = scriptContext.window.calculateShelfLifePrediction;
 
@@ -277,6 +281,183 @@ assert(renderedHtml.includes('Garlic Butter Croutons'), 'Near-expiry Pandesal sh
 assert(renderedHtml.includes('Fine Toasted Breadcrumbs'), 'Near-expiry Pandesal should recommend Breadcrumbs');
 assert(renderedHtml.includes('Freshness 25%–74%'), 'Recommendations must display safety criteria');
 console.log('  ✓ Safe Repurposing: Near-expiry bread (25%–74%) shows actionable bakery recipes with safety requirements.');
+
+// 9. Test Temperature Bands (10°C to 70°C) and Slider Range
+console.log('\n--- 9. Testing Temperature Range (10°C to 70°C) and 4 Bands ---');
+assert(htmlContent.includes('id="shelf-temp" min="10" max="70"'), 'Temperature slider must support min 10 to max 70');
+assert(htmlContent.includes('id="shelf-temp-band"'), 'Temperature band element id must exist in index.html');
+assert(htmlContent.includes('id="shelf-temp-badge"'), 'Temperature badge id must exist in index.html');
+assert(htmlContent.includes('10°C (Cool)'), '10°C Cool marker must exist');
+assert(htmlContent.includes('25°C (Ambient)'), '25°C Ambient marker must exist');
+assert(htmlContent.includes('40°C (Hot)'), '40°C Hot marker must exist');
+assert(htmlContent.includes('70°C (Very Hot)'), '70°C Very Hot marker must exist');
+console.log('  ✓ Verified slider attributes: min="10" max="70"');
+console.log('  ✓ Verified 4 temperature marker bands in HTML: Cool, Ambient, Hot, Very Hot');
+
+// Test getTemperatureBand mapping
+assert.strictEqual(getTemperatureBand(10).band, 'Cool', '10°C must be Cool');
+assert.strictEqual(getTemperatureBand(24).band, 'Cool', '24°C must be Cool');
+assert.strictEqual(getTemperatureBand(25).band, 'Ambient', '25°C must be Ambient');
+assert.strictEqual(getTemperatureBand(39).band, 'Ambient', '39°C must be Ambient');
+assert.strictEqual(getTemperatureBand(40).band, 'Hot', '40°C must be Hot');
+assert.strictEqual(getTemperatureBand(49).band, 'Hot', '49°C must be Hot');
+assert.strictEqual(getTemperatureBand(50).band, 'Very Hot', '50°C must be Very Hot');
+assert.strictEqual(getTemperatureBand(70).band, 'Very Hot', '70°C must be Very Hot');
+console.log('  ✓ Verified getTemperatureBand mapping: 10-24°C (Cool), 25-39°C (Ambient), 40-49°C (Hot), 50-70°C (Very Hot)');
+
+// 10. Comprehensive Verification of All 10 Required Scenarios
+console.log('\n--- 10. Verifying All 10 Required Operational Scenarios ---');
+
+// Scenario 1: Fresh muffin at 25°C (100% Fresh)
+const s1 = calculateShelfLifePrediction({
+  breadType: 'Muffin',
+  breadName: 'Blueberry Muffin',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 25,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 1] Fresh Muffin @ 25°C: Freshness = ${s1.freshnessScore}%, Status = ${s1.freshnessStatus}, Risk = ${s1.risk}`);
+assert.strictEqual(s1.freshnessScore, 100, 'Fresh muffin at 25°C must have 100% freshness');
+assert.strictEqual(s1.freshnessStatus, 'Fresh', 'Fresh muffin must have Fresh status');
+assert.strictEqual(s1.risk, 'Low Risk', 'Fresh muffin must be Low Risk');
+
+// Scenario 2: Muffin stored several days at 25°C (< 75% Moderate or Spoiled)
+const s2 = calculateShelfLifePrediction({
+  breadType: 'Muffin',
+  breadName: 'Blueberry Muffin',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 25,
+  humid: 60,
+  prodDate: twoDaysAgoStr // 2 days old on a 4-day base
+});
+console.log(`  [Scenario 2] 2-day-old Muffin @ 25°C: Freshness = ${s2.freshnessScore}%, Status = ${s2.freshnessStatus}, Risk = ${s2.risk}`);
+assert(s2.freshnessScore < 75, '2-day-old muffin freshness must be < 75%');
+assert.strictEqual(s2.freshnessStatus, 'Moderate', '2-day-old muffin status must be Moderate');
+
+// Scenario 3: Bread exposed to 40°C (< 100%, decay accelerated)
+const s3 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 40,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 3] Bread @ 40°C (Hot): Freshness = ${s3.freshnessScore}%, Shelf Life = ${s3.totalShelfLife}d, Band = ${s3.tempBand}`);
+assert(s3.freshnessScore < 100, 'Freshness must NOT be 100% when exposed to 40°C');
+assert.strictEqual(s3.tempBand, 'Hot', '40°C must be Hot band');
+assert(s3.totalShelfLife < 3.0, 'Effective shelf life must be degraded at 40°C');
+
+// Scenario 4: Bread exposed to 50°C (Hot/Very Hot, significantly lower freshness)
+const s4 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 50,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 4] Bread @ 50°C (Very Hot): Freshness = ${s4.freshnessScore}%, Shelf Life = ${s4.totalShelfLife}d, Band = ${s4.tempBand}`);
+assert.strictEqual(s4.tempBand, 'Very Hot', '50°C must be Very Hot band');
+assert(s4.freshnessScore < s3.freshnessScore, 'Freshness at 50°C must be lower than at 40°C');
+assert(s4.freshnessScore <= 74, 'Freshness at 50°C must drop to Moderate or Critical');
+
+// Scenario 5: Bread exposed to 60°C (Very Hot)
+const s5 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 60,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 5] Bread @ 60°C (Very Hot): Freshness = ${s5.freshnessScore}%, Shelf Life = ${s5.totalShelfLife}d, Band = ${s5.tempBand}`);
+assert.strictEqual(s5.tempBand, 'Very Hot', '60°C must be Very Hot band');
+assert(s5.freshnessScore < s4.freshnessScore, 'Freshness at 60°C must be lower than at 50°C');
+
+// Scenario 6: Bread exposed to 70°C (Very Hot, ~43% or lower)
+const s6 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 70,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 6] Bread @ 70°C (Max Range): Freshness = ${s6.freshnessScore}%, Shelf Life = ${s6.totalShelfLife}d, Band = ${s6.tempBand}`);
+assert.strictEqual(s6.tempBand, 'Very Hot', '70°C must be Very Hot band');
+assert(s6.freshnessScore <= 45, 'Freshness at 70°C must be <= 45%');
+assert(s6.totalShelfLife <= 0.6, 'Shelf life at 70°C must be severely diminished (<= 0.6 days)');
+
+// Scenario 7: Refrigerated conditions (4°C, prolonged shelf life)
+const s7 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Refrigerated Storage',
+  temp: 25,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 7] Refrigerated Storage: Shelf Life = ${s7.totalShelfLife}d, Multiplier = ${s7.storageMultiplier}x`);
+assert(s7.totalShelfLife > 3.0, 'Refrigerated storage must prolong shelf life beyond base');
+assert.strictEqual(s7.storageMultiplier, 1.6, 'Refrigerated storage multiplier must be 1.6x for standard bread');
+
+// Scenario 8: Frozen conditions (-18°C, preserved)
+const s8 = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Frozen Storage',
+  temp: 25,
+  humid: 60,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 8] Frozen Storage: Shelf Life = ${s8.totalShelfLife}d, Multiplier = ${s8.storageMultiplier}x`);
+assert(s8.totalShelfLife >= 10.0, 'Frozen storage must preserve shelf life for >= 10 days');
+assert.strictEqual(s8.storageMultiplier, 3.5, 'Frozen storage multiplier must be 3.5x');
+
+// Scenario 9: Excessive humidity (85%–100%, elevated mold decay)
+const s9Normal = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 28,
+  humid: 55,
+  prodDate: todayStr
+});
+const s9Excessive = calculateShelfLifePrediction({
+  breadType: 'Pandesal',
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 28,
+  humid: 95,
+  prodDate: todayStr
+});
+console.log(`  [Scenario 9] Excessive Humidity (95% vs 55%): ${s9Excessive.totalShelfLife}d vs ${s9Normal.totalShelfLife}d, Humid Msg = "${s9Excessive.humidMsg}"`);
+assert(s9Excessive.totalShelfLife < s9Normal.totalShelfLife, 'Excessive humidity must reduce shelf life');
+assert(s9Excessive.humidMsg.includes('mold risk') || s9Excessive.humidMsg.includes('condensation'), 'Humid msg must warn about mold risk/condensation');
+
+// Scenario 10: Product exceeding shelf life (0% Freshness, Expired, High Risk)
+const fiveDaysAgo = new Date();
+fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+const fiveDaysAgoStr = fiveDaysAgo.toISOString().split('T')[0];
+
+const s10 = calculateShelfLifePrediction({
+  breadType: 'Pandesal', // base = 3 days
+  breadName: 'Pandesal',
+  storage: 'Covered Room-Temperature Storage',
+  temp: 25,
+  humid: 60,
+  prodDate: fiveDaysAgoStr
+});
+console.log(`  [Scenario 10] Exceeded Shelf Life (5 days old): Freshness = ${s10.freshnessScore}%, Days = ${s10.remainingDisplay}, Status = ${s10.freshnessStatus}, Risk = ${s10.risk}`);
+assert.strictEqual(s10.freshnessScore, 0, 'Exceeded product must have 0% freshness');
+assert.strictEqual(s10.remainingDays, 0, 'Exceeded product must have 0 remaining days');
+assert(s10.remainingDisplay.includes('Expired'), 'Remaining display must state Expired');
+assert.strictEqual(s10.freshnessStatus, 'Spoiled / Critical', 'Status must be Spoiled / Critical');
+assert.strictEqual(s10.risk, 'High Risk', 'Risk must be High Risk');
+
+console.log('  ✓ All 10 operational scenarios verified successfully!');
 
 console.log('\n======================================================');
 console.log('ALL STORAGE CONDITION & PREDICTION ALGORITHM TESTS PASSED!');
