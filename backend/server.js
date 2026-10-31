@@ -16,6 +16,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const apicache = require('apicache');
 require('dotenv').config();
+const { runAutoSeeder } = require('./auto_seeder');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -186,6 +187,7 @@ async function setupDatabaseConnection() {
       console.log("🟢 CONNECTED TO RAILWAY MYSQL DATABASE SUCCESSFULLY!");
       console.log("--------------------------------------------------");
       await initializeMysqlSchema();
+      runAutoSeeder(queryDb, false).catch(e => console.warn("Auto-seeder notice:", e.message));
       return;
     } catch (err) {
       console.error("❌ Railway MySQL connection attempt failed:", err.message);
@@ -242,6 +244,7 @@ async function setupDatabaseConnection() {
       }
       console.log("--------------------------------------------------");
       await initializeMysqlSchema();
+      runAutoSeeder(queryDb, false).catch(e => console.warn("Auto-seeder notice:", e.message));
       return;
     } catch (err) {
       console.log("ℹ️ MySQL configuration attempt failed:", err.message);
@@ -280,6 +283,7 @@ async function setupDatabaseConnection() {
         console.log("🟢 CONNECTED TO POSTGRESQL DATABASE FALLBACK SUCCESSFULLY!");
         console.log("--------------------------------------------------");
         await initializePgSchema();
+        runAutoSeeder(queryDb, false).catch(e => console.warn("Auto-seeder notice:", e.message));
         return;
       } catch (pgErr) {
         console.error(`❌ PostgreSQL connection fallback attempt ${attempt} failed:`, pgErr.message);
@@ -982,6 +986,20 @@ app.get('/api/status', (req, res) => {
     connectionStringUsed: activeDbDriver === 'mysql' ? 'MySQL Database (Railway / Local)' : 'PostgreSQL Database',
     timestamp: new Date().toISOString()
   });
+});
+
+// ADMINISTRATIVE TRIGGER TO ENSURE MASTER DEMO DATA IS FULLY POPULATED
+app.all('/api/admin/seed-demo-data', async (req, res) => {
+  try {
+    const force = req.query.force === 'true' || req.body?.force === true;
+    console.log(`[ADMIN SEED] Triggered demo data seeding (force=${force}) on driver: ${activeDbDriver}...`);
+    const result = await runAutoSeeder(queryDb, force);
+    if (typeof clearApiCache === 'function') clearApiCache();
+    res.json(result);
+  } catch (err) {
+    console.error('[ADMIN SEED ERROR]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 2. AUTHENTICATION & LOGIN API
