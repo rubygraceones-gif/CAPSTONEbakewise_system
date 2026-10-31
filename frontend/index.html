@@ -570,7 +570,7 @@
                   <label for="br-contact-input" class="form-label">Contact Number</label>
                   <div class="input-container">
                     <i data-lucide="phone" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="br-contact-input" class="form-input" placeholder="e.g. 0912-345-6789">
+                    <input type="tel" id="br-contact-input" class="form-input" required inputmode="numeric" pattern="^(09\d{9}|639\d{9})$" maxlength="12" placeholder="e.g. 09123456789 or 639123456789" title="Please enter a valid Philippine contact number using numbers only.">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -1688,7 +1688,7 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-br-contact" class="form-label">Contact Number</label>
-        <input type="text" id="edit-br-contact" class="form-input" style="padding-left: 14px;">
+        <input type="tel" id="edit-br-contact" class="form-input" style="padding-left: 14px;" required inputmode="numeric" pattern="^(09\d{9}|639\d{9})$" maxlength="12" placeholder="e.g. 09123456789 or 639123456789" title="Please enter a valid Philippine contact number using numbers only.">
       </div>
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button type="button" class="btn-secondary" id="btn-switch-to-branch" style="flex: 1;">

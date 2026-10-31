@@ -913,13 +913,18 @@ app.get('/api/branches', async (req, res) => {
 
 app.post('/api/branches', async (req, res) => {
   const { name, latitude, longitude, address, store_hours, contact_no } = req.body;
+  const cleanContact = (contact_no ? String(contact_no).trim() : '');
+  const phContactRegex = /^(09\d{9}|639\d{9})$/;
+  if (!cleanContact || !phContactRegex.test(cleanContact)) {
+    return res.status(400).json({ error: "Please enter a valid Philippine contact number using numbers only." });
+  }
   try {
     const result = await queryDb(
       "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *",
-      [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, contact_no]
+      [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, cleanContact]
     );
     clearApiCache();
-    res.status(201).json(result.rows[0] || { name, latitude, longitude, address, store_hours, contact_no, status: 'Active' });
+    res.status(201).json(result.rows[0] || { name, latitude, longitude, address, store_hours, contact_no: cleanContact, status: 'Active' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -928,13 +933,18 @@ app.post('/api/branches', async (req, res) => {
 app.put('/api/branches/:id', async (req, res) => {
   const { id } = req.params;
   const { name, latitude, longitude, address, store_hours, contact_no, status } = req.body;
+  const cleanContact = (contact_no ? String(contact_no).trim() : '');
+  const phContactRegex = /^(09\d{9}|639\d{9})$/;
+  if (!cleanContact || !phContactRegex.test(cleanContact)) {
+    return res.status(400).json({ error: "Please enter a valid Philippine contact number using numbers only." });
+  }
   try {
     await queryDb(
       "UPDATE bw_branches SET name = $1, latitude = $2, longitude = $3, address = $4, store_hours = $5, contact_no = $6, status = $7 WHERE id = $8",
-      [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, contact_no, status || 'Active', parseInt(id)]
+      [name, parseFloat(latitude), parseFloat(longitude), address, store_hours, cleanContact, status || 'Active', parseInt(id)]
     );
     clearApiCache();
-    res.json({ success: true, id, name, latitude, longitude, address, store_hours, contact_no, status });
+    res.json({ success: true, id, name, latitude, longitude, address, store_hours, contact_no: cleanContact, status });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

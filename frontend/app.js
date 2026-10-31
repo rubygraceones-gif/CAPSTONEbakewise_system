@@ -1,3 +1,52 @@
+
+// --- PHILIPPINE CONTACT NUMBER VALIDATION & NUMERIC INPUT RESTRICTION ---
+function isValidPhContactNumber(val) {
+  if (!val) return false;
+  const cleaned = String(val).trim();
+  return /^(09\d{9}|639\d{9})$/.test(cleaned);
+}
+
+function handleContactKeyDown(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'];
+  if (allowedKeys.includes(e.key)) return;
+  if (!/^\d$/.test(e.key)) {
+    e.preventDefault();
+  }
+}
+
+function handleContactInput(e) {
+  const input = e.target;
+  const digitsOnly = input.value.replace(/\D/g, '').slice(0, 12);
+  if (input.value !== digitsOnly) {
+    input.value = digitsOnly;
+  }
+}
+
+function handleContactPaste(e) {
+  e.preventDefault();
+  const clipboardData = e.clipboardData || window.clipboardData;
+  const pastedText = clipboardData ? clipboardData.getData('text') : '';
+  const digitsOnly = (pastedText || '').replace(/\D/g, '');
+  const input = e.target;
+  const start = input.selectionStart || 0;
+  const end = input.selectionEnd || 0;
+  const currentVal = input.value || '';
+  const newVal = (currentVal.slice(0, start) + digitsOnly + currentVal.slice(end)).replace(/\D/g, '').slice(0, 12);
+  input.value = newVal;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function bindContactNumberSanitizer(inputId) {
+  const el = document.getElementById(inputId);
+  if (el && !el.dataset.numericBound) {
+    el.dataset.numericBound = "true";
+    el.addEventListener("keydown", handleContactKeyDown);
+    el.addEventListener("input", handleContactInput);
+    el.addEventListener("paste", handleContactPaste);
+  }
+}
+
 /* ==========================================================================
    BAKEWISE APPLICATION LOGIC
    Advanced Bakery Management System Client Code
@@ -857,6 +906,9 @@ class BakeWiseStore {
           this.branches.push(newBr);
           this.save("bakewise_v2_branches", this.branches);
           return true;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to register branch.");
         }
       } catch (e) { console.error(e); }
     }
@@ -875,11 +927,15 @@ class BakeWiseStore {
 
     if (this.isBackendOnline) {
       try {
-        await fetch(`/api/branches/${bId}`, {
+        const res = await fetch(`/api/branches/${bId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, latitude: parsedLat, longitude: parsedLng, address, store_hours, contact_no, status })
         });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update branch.");
+        }
       } catch (e) { console.error(e); }
     }
 
@@ -2288,10 +2344,22 @@ function setupFormSubmissions() {
     });
   }
 
+  bindContactNumberSanitizer("br-contact-input");
+  bindContactNumberSanitizer("edit-br-contact");
+
   const branchForm = document.getElementById("admin-branch-form");
   if (branchForm) {
     branchForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      const contactNo = (document.getElementById("br-contact-input")?.value || "").trim();
+      if (!isValidPhContactNumber(contactNo)) {
+        showToast("Please enter a valid Philippine contact number using numbers only.", "error");
+        const contactInput = document.getElementById("br-contact-input");
+        if (contactInput) contactInput.focus();
+        return;
+      }
+
       if (!(await showConfirmModal("Are you sure you want to register this new branch?"))) return;
 
       const name = document.getElementById("br-name-input").value;
@@ -2299,15 +2367,20 @@ function setupFormSubmissions() {
       const lng = document.getElementById("br-lng-input")?.value || 120.9842;
       const address = document.getElementById("br-address-input").value;
       const storeHours = document.getElementById("br-hours-input").value;
-      const contactNo = document.getElementById("br-contact-input").value;
 
-      const success = await store.addBranch(name, lat, lng, address, storeHours, contactNo);
-      if (success) {
-        showToast("Branch registered.", "success");
-        branchForm.reset();
-        populateSelectDropdowns();
-        refreshAdminBranchesPane();
-      } else showToast("Error registering branch.", "error");
+      try {
+        const success = await store.addBranch(name, lat, lng, address, storeHours, contactNo);
+        if (success) {
+          showToast("Branch registered.", "success");
+          branchForm.reset();
+          populateSelectDropdowns();
+          refreshAdminBranchesPane();
+        } else {
+          showToast("Error registering branch.", "error");
+        }
+      } catch (err) {
+        showToast(err.message || "Error registering branch.", "error");
+      }
     });
   }
 
@@ -2315,6 +2388,15 @@ function setupFormSubmissions() {
   if (branchEditForm) {
     branchEditForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      const contactNo = (document.getElementById("edit-br-contact")?.value || "").trim();
+      if (!isValidPhContactNumber(contactNo)) {
+        showToast("Please enter a valid Philippine contact number using numbers only.", "error");
+        const editContactInput = document.getElementById("edit-br-contact");
+        if (editContactInput) editContactInput.focus();
+        return;
+      }
+
       if (!(await showConfirmModal("Are you sure you want to save changes to this branch?"))) return;
 
       const id = document.getElementById("edit-branch-id").value;
@@ -2322,17 +2404,20 @@ function setupFormSubmissions() {
       const status = document.getElementById("edit-br-status").value;
       const address = document.getElementById("edit-br-address").value;
       const storeHours = document.getElementById("edit-br-hours").value;
-      const contactNo = document.getElementById("edit-br-contact").value;
       const branch = store.branches.find(b => b.id === parseInt(id));
       const lat = branch ? branch.latitude : 300;
       const lng = branch ? branch.longitude : 200;
 
-      await store.updateBranch(id, name, lat, lng, address, storeHours, contactNo, status);
-      document.getElementById("branch-edit-modal").style.display = "none";
-      document.getElementById("modal-overlay").classList.remove("visible");
-      populateSelectDropdowns();
-      await refreshAdminBranchesPane();
-      showToast("Branch updated successfully.", "success");
+      try {
+        await store.updateBranch(id, name, lat, lng, address, storeHours, contactNo, status);
+        document.getElementById("branch-edit-modal").style.display = "none";
+        document.getElementById("modal-overlay").classList.remove("visible");
+        populateSelectDropdowns();
+        await refreshAdminBranchesPane();
+        showToast("Branch updated successfully.", "success");
+      } catch (err) {
+        showToast(err.message || "Failed to update branch.", "error");
+      }
     });
   }
 
@@ -5328,6 +5413,8 @@ let branchCurrentPage = 1;
 const BRANCHES_PER_PAGE = 10;
 
 async function refreshAdminBranchesPane() {
+  bindContactNumberSanitizer("br-contact-input");
+  bindContactNumberSanitizer("edit-br-contact");
   const tbody = document.getElementById("admin-branches-tbody");
 
   if (store.isBackendOnline) {
