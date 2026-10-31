@@ -505,8 +505,8 @@
                 <i data-lucide="store" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Active Branches</span>
-                <span class="stats-value" id="branch-kpi-count">3 Nodes</span>
+                <span class="stats-label">Total Branches</span>
+                <span class="stats-value" id="branch-kpi-count">0</span>
                 <span class="stats-trend up" style="color: var(--color-success);">System Synchronized</span>
               </div>
             </div>
@@ -516,9 +516,9 @@
                 <i data-lucide="trending-up" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Network Total Revenue</span>
-                <span class="stats-value" id="branch-kpi-sales">₱7,649.00</span>
-                <span class="stats-trend up" style="color: var(--color-success);">Combined POS Transactions</span>
+                <span class="stats-label">Total Sales</span>
+                <span class="stats-value" id="branch-kpi-sales">₱0.00</span>
+                <span class="stats-trend up" style="color: var(--color-success);">Combined Sales Revenue</span>
               </div>
             </div>
 
@@ -527,8 +527,8 @@
                 <i data-lucide="alert-triangle" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Network Total Waste Loss</span>
-                <span class="stats-value" id="branch-kpi-waste">₱453.00</span>
+                <span class="stats-label">Total Waste Cost</span>
+                <span class="stats-value" id="branch-kpi-waste">₱0.00</span>
                 <span class="stats-trend down" style="color: var(--color-error);">Disposal Cost Metrics</span>
               </div>
             </div>
@@ -538,8 +538,8 @@
                 <i data-lucide="dollar-sign" style="width: 24px; height: 24px;"></i>
               </div>
               <div class="card-stats">
-                <span class="stats-label">Network Net Margin</span>
-                <span class="stats-value" id="branch-kpi-net">₱7,196.00</span>
+                <span class="stats-label">Total Net Profit</span>
+                <span class="stats-value" id="branch-kpi-net">₱0.00</span>
                 <span class="stats-trend up" style="color: var(--color-success);" id="branch-kpi-net-subtext">Real-time Net Earnings</span>
               </div>
             </div>
@@ -549,7 +549,7 @@
           <div class="form-card-split">
             <div class="panel-card">
               <div class="panel-card-header">
-                <h2 class="panel-card-title">Add New Branch</h2>
+                <h2 class="panel-card-title">Register New Branch</h2>
               </div>
               <form id="admin-branch-form" method="POST">
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -567,14 +567,14 @@
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="br-contact-input" class="form-label">Contact No.</label>
+                  <label for="br-contact-input" class="form-label">Contact Number</label>
                   <div class="input-container">
                     <i data-lucide="phone" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <input type="text" id="br-contact-input" class="form-input" placeholder="e.g. 0912-345-6789">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label for="br-address-input" class="form-label">Branch Physical Address</label>
+                  <label for="br-address-input" class="form-label">Branch Address</label>
                   <div class="input-container">
                     <i data-lucide="map-pin" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <input type="text" id="br-address-input" class="form-input" required placeholder="Street, Barangay, City">
@@ -582,16 +582,16 @@
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">
                   <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
-                  <span>Register Branch</span>
+                  <span>Register New Branch</span>
                 </button>
               </form>
             </div>
 
             <div class="panel-card">
               <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
-                <h2 class="panel-card-title">Network Branches Directory</h2>
+                <h2 class="panel-card-title">Branch List</h2>
                 <div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 400px;">
-                  <label for="branch-search-input" style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">Search Branch:</label>
+                  <label for="branch-search-input" style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">Search Branches:</label>
                   <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="flex: 1; padding: 6px 12px; font-size: 0.82rem;">
                 </div>
               </div>
@@ -602,7 +602,7 @@
                       <th>Branch Name</th>
                       <th>Address</th>
                       <th>Store Hours</th>
-                      <th>Contact No.</th>
+                      <th>Contact Number</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -1679,7 +1679,7 @@
         </select>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-br-address" class="form-label">Physical Address</label>
+        <label for="edit-br-address" class="form-label">Branch Address</label>
         <input type="text" id="edit-br-address" class="form-input" style="padding-left: 14px;" required>
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
@@ -1687,7 +1687,7 @@
         <input type="text" id="edit-br-hours" class="form-input" style="padding-left: 14px;">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
-        <label for="edit-br-contact" class="form-label">Contact No.</label>
+        <label for="edit-br-contact" class="form-label">Contact Number</label>
         <input type="text" id="edit-br-contact" class="form-input" style="padding-left: 14px;">
       </div>
       <div style="display: flex; gap: 10px; margin-top: 16px;">

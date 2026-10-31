@@ -180,12 +180,7 @@ class BakeWiseStore {
     this._production = this.load("bakewise_v2_production", DEFAULT_PRODUCTION);
     this._waste = this.load("bakewise_v2_waste", DEFAULT_WASTE);
 
-    this.branches = this.load("bakewise_v2_branches", [
-      { id: 1, name: "Main Branch (Central)", latitude: 620, longitude: 100, address: "Central Boulevard, Main City", status: "Active" },
-      { id: 2, name: "North District Branch", latitude: 480, longitude: 170, address: "North Commercial Ave, Main City", status: "Active" },
-      { id: 3, name: "Eastside Hub Branch", latitude: 380, longitude: 230, address: "Eastside Market Crossing, Main City", status: "Active" },
-      { id: 4, name: "South Regional Branch", latitude: 240, longitude: 310, address: "South Highway, Main City", status: "Active" }
-    ]);
+    this.branches = this.load("bakewise_v2_branches", []);
 
     this.users = this.load("bakewise_v2_users", [
       { id: 1, email: "admin@bakewise.com", name: "System Administrator", role: "admin", branch_id: null }
@@ -927,25 +922,15 @@ class BakeWiseStore {
     this.branches = this.branches.filter(b => b.id.toString() !== branchIdStr);
     this.save("bakewise_v2_branches", this.branches);
 
-    // 2. Cascade delete all users associated with this branch (protect global admins)
-    this.users = this.users.filter(u => u.role === 'admin' || (u.branch_id !== null && u.branch_id !== undefined && u.branch_id.toString() !== branchIdStr));
+    // 2. Clear branch assignment on users without deleting accounts
+    this.users.forEach(u => {
+      if (u.branch_id !== null && u.branch_id !== undefined && u.branch_id.toString() === branchIdStr) {
+        u.branch_id = null;
+      }
+    });
     this.save("bakewise_v2_users", this.users);
 
-    // 3. Cascade delete sales records for this branch
-    this._sales = this._sales.filter(s => s.branch_id?.toString() !== branchIdStr);
-    this.save("bakewise_v2_sales", this._sales);
-
-    // 4. Cascade delete inventory records for this branch
-    this._inventory = this._inventory.filter(i => i.branch_id?.toString() !== branchIdStr);
-    this.save("bakewise_v2_inventory", this._inventory);
-
-    // 5. Cascade delete production batches for this branch
-    this._production = this._production.filter(p => p.branch_id?.toString() !== branchIdStr);
-    this.save("bakewise_v2_production", this._production);
-
-    // 6. Cascade delete waste records for this branch
-    this._waste = this._waste.filter(w => w.branch_id?.toString() !== branchIdStr);
-    this.save("bakewise_v2_waste", this._waste);
+    // Historical sales, inventory, production, and waste transactions are preserved
 
     // Commit all local changes and re-sync with backend
     this.commitAll();
@@ -953,7 +938,7 @@ class BakeWiseStore {
       await this.syncWithBackend();
     }
 
-    this.logActivity(`Deleted branch ID ${id} and all associated data`);
+    this.logActivity(`Deleted branch ID ${id}`);
     return true;
   }
 
@@ -5295,18 +5280,26 @@ async function refreshAdminBranchesPane() {
   if (store.isBackendOnline) {
     try {
       const res = await fetch('/api/branches');
-      if (res.ok) store.branches = await res.json();
+      if (res.ok) { store.branches = await res.json(); store.save("bakewise_v2_branches", store.branches); }
     } catch (e) { console.error("Error fetching branches:", e); }
   }
 
   // Dynamic Network KPI Updates
-  const activeCount = store.branches.filter(b => b.status === 'Active').length;
-  const totalNetworkSales = store._sales.reduce((sum, s) => sum + (s.qty * s.price), 0);
-  const totalNetworkWaste = store._waste.reduce((sum, w) => sum + (w.qty * w.cost), 0);
+  const totalBranchesCount = (store.branches || []).length;
+
+  // Only aggregate financial KPIs for registered branches; show ₱0.00 when none
+  const registeredBranchIds = new Set((store.branches || []).map(b => b.id != null ? b.id.toString() : null).filter(Boolean));
+  const hasBranches = totalBranchesCount > 0;
+  const totalNetworkSales = hasBranches
+    ? store._sales.filter(s => s.branch_id != null && registeredBranchIds.has(s.branch_id.toString())).reduce((sum, s) => sum + (s.qty * s.price), 0)
+    : 0;
+  const totalNetworkWaste = hasBranches
+    ? store._waste.filter(w => w.branch_id != null && registeredBranchIds.has(w.branch_id.toString())).reduce((sum, w) => sum + (w.qty * w.cost), 0)
+    : 0;
   const netMargin = totalNetworkSales - totalNetworkWaste;
 
   const countEl = document.getElementById("branch-kpi-count");
-  if (countEl) countEl.textContent = `${activeCount} Active ${activeCount === 1 ? 'Node' : 'Nodes'}`;
+  if (countEl) countEl.textContent = `${totalBranchesCount}`;
 
   const salesEl = document.getElementById("branch-kpi-sales");
   if (salesEl) salesEl.textContent = `₱${totalNetworkSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -5330,6 +5323,9 @@ async function refreshAdminBranchesPane() {
   const pagedBranches = filteredBranches.slice(startIndex, startIndex + BRANCHES_PER_PAGE);
 
   if (tbody) {
+    if (pagedBranches.length === 0) {
+      setSafeHtml(tbody, `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted, #888); font-size: 0.97rem;">No branches registered yet. Register your first branch to get started.</td></tr>`);
+    } else {
     setSafeHtml(tbody, pagedBranches.map(b => `
       <tr>
         <td style="font-weight: 700;">${b.name}</td>
@@ -5349,6 +5345,7 @@ async function refreshAdminBranchesPane() {
         </td>
       </tr>
     `).join(''));
+    } // end else (pagedBranches.length > 0)
     lucide.createIcons();
 
     if (searchInput && !searchInput.dataset.listening) {
@@ -5420,7 +5417,7 @@ async function refreshAdminBranchesPane() {
         const bObj = (store.branches || []).find(b => b.id.toString() === id.toString());
         const bName = bObj ? bObj.name : `Branch #${id}`;
 
-        if (await showConfirmModal(`Are you sure you want to permanently delete branch "${bName}"? ALL associated branch data including staff user accounts, sales records, inventory stock, and production batches will also be deleted from the system.`)) {
+        if (await showConfirmModal(`Are you sure you want to delete branch "${bName}"? This action cannot be undone.`)) {
           try {
             await store.deleteBranch(id);
             populateSelectDropdowns();
@@ -5429,7 +5426,7 @@ async function refreshAdminBranchesPane() {
             if (typeof refreshInventoryPane === 'function') await refreshInventoryPane();
             if (typeof refreshSalesPane === 'function') await refreshSalesPane();
             if (typeof refreshDashboardPane === 'function') await refreshDashboardPane();
-            showToast(`Branch "${bName}" and all associated records deleted successfully.`, "success");
+            showToast(`Branch "${bName}" deleted successfully.`, "success");
           } catch (err) {
             console.error("Branch deletion error:", err);
             showToast(err.message || "Failed to delete branch.", "error");
