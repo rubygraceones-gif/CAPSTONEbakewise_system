@@ -21,16 +21,17 @@ for (let d = 14; d <= 31; d++) {
 }
 for (let d = 1; d <= 13; d++) {
   const dayStr = d < 10 ? `0${d}` : `${d}`;
-  DATES.push({ dateStr: `2026-11-${dayStr}`, isFuture: true });
+  DATES.push({ dateStr: `2026-11-${dayStr}`, isFuture: d > 1 });
 }
 
 const PRODUCTS_MASTER = {
   p1: { id: 'p1', name: 'Pandesal', category: 'Bread', price: 45.00, cost: 25.00, unit: 'pack', shelf_life: 2, repurpose: 'Bread Crumbs' },
-  p2: { id: 'p2', name: 'Special Ensaymada', category: 'Pastries', price: 30.00, cost: 18.00, unit: 'pcs', shelf_life: 3, repurpose: 'Bread Pudding' },
-  p3: { id: 'p3', name: 'Classic Sliced Bread', category: 'Bread', price: 65.00, cost: 38.00, unit: 'loaf', shelf_life: 4, repurpose: 'Croutons' },
-  p4: { id: 'p4', name: 'Premium Chocolate Cake', category: 'Cakes', price: 380.00, cost: 220.00, unit: 'box', shelf_life: 5, repurpose: null },
-  p5: { id: 'p5', name: 'Spanish Bread', category: 'Bread', price: 10.00, cost: 5.00, unit: 'pcs', shelf_life: 2, repurpose: 'Bread Crumbs' },
-  p6: { id: 'p6', name: 'Butter Croissant', category: 'Pastries', price: 50.00, cost: 28.00, unit: 'pcs', shelf_life: 2, repurpose: 'Bread Pudding' },
+  p2: { id: 'p2', name: 'Special Ensaymada', category: 'Pastries', price: 30.00, cost: 18.00, unit: 'pcs', shelf_life: 3, repurpose: 'Baked Ensaymada Pudding' },
+  p3: { id: 'p3', name: 'Classic Sliced Bread', category: 'Bread', price: 65.00, cost: 38.00, unit: 'loaf', shelf_life: 4, repurpose: 'Cinnamon Bread Pudding or French Toast Sliders' },
+  p4: { id: 'p4', name: 'Premium Chocolate Cake', category: 'Cakes', price: 380.00, cost: 220.00, unit: 'box', shelf_life: 5, repurpose: 'Chocolate Truffle Cake Pops' },
+  p5: { id: 'p5', name: 'Spanish Bread', category: 'Bread', price: 10.00, cost: 5.00, unit: 'pcs', shelf_life: 2, repurpose: 'Bread Pudding Base' },
+  p6: { id: 'p6', name: 'Butter Croissant', category: 'Pastries', price: 50.00, cost: 28.00, unit: 'pcs', shelf_life: 2, repurpose: 'Double Baked Almond Croissants' },
+  p7: { id: 'p7', name: 'Coke', category: 'Drinks', price: 25.00, cost: 12.00, unit: 'pcs', shelf_life: 90, repurpose: null },
   p8: { id: 'p8', name: 'Chiffon Cake', category: 'Cakes', price: 180.00, cost: 100.00, unit: 'box', shelf_life: 2, repurpose: null },
   p10: { id: 'p10', name: 'Muffin', category: 'Pastries', price: 12.00, cost: 7.00, unit: 'pcs', shelf_life: 3, repurpose: 'Crumb Topping' },
   p_ube_lasang: { id: 'p_ube_lasang', name: 'Ube Cheese Pandesal', category: 'Bread', price: 50.00, cost: 30.00, unit: 'pack', shelf_life: 2, repurpose: 'Bread Crumbs' }
@@ -122,7 +123,7 @@ async function runAutoSeeder(queryDb, force = false) {
 
   // Permanently remove Tibungco branch and all records/accounts belonging to other branches
   try {
-    await queryDb("DELETE FROM bw_branches WHERE id != $1 OR LOWER(name) LIKE '%tibungco%'", [lasangId]);
+    await queryDb("DELETE FROM bw_branches WHERE LOWER(name) LIKE '%tibungco%'");
     await queryDb("DELETE FROM bw_users WHERE (branch_id IS NOT NULL AND branch_id != $1) OR LOWER(email) IN ('roberto.gomez@bakewise.com', 'lorna.villanueva@bakewise.com', 'arnel.mendoza@bakewise.com', 'patricia.dizon@bakewise.com', 'kristine.ramos@bakewise.com')", [lasangId]);
     await queryDb("DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id != $1)", [lasangId]);
     await queryDb("DELETE FROM bw_pos_transactions WHERE branch_id != $1", [lasangId]);
@@ -165,51 +166,109 @@ async function runAutoSeeder(queryDb, force = false) {
   }
 
   async function seedRichInventory(lId) {
-    console.log('Populating active consolidated inventory for Lasang...');
+    console.log('Populating comprehensive batch inventory for Lasang from Oct 14 to Nov 1...');
     await queryDb("DELETE FROM bw_inventory WHERE branch_id = $1", [lId]);
 
     const productIds = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p8', 'p10', 'p_ube_lasang'];
     const invRows = [];
 
-    for (const pId of productIds) {
-      const p = PRODUCTS_MASTER[pId];
-      const shelfDays = p.shelf_life || 3;
-      const curProdDate = '2026-10-31';
-      const dObj = new Date(`${curProdDate}T00:00:00Z`);
-      const expObj = new Date(dObj.getTime() + shelfDays * 24 * 60 * 60 * 1000);
-      const expMonth = String(expObj.getMonth() + 1).padStart(2, '0');
-      const expDay = String(expObj.getDate()).padStart(2, '0');
-      const curExpDate = `${expObj.getFullYear()}-${expMonth}-${expDay}`;
-      const baseStock = (pId === 'p1' || pId === 'p_ube_lasang') ? 60 : (pId === 'p4' ? 15 : 40);
-      const stockLevel = baseStock + ((pId.charCodeAt(pId.length - 1) * 7) % 15);
+    // Current active stock levels for Nov 1
+    const activeStockMap = {
+      p1: 72,
+      p_ube_lasang: 61,
+      p3: 52,
+      p5: 51,
+      p10: 46,
+      p2: 45,
+      p6: 43,
+      p8: 42,
+      p4: 19
+    };
 
-      invRows.push({
-        product_id: pId,
-        stock_level: stockLevel,
-        production_date: curProdDate,
-        expiry_date: curExpDate,
-        branch_id: lId,
-        batch_id: `BAT-B${lId}-${pId}-20261031`,
-        unit: p.unit || 'pcs',
-        status: 'In Stock'
-      });
+    // Iterate through all historical days from Oct 14 to Nov 1 (19 calendar days)
+    for (let dayIdx = 0; dayIdx < 19; dayIdx++) {
+      const { dateStr } = DATES[dayIdx];
+      const dateClean = dateStr.replace(/-/g, '');
+
+      // Varied daily production times (~05:20 to ~05:45 AM)
+      const prodMin = 20 + ((dayIdx * 7 + 13) % 25);
+      const prodSec = (dayIdx * 19 + 7) % 60;
+      const prodTimeStr = `05:${String(prodMin).padStart(2, '0')}:${String(prodSec).padStart(2, '0')}`;
+
+      // Varied daily closing/expiry times (~18:10 to ~18:55 PM)
+      const expMin = 10 + ((dayIdx * 11 + 5) % 45);
+      const expTimeStr = `18:${String(expMin).padStart(2, '0')}:00`;
+
+      for (const pId of productIds) {
+        const p = PRODUCTS_MASTER[pId];
+        const shelfDays = p.shelf_life || 2;
+        const dObj = new Date(`${dateStr}T00:00:00Z`);
+        const expObj = new Date(dObj.getTime() + shelfDays * 24 * 60 * 60 * 1000);
+        const expMonth = String(expObj.getMonth() + 1).padStart(2, '0');
+        const expDay = String(expObj.getDate()).padStart(2, '0');
+        const expDateStr = `${expObj.getFullYear()}-${expMonth}-${expDay}`;
+
+        // Only batches from 2026-10-31 and 2026-11-01 are currently active/in stock
+        const isActiveBatch = (dateStr === '2026-10-31' || dateStr === '2026-11-01');
+        const stockLevel = isActiveBatch ? (activeStockMap[pId] || 40) : 0;
+        const status = isActiveBatch ? 'In Stock' : 'Expired';
+
+        invRows.push({
+          product_id: pId,
+          stock_level: stockLevel,
+          production_date: dateStr,
+          expiry_date: expDateStr,
+          branch_id: lId,
+          batch_id: `BAT-B${lId}-${pId}-${dateClean}`,
+          unit: p.unit || 'pcs',
+          status: status,
+          production_time: prodTimeStr,
+          expiry_time: expTimeStr
+        });
+      }
     }
+
+    // Add Coke (Drinks)
+    invRows.push({
+      product_id: 'p7',
+      stock_level: 50,
+      production_date: '2026-10-31',
+      expiry_date: '2027-01-29',
+      branch_id: lId,
+      batch_id: `BAT-B${lId}-p7-20261031`,
+      unit: 'pcs',
+      status: 'In Stock',
+      production_time: '06:00:00',
+      expiry_time: '18:00:00'
+    });
 
     await batchInsert('bw_inventory', [
       'product_id', 'stock_level', 'production_date', 'expiry_date',
-      'branch_id', 'batch_id', 'unit', 'status'
+      'branch_id', 'batch_id', 'unit', 'status', 'production_time', 'expiry_time'
     ], invRows);
 
-    console.log(`✓ Seeded ${invRows.length} active consolidated inventory records for Lasang.`);
+    console.log(`Successfully seeded ${invRows.length} batch inventory records for Lasang across Oct 14 - Nov 1.`);
+
+    // Protect future dates: update future production records to Scheduled (planned only, actual = 0)
+    try {
+      await queryDb("UPDATE bw_production SET status = 'Scheduled', actual = 0 WHERE date > '2026-11-01'");
+    } catch (eFutProd) { console.warn("Future production schedule notice:", eFutProd.message); }
+
+    // Protect future dates: clean up future sales (Nov 2 - Nov 13) so no false sales appear in official reports
+    try {
+      await queryDb("DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE date > '2026-11-01')");
+      await queryDb("DELETE FROM bw_pos_transactions WHERE date > '2026-11-01'");
+      await queryDb("DELETE FROM bw_sales WHERE date > '2026-11-01'");
+    } catch (eFutSales) { console.warn("Future sales cleanup notice:", eFutSales.message); }
   }
 
   // Check if Catalina Kato is already cashier and transactions fully populated with varied timestamps
   const countRes = await queryDb(
-    "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id = $1 AND date >= '2026-10-14' AND date <= '2026-11-13' AND cashier = 'Catalina Kato'",
+    "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id = $1 AND date >= '2026-10-14' AND date <= '2026-11-01' AND cashier = 'Catalina Kato'",
     [lasangId]
   );
   const currentCount = parseInt(countRes.rows[0]?.count || 0);
-  console.log(`Current completed POS transactions with Cashier Catalina Kato: ${currentCount}`);
+  console.log(`Current completed POS transactions with Cashier Catalina Kato (Oct 14 - Nov 1): ${currentCount}`);
 
   // Check if timestamps are properly varied across different days
   const checkSample = await queryDb(
@@ -224,11 +283,16 @@ async function runAutoSeeder(queryDb, force = false) {
     hasVariedTimes = (t0 !== t1 && t1 !== t2 && t0 !== t2);
   }
 
-  if (!force && currentCount >= 7750 && hasVariedTimes) {
-    console.log('✓ Target 7,750 Lasang sales with Cashier Catalina Kato and varied timestamps are already fully populated. Ensuring inventory...');
-    await seedRichInventory(lasangId);
+  // Ensure inventory is verified with batch tracking
+  const invBatchCheck = await queryDb("SELECT COUNT(*) as count FROM bw_inventory WHERE branch_id = $1", [lasangId]);
+  const hasFullBatches = parseInt(invBatchCheck.rows[0]?.count || 0) >= 150;
+
+  if (!force && currentCount >= 4750 && hasVariedTimes && hasFullBatches) {
+    console.log('Target 4,750 Lasang sales with Cashier Catalina Kato and varied timestamps are already fully populated.');
     return { success: true, alreadyPopulated: true, totalTransactions: currentCount, branch: 'Lasang' };
   }
+
+  await seedRichInventory(lasangId);
 
   // Ensure products exist in bw_products
   for (const pid of Object.keys(PRODUCTS_MASTER)) {
@@ -372,89 +436,91 @@ async function runAutoSeeder(queryDb, force = false) {
     const movSec = (dayIdx * 29 + 11) % 60;
     const movTimeStr = `20:${String(movMin).padStart(2, '0')}:${String(movSec).padStart(2, '0')}`;
 
-    // Generate exactly 250 sales with Cashier: Catalina Kato
-    for (let txSeq = 1; txSeq <= 250; txSeq++) {
-      const rng = createRng((dayIdx + 1) * 100000 + lasangId * 1000 + txSeq);
-      const cashier = 'Catalina Kato';
+    // Generate exactly 250 sales with Cashier: Catalina Kato ONLY for historical days (!isFuture)
+    if (!isFuture) {
+      for (let txSeq = 1; txSeq <= 250; txSeq++) {
+        const rng = createRng((dayIdx + 1) * 100000 + lasangId * 1000 + txSeq);
+        const cashier = 'Catalina Kato';
 
-      // Unique non-repeating timestamp for this exact transaction sequence on this day
-      const timeStr = dayTimes[txSeq - 1];
-      const createdAt = `${dateStr} ${timeStr}`;
+        // Unique non-repeating timestamp for this exact transaction sequence on this day
+        const timeStr = dayTimes[txSeq - 1];
+        const createdAt = `${dateStr} ${timeStr}`;
 
-      const seqStr = String(txSeq).padStart(3, '0');
-      const txNum = `POS-B${lasangId}-${dateClean}-${seqStr}`;
+        const seqStr = String(txSeq).padStart(3, '0');
+        const txNum = `POS-B${lasangId}-${dateClean}-${seqStr}`;
 
-      // Pick 1 to 3 distinct products
-      const numLines = Math.floor(rng() * 3) + 1;
-      const pPool = [...branchConfig.productIds];
-      const selectedItems = [];
-      let subtotal = 0;
+        // Pick 1 to 3 distinct products
+        const numLines = Math.floor(rng() * 3) + 1;
+        const pPool = [...branchConfig.productIds];
+        const selectedItems = [];
+        let subtotal = 0;
 
-      for (let line = 0; line < numLines; line++) {
-        if (pPool.length === 0) break;
-        const pIndex = Math.floor(rng() * pPool.length);
-        const pId = pPool.splice(pIndex, 1)[0];
-        const p = PRODUCTS_MASTER[pId];
+        for (let line = 0; line < numLines; line++) {
+          if (pPool.length === 0) break;
+          const pIndex = Math.floor(rng() * pPool.length);
+          const pId = pPool.splice(pIndex, 1)[0];
+          const p = PRODUCTS_MASTER[pId];
 
-        // Quantity: cakes 1 box, breads/pastries 1-3
-        let qty = 1;
-        if (p.category !== 'Cakes') {
-          qty = Math.floor(rng() * 3) + 1;
+          // Quantity: cakes 1 box, breads/pastries 1-3
+          let qty = 1;
+          if (p.category !== 'Cakes') {
+            qty = Math.floor(rng() * 3) + 1;
+          }
+
+          const lineTotal = Math.round(qty * p.price * 100) / 100;
+          subtotal += lineTotal;
+          selectedItems.push({
+            product_id: p.id,
+            qty: qty,
+            price: p.price,
+            name: p.name,
+            category: p.category
+          });
+
+          dayProductSoldQty[pId] = (dayProductSoldQty[pId] || 0) + qty;
         }
 
-        const lineTotal = Math.round(qty * p.price * 100) / 100;
-        subtotal += lineTotal;
-        selectedItems.push({
-          product_id: p.id,
-          qty: qty,
-          price: p.price,
-          name: p.name,
-          category: p.category
-        });
+        subtotal = Math.round(subtotal * 100) / 100;
+        const discount = 0.00;
+        const total = subtotal;
 
-        dayProductSoldQty[pId] = (dayProductSoldQty[pId] || 0) + qty;
+        // Payment method
+        const payRng = rng();
+        let payMethod = 'Cash';
+        let tender = total;
+        let change = 0.00;
+        if (payRng > 0.65) {
+          payMethod = 'GCash';
+          tender = total;
+        } else if (payRng > 0.50) {
+          payMethod = 'Credit Card';
+          tender = total;
+        } else {
+          const roundBills = [20, 50, 100, 200, 500, 1000];
+          const nextBill = roundBills.find(b => b >= total) || Math.ceil(total / 100) * 100;
+          tender = nextBill;
+          change = Math.round((tender - total) * 100) / 100;
+        }
+
+        const txRecord = {
+          transaction_number: txNum,
+          branch_id: lasangId,
+          cashier: cashier,
+          subtotal: subtotal,
+          discount: discount,
+          total: total,
+          payment_amount: tender,
+          change_amount: change,
+          payment_method: payMethod,
+          status: 'Completed',
+          date: dateStr,
+          created_at: createdAt,
+          items: selectedItems
+        };
+
+        branchTxs.push(txRecord);
+        dayTxBatch.push(txRecord);
       }
-
-      subtotal = Math.round(subtotal * 100) / 100;
-      const discount = 0.00;
-      const total = subtotal;
-
-      // Payment method
-      const payRng = rng();
-      let payMethod = 'Cash';
-      let tender = total;
-      let change = 0.00;
-      if (payRng > 0.65) {
-        payMethod = 'GCash';
-        tender = total;
-      } else if (payRng > 0.50) {
-        payMethod = 'Credit Card';
-        tender = total;
-      } else {
-        const roundBills = [20, 50, 100, 200, 500, 1000];
-        const nextBill = roundBills.find(b => b >= total) || Math.ceil(total / 100) * 100;
-        tender = nextBill;
-        change = Math.round((tender - total) * 100) / 100;
-      }
-
-      const txRecord = {
-        transaction_number: txNum,
-        branch_id: lasangId,
-        cashier: cashier,
-        subtotal: subtotal,
-        discount: discount,
-        total: total,
-        payment_amount: tender,
-        change_amount: change,
-        payment_method: payMethod,
-        status: 'Completed',
-        date: dateStr,
-        created_at: createdAt,
-        items: selectedItems
-      };
-
-      branchTxs.push(txRecord);
-      dayTxBatch.push(txRecord);
     }
 
     // Morning Production: varied time per day
@@ -465,173 +531,185 @@ async function runAutoSeeder(queryDb, force = false) {
       const bakeQty = Math.max(15, soldEst + buffer);
 
       const prodCode = `PRD-B${lasangId}-${pId}-${dateClean}`;
+      const isCompleted = !isFuture;
+
       dayProdBatch.push({
         product_id: pId,
         planned: bakeQty,
-        actual: bakeQty,
+        actual: isCompleted ? bakeQty : 0,
         date: dateStr,
         baker: branchConfig.bakerName,
-        status: 'Completed',
+        status: isCompleted ? 'Completed' : 'Scheduled',
         code: prodCode,
         branch_id: lasangId,
         created_at: `${dateStr} ${prodTimeStr}`
       });
 
-      const batchNum = `BAT-B${lasangId}-${pId}-${dateClean}`;
-      const dObj = new Date(`${dateStr}T00:00:00Z`);
-      const expObj = new Date(dObj.getTime() + (p.shelf_life || 2) * 24 * 60 * 60 * 1000);
-      const expMonth = String(expObj.getMonth() + 1).padStart(2, '0');
-      const expDay = String(expObj.getDate()).padStart(2, '0');
-      const expStr = `${expObj.getFullYear()}-${expMonth}-${expDay}`;
+      if (!isFuture) {
+        const batchNum = `BAT-B${lasangId}-${pId}-${dateClean}`;
+        const dObj = new Date(`${dateStr}T00:00:00Z`);
+        const expObj = new Date(dObj.getTime() + (p.shelf_life || 2) * 24 * 60 * 60 * 1000);
+        const expMonth = String(expObj.getMonth() + 1).padStart(2, '0');
+        const expDay = String(expObj.getDate()).padStart(2, '0');
+        const expStr = `${expObj.getFullYear()}-${expMonth}-${expDay}`;
 
-      dayBatchRows.push({
-        batch_number: batchNum,
-        product_id: pId,
-        branch_id: lasangId,
-        quantity_produced: bakeQty,
-        quantity_remaining: Math.max(0, bakeQty - (dayProductSoldQty[pId] || 0)),
-        production_date: dateStr,
-        expiry_date: expStr,
-        production_time: prodTimeStr,
-        expiry_time: expTimeStr,
-        freshness_degradation: 0,
-        status: 'Fresh',
-        food_safety_status: 'Safe',
-        created_at: `${dateStr} ${prodTimeStr}`
-      });
+        dayBatchRows.push({
+          batch_number: batchNum,
+          product_id: pId,
+          branch_id: lasangId,
+          quantity_produced: bakeQty,
+          quantity_remaining: Math.max(0, bakeQty - (dayProductSoldQty[pId] || 0)),
+          production_date: dateStr,
+          expiry_date: expStr,
+          production_time: prodTimeStr,
+          expiry_time: expTimeStr,
+          freshness_degradation: 0,
+          status: 'Fresh',
+          food_safety_status: 'Safe',
+          created_at: `${dateStr} ${prodTimeStr}`
+        });
 
-      runningStock[pId] += bakeQty;
+        runningStock[pId] += bakeQty;
+      }
     }
 
-    // Deduct sold items
-    for (const tx of branchTxs) {
-      for (const item of tx.items) {
-        runningStock[item.product_id] -= item.qty;
-        daySalesBatch.push({
-          product_id: item.product_id,
-          qty: item.qty,
-          price: item.price,
+    if (!isFuture) {
+      // Deduct sold items
+      for (const tx of branchTxs) {
+        for (const item of tx.items) {
+          runningStock[item.product_id] -= item.qty;
+          daySalesBatch.push({
+            product_id: item.product_id,
+            qty: item.qty,
+            price: item.price,
+            date: dateStr,
+            cashier: tx.cashier,
+            branch_id: lasangId,
+            created_at: tx.created_at
+          });
+        }
+      }
+
+      // Waste scrap on select days
+      if (dayIdx % 5 === 2) {
+        const wastePid = 'p1';
+        const wasteQty = 2;
+        const unitCost = PRODUCTS_MASTER[wastePid].cost;
+        runningStock[wastePid] -= wasteQty;
+
+        dayWasteBatch.push({
+          product_id: wastePid,
+          qty: wasteQty,
+          cost: unitCost,
+          reason: 'Overbaked Batch Trimming / Display Scrap',
           date: dateStr,
-          cashier: tx.cashier,
           branch_id: lasangId,
-          created_at: tx.created_at
+          created_at: `${dateStr} ${wasteTimeStr}`
+        });
+      }
+
+      // Repurpose on Day 6 & Day 18
+      if (dayIdx === 6 || dayIdx === 18) {
+        const repurposeQty = 8;
+        runningStock['p1'] -= repurposeQty;
+
+        dayRepurposeBatch.push({
+          batch_id: `BAT-B${lasangId}-p1-${dateClean}`,
+          product_id: 'p1',
+          product_name: 'Pandesal',
+          quantity: repurposeQty,
+          target_recipe: 'Bread Crumbs',
+          branch_id: lasangId,
+          timestamp: `${dateStr} ${repurposeTimeStr}`
+        });
+      }
+
+      // Stock Movements
+      for (const pId of branchConfig.productIds) {
+        dayMovementsBatch.push({
+          product_id: pId,
+          branch_id: lasangId,
+          quantity: dayProductSoldQty[pId] || 10,
+          movement_type: 'Out - Sale',
+          notes: `Consolidated daily POS sales for ${dateStr} (Cashier: Catalina Kato)`,
+          created_at: `${dateStr} ${movTimeStr}`
         });
       }
     }
 
-    // Waste scrap on select days
-    if (dayIdx % 5 === 2) {
-      const wastePid = 'p1';
-      const wasteQty = 2;
-      const unitCost = PRODUCTS_MASTER[wastePid].cost;
-      runningStock[wastePid] -= wasteQty;
-
-      dayWasteBatch.push({
-        product_id: wastePid,
-        qty: wasteQty,
-        cost: unitCost,
-        reason: 'Overbaked Batch Trimming / Display Scrap',
-        date: dateStr,
-        branch_id: lasangId,
-        created_at: `${dateStr} ${wasteTimeStr}`
-      });
-    }
-
-    // Repurpose on Day 6 & Day 18
-    if (dayIdx === 6 || dayIdx === 18) {
-      const repurposeQty = 8;
-      runningStock['p1'] -= repurposeQty;
-
-      dayRepurposeBatch.push({
-        batch_id: `BAT-B${lasangId}-p1-${dateClean}`,
-        product_id: 'p1',
-        product_name: 'Pandesal',
-        quantity: repurposeQty,
-        target_recipe: 'Bread Crumbs',
-        branch_id: lasangId,
-        timestamp: `${dateStr} ${repurposeTimeStr}`
-      });
-    }
-
-    // Stock Movements
-    for (const pId of branchConfig.productIds) {
-      dayMovementsBatch.push({
-        product_id: pId,
-        branch_id: lasangId,
-        quantity: dayProductSoldQty[pId] || 10,
-        movement_type: 'Out - Sale',
-        notes: `Consolidated daily POS sales for ${dateStr} (Cashier: Catalina Kato)`,
-        created_at: `${dateStr} ${movTimeStr}`
-      });
-    }
-
     // Insert batches for current day
     await batchInsert('bw_production', ['product_id', 'planned', 'actual', 'date', 'baker', 'status', 'code', 'branch_id', 'created_at'], dayProdBatch);
-    try {
-      await batchInsert('bw_inventory_movements', ['product_id', 'branch_id', 'quantity', 'movement_type', 'notes', 'created_at'], dayMovementsBatch);
-    } catch (e) {}
-    try {
-      await batchInsert('bw_inventory_batches', [
-        'batch_number', 'product_id', 'branch_id', 'quantity_produced', 'quantity_remaining',
-        'production_date', 'expiry_date', 'production_time', 'expiry_time', 'freshness_degradation', 'status', 'food_safety_status', 'created_at'
-      ], dayBatchRows);
-    } catch (e) {}
-
-    if (dayWasteBatch.length > 0) {
-      await batchInsert('bw_waste', ['product_id', 'qty', 'cost', 'reason', 'date', 'branch_id', 'created_at'], dayWasteBatch);
-    }
-    if (dayRepurposeBatch.length > 0) {
+    
+    if (!isFuture) {
       try {
-        await batchInsert('bw_repurpose_logs', ['batch_id', 'product_id', 'product_name', 'quantity', 'target_recipe', 'branch_id', 'timestamp'], dayRepurposeBatch);
+        await batchInsert('bw_inventory_movements', ['product_id', 'branch_id', 'quantity', 'movement_type', 'notes', 'created_at'], dayMovementsBatch);
       } catch (e) {}
-    }
+      try {
+        await batchInsert('bw_inventory_batches', [
+          'batch_number', 'product_id', 'branch_id', 'quantity_produced', 'quantity_remaining',
+          'production_date', 'expiry_date', 'production_time', 'expiry_time', 'freshness_degradation', 'status', 'food_safety_status', 'created_at'
+        ], dayBatchRows);
+      } catch (e) {}
 
-    // Insert 250 POS Transactions
-    await batchInsert('bw_pos_transactions', [
-      'transaction_number', 'branch_id', 'cashier', 'subtotal', 'discount', 'total',
-      'payment_amount', 'change_amount', 'payment_method', 'status', 'date', 'created_at'
-    ], dayTxBatch);
+      if (dayWasteBatch.length > 0) {
+        await batchInsert('bw_waste', ['product_id', 'qty', 'cost', 'reason', 'date', 'branch_id', 'created_at'], dayWasteBatch);
+      }
+      if (dayRepurposeBatch.length > 0) {
+        try {
+          await batchInsert('bw_repurpose_logs', ['batch_id', 'product_id', 'product_name', 'quantity', 'target_recipe', 'branch_id', 'timestamp'], dayRepurposeBatch);
+        } catch (e) {}
+      }
 
-    // Fetch inserted IDs to link items
-    const insertedTxsRes = await queryDb(
-      "SELECT id, transaction_number FROM bw_pos_transactions WHERE date = $1 AND branch_id = $2",
-      [dateStr, lasangId]
-    );
-    const txIdMap = {};
-    (insertedTxsRes.rows || []).forEach(t => { txIdMap[t.transaction_number] = t.id; });
+      // Insert 250 POS Transactions
+      await batchInsert('bw_pos_transactions', [
+        'transaction_number', 'branch_id', 'cashier', 'subtotal', 'discount', 'total',
+        'payment_amount', 'change_amount', 'payment_method', 'status', 'date', 'created_at'
+      ], dayTxBatch);
 
-    const dayTxItems = [];
-    for (const t of dayTxBatch) {
-      const realTxId = txIdMap[t.transaction_number];
-      if (realTxId) {
-        for (const item of t.items) {
-          dayTxItems.push({
-            transaction_id: realTxId,
-            product_id: item.product_id,
-            quantity: item.qty,
-            unit_price: item.price,
-            subtotal: Math.round(item.qty * item.price * 100) / 100
-          });
+      // Fetch inserted IDs to link items
+      const insertedTxsRes = await queryDb(
+        "SELECT id, transaction_number FROM bw_pos_transactions WHERE date = $1 AND branch_id = $2",
+        [dateStr, lasangId]
+      );
+      const txIdMap = {};
+      (insertedTxsRes.rows || []).forEach(t => { txIdMap[t.transaction_number] = t.id; });
+
+      const dayTxItems = [];
+      for (const t of dayTxBatch) {
+        const realTxId = txIdMap[t.transaction_number];
+        if (realTxId) {
+          for (const item of t.items) {
+            dayTxItems.push({
+              transaction_id: realTxId,
+              product_id: item.product_id,
+              quantity: item.qty,
+              unit_price: item.price,
+              subtotal: Math.round(item.qty * item.price * 100) / 100
+            });
+          }
         }
       }
-    }
-    if (dayTxItems.length > 0) {
-      await batchInsert('bw_pos_transaction_items', ['transaction_id', 'product_id', 'quantity', 'unit_price', 'subtotal'], dayTxItems);
-    }
+      if (dayTxItems.length > 0) {
+        await batchInsert('bw_pos_transaction_items', ['transaction_id', 'product_id', 'quantity', 'unit_price', 'subtotal'], dayTxItems);
+      }
 
-    // Mirror to bw_sales
-    await batchInsert('bw_sales', ['product_id', 'qty', 'price', 'date', 'cashier', 'branch_id', 'created_at'], daySalesBatch);
+      // Mirror to bw_sales
+      if (daySalesBatch.length > 0) {
+        await batchInsert('bw_sales', ['product_id', 'qty', 'price', 'date', 'cashier', 'branch_id', 'created_at'], daySalesBatch);
+      }
+    }
 
     if ((dayIdx + 1) % 5 === 0 || dayIdx === DATES.length - 1) {
-      console.log(`[Day ${dayIdx + 1}/31] Seeded 250 POS sales for ${dateStr} with Cashier Catalina Kato (Total: ${(dayIdx + 1) * 250})`);
+      const daySalesCount = isFuture ? 0 : 250;
+      console.log(`[Day ${dayIdx + 1}/31] Processed ${dateStr} (isFuture=${isFuture}, Sales: ${daySalesCount}, Cashier: Catalina Kato)`);
     }
   }
 
   // Seed rich multi-batch inventory across dates
   await seedRichInventory(lasangId);
 
-  console.log('🎉 AUTO-SEEDER COMPLETED SUCCESSFULLY: 7,750 completed transactions generated for Lasang with Cashier Catalina Kato!');
-  return { success: true, totalTransactions: 7750, dateRange: '2026-10-14 to 2026-11-13', branch: 'Lasang', cashier: 'Catalina Kato' };
+  console.log('AUTO-SEEDER COMPLETED SUCCESSFULLY: 4,750 completed transactions generated for Lasang with Cashier Catalina Kato (Oct 14 - Nov 1)! Future dates Nov 2-13 scheduled.');
+  return { success: true, totalTransactions: 4750, dateRange: '2026-10-14 to 2026-11-01', branch: 'Lasang', cashier: 'Catalina Kato' };
 }
 
 module.exports = { runAutoSeeder, generateDayTimes, DATES, SEED_IDENTIFIER };

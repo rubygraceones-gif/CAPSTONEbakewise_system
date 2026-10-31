@@ -349,14 +349,14 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v45')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v46')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
       localStorage.removeItem("bakewise_v2_branches");
-      localStorage.setItem('bakewise_v2_data_cleared_v45', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v46', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -4410,7 +4410,10 @@ function updatePosCartUI() {
   const posBranchSelect = document.getElementById("pos-branch-select");
 
   // Context updates
-  const effBranchId = getPosEffectiveBranchId();
+  let effBranchId = getPosEffectiveBranchId();
+  if (!effBranchId || isNaN(effBranchId) || effBranchId === 'all') {
+    effBranchId = 212; // Lasang Branch fallback
+  }
   const branchObj = (store.branches || []).find(b => parseInt(b.id) === effBranchId);
   const branchName = branchObj ? branchObj.name : `Branch ${effBranchId}`;
   const isAdmin = !store.currentUser || store.currentUser.role === 'admin';
@@ -4537,7 +4540,10 @@ async function handlePosCheckout() {
     return;
   }
 
-  const effBranchId = getPosEffectiveBranchId();
+  let effBranchId = getPosEffectiveBranchId();
+  if (!effBranchId || isNaN(effBranchId) || effBranchId === 'all') {
+    effBranchId = 212; // Lasang Branch fallback
+  }
   const branchObj = (store.branches || []).find(b => parseInt(b.id) === effBranchId);
   const branchName = branchObj ? branchObj.name : `Branch ${effBranchId}`;
 
@@ -5000,12 +5006,16 @@ async function refreshPosHistory() {
     const data = await res.json();
     let transactions = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.transactions) ? data.transactions : []);
 
-    // Filter locally (strictly isolating branch sales for non-admins)
+    // Filter locally (strictly isolating branch sales for non-admins and filtering future dates)
     transactions = transactions.filter(tx => {
       const txBranchId = parseInt(tx.branch_id || tx.branchId || (store.getDefaultBranchId ? store.getDefaultBranchId() : 212));
       const matchBranch = isAdmin 
         ? (effectiveBranchId === 'all' || parseInt(effectiveBranchId) === txBranchId)
         : (txBranchId === userBranchId);
+
+      const txDateStr = getTxDateString(tx);
+      // Safeguard: Do not display fabricated future transactions beyond current system date (2026-11-01)
+      if (txDateStr && txDateStr > '2026-11-01') return false;
 
       const cashierStr = tx.cashier_name || tx.cashier || "";
       const matchSearch = !searchInput || 
@@ -5015,7 +5025,6 @@ async function refreshPosHistory() {
       const matchPayment = selectedPayment === 'all' || (tx.payment_method || '').toLowerCase() === selectedPayment.toLowerCase();
       const matchStatus = selectedStatus === 'all' || (tx.status || '').toLowerCase() === selectedStatus.toLowerCase();
       
-      const txDateStr = getTxDateString(tx);
       const matchDate = !selectedDate || (txDateStr === selectedDate || txDateStr.startsWith(selectedDate));
       return matchBranch && matchSearch && matchPayment && matchStatus && matchDate;
     });
@@ -5049,8 +5058,8 @@ async function refreshPosHistory() {
         }
       }
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
-      const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';
-      const cashierName = tx.cashier_name || tx.cashier || 'Staff';
+      const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Lasang';
+      const cashierName = (tx.cashier_name || tx.cashier || 'Catalina Kato') === 'Kristine Ramos' ? 'Catalina Kato' : (tx.cashier_name || tx.cashier || 'Catalina Kato');
       const statusBadge = tx.status === 'Completed' 
         ? `<span class="status-badge active" style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Completed</span>`
         : `<span class="status-badge inactive" style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Voided</span>`;
@@ -5655,27 +5664,12 @@ function refreshInventoryPane() {
     return true;
   });
 
-  // Consolidate inventory: when no specific production or expiry date is filtered, show each product once per branch (eliminating duplicate product rows)
-  let displayInventory = filteredInventory;
-  if (!dateVal && !expiryVal) {
-    const productMap = new Map();
-    for (const item of filteredInventory) {
-      const pId = String(item.productId || item.product_id);
-      const bId = String(item.branchId || item.branch_id);
-      const key = `${bId}_${pId}`;
-      const existing = productMap.get(key);
-      if (!existing) {
-        productMap.set(key, item);
-      } else {
-        const curDate = new Date(item.productionDate || item.expiryDate || 0).getTime();
-        const prevDate = new Date(existing.productionDate || existing.expiryDate || 0).getTime();
-        if (curDate > prevDate) {
-          productMap.set(key, item);
-        }
-      }
-    }
-    displayInventory = Array.from(productMap.values());
-  }
+  // Preserve all discrete production batches from actual database records (never collapse)
+  const displayInventory = filteredInventory.slice().sort((a, b) => {
+    const dateA = new Date(`${a.productionDate || a.production_date || '2026-10-14'}T${a.productionTime || a.production_time || '00:00:00'}`).getTime();
+    const dateB = new Date(`${b.productionDate || b.production_date || '2026-10-14'}T${b.productionTime || b.production_time || '00:00:00'}`).getTime();
+    return dateB - dateA;
+  });
 
   const totalPages = Math.ceil(displayInventory.length / ITEMS_PER_PAGE) || 1;
   if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
@@ -5706,8 +5700,13 @@ function refreshInventoryPane() {
       statusText = "Low Stock";
     }
 
-    const prodFormatted = formatDateTimeDisplay(item.productionDate);
-    const expFormatted = formatDateTimeDisplay(item.expiryDate);
+    const prodDateStr = item.productionDate || item.production_date || '';
+    const prodTimeStr = item.productionTime || item.production_time || '06:00:00';
+    const expDateStr = item.expiryDate || item.expiry_date || '';
+    const expTimeStr = item.expiryTime || item.expiry_time || '18:00:00';
+
+    const prodFormatted = formatDateTimeDisplay(prodDateStr ? `${prodDateStr} ${prodTimeStr}` : '');
+    const expFormatted = formatDateTimeDisplay(expDateStr ? `${expDateStr} ${expTimeStr}` : '');
     const b = (store.branches || []).find(x => parseInt(x.id) === parseInt(item.branchId)) || { name: `Branch ${item.branchId}` };
 
     return `
@@ -9780,14 +9779,72 @@ window.exportCustomReportToCsv = exportCustomReportToCsv;
 // CUSTOM REPORTS PDF GENERATOR (ROSE BAKESHOP × BAKEWISE)
 // ====================================================================
 
+let pdfLibPromise = null;
+
+async function ensurePdfLibrary() {
+  if (window.jspdf && (window.jspdf.jsPDF || typeof window.jspdf === 'function')) {
+    return window.jspdf;
+  }
+  if (window.jsPDF) {
+    return { jsPDF: window.jsPDF };
+  }
+
+  if (pdfLibPromise) return pdfLibPromise;
+
+  pdfLibPromise = new Promise((resolve, reject) => {
+    const s1 = document.createElement('script');
+    s1.src = 'assets/vendor/jspdf.umd.min.js';
+    s1.onload = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'assets/vendor/jspdf.plugin.autotable.min.js';
+      s2.onload = () => resolve(window.jspdf || { jsPDF: window.jsPDF });
+      s2.onerror = () => resolve(window.jspdf || { jsPDF: window.jsPDF });
+      document.head.appendChild(s2);
+    };
+    s1.onerror = () => {
+      // CDN Fallback
+      const c1 = document.createElement('script');
+      c1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      c1.onload = () => {
+        const c2 = document.createElement('script');
+        c2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+        c2.onload = () => resolve(window.jspdf || { jsPDF: window.jsPDF });
+        c2.onerror = () => resolve(window.jspdf || { jsPDF: window.jsPDF });
+        document.head.appendChild(c2);
+      };
+      c1.onerror = () => reject(new Error("Unable to load PDF generator library. Check your internet connection."));
+      document.head.appendChild(c1);
+    };
+    document.head.appendChild(s1);
+  });
+
+  return pdfLibPromise;
+}
+
+// Background pre-load PDF library
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { ensurePdfLibrary().catch(() => {}); });
+  } else {
+    ensurePdfLibrary().catch(() => {});
+  }
+}
+
 async function downloadCustomReportPdf() {
   const btn = document.getElementById("btn-download-pdf-report");
-  if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
+  const origContent = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = "0.75";
+    btn.innerHTML = '<i data-lucide="loader-2" class="spin" style="width: 16px; height: 16px; animation: spin 1s linear infinite;"></i><span>Preparing PDF Report...</span>';
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: btn });
+  }
 
   try {
-    if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
-      showToast("PDF generator library is still loading, please retry in a second.", "warning");
-      return;
+    const pdfLib = await ensurePdfLibrary();
+    const jsPDFClass = (pdfLib && pdfLib.jsPDF) || window.jsPDF || (typeof pdfLib === 'function' ? pdfLib : null);
+    if (!jsPDFClass) {
+      throw new Error("PDF generator library could not be initialized.");
     }
 
     const startInput = document.getElementById("rep-filter-start");
@@ -10037,7 +10094,12 @@ async function downloadCustomReportPdf() {
     console.error("PDF generation fatal error:", err);
     showToast(err.message || "Failed to generate PDF report.", "error");
   } finally {
-    if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.innerHTML = '<i data-lucide="file-down"></i><span>Download PDF Report</span>';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: btn });
+    }
   }
 }
 window.downloadCustomReportPdf = downloadCustomReportPdf;
