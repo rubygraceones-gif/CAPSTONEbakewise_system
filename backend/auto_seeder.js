@@ -118,53 +118,30 @@ async function runAutoSeeder(queryDb, force = false) {
       }
     ];
 
-    const checkpoints = [
-      '2026-10-14', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19',
-      '2026-10-21', '2026-10-24', '2026-10-27', '2026-10-30',
-      '2026-11-02', '2026-11-05', '2026-11-08', '2026-11-11', '2026-11-13'
-    ];
-
     const invRows = [];
     for (const b of bConfigs) {
       for (const pId of b.productIds) {
         const p = PRODUCTS_MASTER[pId];
         const shelfDays = p.shelf_life || 3;
+        const curProdDate = '2026-10-31';
+        const dObj = new Date(`${curProdDate}T00:00:00Z`);
+        const expObj = new Date(dObj.getTime() + shelfDays * 24 * 60 * 60 * 1000);
+        const expMonth = String(expObj.getMonth() + 1).padStart(2, '0');
+        const expDay = String(expObj.getDate()).padStart(2, '0');
+        const curExpDate = `${expObj.getFullYear()}-${expMonth}-${expDay}`;
+        const baseStock = (pId === 'p1' || pId === 'p_ube_lasang') ? 60 : (pId === 'p4' ? 15 : 40);
+        const stockLevel = baseStock + ((pId.charCodeAt(pId.length - 1) * 7) % 15);
 
-        for (const prodDate of checkpoints) {
-          const dObj = new Date(`${prodDate}T00:00:00Z`);
-          const expObj = new Date(dObj.getTime() + shelfDays * 24 * 60 * 60 * 1000);
-          let expDate = expObj.toISOString().split('T')[0];
-
-          // Ensure specific lots expire on 2026-10-21 for both branches
-          if (prodDate === '2026-10-18' && (pId === 'p2' || pId === 'p10' || pId === 'p3')) {
-            expDate = '2026-10-21';
-          }
-          if (prodDate === '2026-10-19' && (pId === 'p1' || pId === 'p5' || pId === 'p6' || pId === 'p8' || pId === 'p_ube_lasang')) {
-            expDate = '2026-10-21';
-          }
-          if (prodDate === '2026-10-17' && pId === 'p4') {
-            expDate = '2026-10-21';
-          }
-
-          const dateClean = prodDate.replace(/-/g, '');
-          const batchCode = `BAT-B${b.branchId}-${pId}-${dateClean}`;
-          const baseStock = (pId === 'p1' || pId === 'p_ube_lasang') ? 60 : (pId === 'p4' ? 15 : 40);
-          const stockLevel = Math.max(12, baseStock + ((prodDate.charCodeAt(9) * 7) % 25) - 8);
-
-          let status = 'In Stock';
-          if (stockLevel <= 10) status = 'Low Stock';
-
-          invRows.push({
-            product_id: pId,
-            stock_level: stockLevel,
-            production_date: prodDate,
-            expiry_date: expDate,
-            branch_id: b.branchId,
-            batch_id: batchCode,
-            unit: p.unit || 'pcs',
-            status: status
-          });
-        }
+        invRows.push({
+          product_id: pId,
+          stock_level: stockLevel,
+          production_date: curProdDate,
+          expiry_date: curExpDate,
+          branch_id: b.branchId,
+          batch_id: `BAT-B${b.branchId}-${pId}-20261031`,
+          unit: p.unit || 'pcs',
+          status: 'In Stock'
+        });
       }
     }
 
@@ -173,7 +150,7 @@ async function runAutoSeeder(queryDb, force = false) {
       'branch_id', 'batch_id', 'unit', 'status'
     ], invRows);
 
-    console.log(`✓ Seeded ${invRows.length} rich multi-date inventory records into bw_inventory.`);
+    console.log(`✓ Seeded ${invRows.length} active consolidated inventory records into bw_inventory (1 record per product per branch).`);
   }
 
   // 2. Check existing transaction counts
@@ -352,17 +329,17 @@ async function runAutoSeeder(queryDb, force = false) {
         const rng = createRng((dayIdx + 1) * 100000 + branchId * 1000 + txSeq);
         const cashier = (txSeq <= 135) ? b.cashiers[0].name : b.cashiers[1].name;
 
-        // Transaction timestamp
-        let hour = 5 + Math.floor((txSeq / 250) * 16);
-        if (hour > 20) hour = 20;
-        const minute = Math.floor(rng() * 60);
-        const second = Math.floor(rng() * 60);
+        // Transaction timestamp - distributed sequentially across store hours 05:15 to 20:45
+        const minuteOffset = Math.floor(((txSeq - 1) / 250) * 930);
+        const txTotalMinutes = 5 * 60 + 15 + minuteOffset;
+        const hour = Math.floor(txTotalMinutes / 60);
+        const minute = txTotalMinutes % 60;
+        const second = (txSeq * 19 + 7) % 60;
         const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
         const txTimestamp = `${dateStr} ${timeStr}`;
 
         const seqStr = String(txSeq).padStart(3, '0');
-        const txPrefix = isFuture ? 'SIM-POS' : 'POS';
-        const txNumber = `${txPrefix}-B${branchId}-${dateClean}-${seqStr}`;
+        const txNumber = `POS-B${branchId}-${dateClean}-${seqStr}`;
 
         // Construct items
         const basket = [];

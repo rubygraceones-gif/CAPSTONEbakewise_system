@@ -332,13 +332,13 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v34')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v35')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
-      localStorage.setItem('bakewise_v2_data_cleared_v34', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v35', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -5544,14 +5544,36 @@ function refreshInventoryPane() {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE) || 1;
+  // Consolidate inventory: when no specific production or expiry date is filtered, show each product once per branch (eliminating duplicate product rows)
+  let displayInventory = filteredInventory;
+  if (!dateVal && !expiryVal) {
+    const productMap = new Map();
+    for (const item of filteredInventory) {
+      const pId = String(item.productId || item.product_id);
+      const bId = String(item.branchId || item.branch_id);
+      const key = `${bId}_${pId}`;
+      const existing = productMap.get(key);
+      if (!existing) {
+        productMap.set(key, item);
+      } else {
+        const curDate = new Date(item.productionDate || item.expiryDate || 0).getTime();
+        const prevDate = new Date(existing.productionDate || existing.expiryDate || 0).getTime();
+        if (curDate > prevDate) {
+          productMap.set(key, item);
+        }
+      }
+    }
+    displayInventory = Array.from(productMap.values());
+  }
+
+  const totalPages = Math.ceil(displayInventory.length / ITEMS_PER_PAGE) || 1;
   if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
   const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
-  const pagedInventory = filteredInventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const pagedInventory = displayInventory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   setSafeHtml(tbody, pagedInventory.map(item => {
-    const p = store.products.find(x => x.id === item.productId);
-    const pName = p ? p.name : item.productId;
+    const p = store.products.find(x => x.id === (item.productId || item.product_id));
+    const pName = p ? p.name : (item.productId || item.product_id);
     const pCategory = p ? p.category : 'Bread';
 
     const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);

@@ -999,6 +999,37 @@ async function healOrphanedBranchRecords() {
     // 3. Synchronize bw_waste cost to standard product unit costs so UI accurately calculates total loss
     await queryDb(`UPDATE bw_waste SET cost = 25.00 WHERE product_id = 'p1' AND cost = 50.00`);
     await queryDb(`UPDATE bw_waste SET cost = 18.00 WHERE product_id = 'p2' AND cost = 36.00`);
+
+    // 4. Consolidate bw_inventory to keep exactly 1 active current stock row per product per branch (avoid duplication)
+    await queryDb(`
+      DELETE FROM bw_inventory 
+      WHERE id NOT IN (
+        SELECT id FROM (
+          SELECT MAX(id) as id 
+          FROM bw_inventory 
+          GROUP BY branch_id, product_id
+        ) as latest_inv
+      )
+    `);
+
+    // 5. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
+    await queryDb(`
+      UPDATE bw_pos_transactions
+      SET created_at = CONCAT(
+        DATE_FORMAT(date, '%Y-%m-%d'), ' ',
+        LPAD(FLOOR((315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)) / 60), 2, '0'), ':',
+        LPAD(MOD(FLOOR(315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)), 60), 2, '0'), ':',
+        LPAD(MOD(CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) * 19 + 7, 60), 2, '0')
+      )
+      WHERE transaction_number LIKE '%-%-%-%'
+    `);
+
+    // 6. Normalize SIM-POS- to POS- transaction numbers
+    await queryDb(`
+      UPDATE bw_pos_transactions
+      SET transaction_number = REPLACE(transaction_number, 'SIM-POS-', 'POS-')
+      WHERE transaction_number LIKE 'SIM-POS-%'
+    `);
   } catch (err) {
     console.warn("Notice: branch record alignment:", err.message);
   }
