@@ -206,6 +206,15 @@ window.fetch = async function () {
 };
 
 
+// --- GLOBAL DEFAULT BRANCH HELPER ---
+function getDefaultBranchId() {
+  if (typeof store !== 'undefined' && store && typeof store.getDefaultBranchId === 'function') {
+    return store.getDefaultBranchId();
+  }
+  return 212;
+}
+window.getDefaultBranchId = getDefaultBranchId;
+
 // --- SAFE DOM HTML SINK HELPER ---
 function setSafeHtml(target, htmlString) {
   if (!target) return;
@@ -340,14 +349,14 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v43')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v44')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
       localStorage.removeItem("bakewise_v2_branches");
-      localStorage.setItem('bakewise_v2_data_cleared_v43', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v44', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -5934,11 +5943,11 @@ function refreshWastePane() {
 
 // 6. AI ANALYTICS CONTROLLER & DEMAND FORECASTING ENGINE
 async function refreshAIAnalyticsPane() {
-  await renderAIDemandForecastChart();
-  await renderDailyPredictionTable();
-  await render7DayProjectionTable();
-  await renderBakeRecommendations();
-  await renderRepurposingAlerts();
+  try { await renderAIDemandForecastChart(); } catch (e) { console.error("renderAIDemandForecastChart error:", e); }
+  try { await renderDailyPredictionTable(); } catch (e) { console.error("renderDailyPredictionTable error:", e); }
+  try { await render7DayProjectionTable(); } catch (e) { console.error("render7DayProjectionTable error:", e); }
+  try { await renderBakeRecommendations(); } catch (e) { console.error("renderBakeRecommendations error:", e); }
+  try { await renderRepurposingAlerts(); } catch (e) { console.error("renderRepurposingAlerts error:", e); }
 
   // Bind Refresh buttons for Demand Forecasting
   const btnRefreshRecs = document.getElementById("btn-refresh-recs");
@@ -6390,185 +6399,248 @@ async function renderBakeRecommendations() {
   if (!container) return;
   container.replaceChildren();
 
-  const activeBranch = (store.getSelectedBranchId() === 'all') ? getDefaultBranchId() : store.getSelectedBranchId();
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  try {
+    const activeBranch = (store.getSelectedBranchId() === 'all') ? getDefaultBranchId() : store.getSelectedBranchId();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
 
-  const recsPromises = (store.products || []).filter(p => p.status !== 'Inactive').map(async p => {
-    // 1. Usable Available Stock (exclude expired, damaged, quarantined, or spoiled)
-    const matchingInv = (store.inventory || []).filter(i => {
-      if (i.productId !== p.id && String(i.productId) !== String(p.id)) return false;
-      if (activeBranch && activeBranch !== 'all' && i.branchId && parseInt(i.branchId) !== parseInt(activeBranch)) return false;
-      return true;
-    });
-
-    let usableStock = 0;
-    let expiredStock = 0;
-    matchingInv.forEach(i => {
-      const isExp = (i.status === 'Expired' || i.status === 'Damaged' || i.status === 'Quarantined' || i.status === 'Spoiled' ||
-        (i.expiryDate && new Date(i.expiryDate) < new Date(todayStr + 'T00:00:00')));
-      if (isExp) {
-        expiredStock += (parseInt(i.stockLevel) || 0);
-      } else {
-        usableStock += (parseInt(i.stockLevel) || 0);
-      }
-    });
-
-    // 2. Confirmed Scheduled Production (Planned, In Progress, or Scheduled)
-    const matchingProd = (store.production || []).filter(pr => {
-      if (pr.productId !== p.id && String(pr.productId) !== String(p.id)) return false;
-      if (activeBranch && activeBranch !== 'all' && pr.branchId && parseInt(pr.branchId) !== parseInt(activeBranch)) return false;
-      return (pr.status === 'Planned' || pr.status === 'In Progress' || pr.status === 'Scheduled');
-    });
-    const scheduledProduction = matchingProd.reduce((sum, pr) => sum + (parseInt(pr.planned) || 0), 0);
-
-    // 3. Tomorrow's Forecasted Demand
-    const predictionResult = await getAIPredictedDemand(p.id, activeBranch);
-    const tomorrowDemand = predictionResult.demand;
-    const unit = p.unit || predictionResult.unit || 'pcs';
-
-    // 4. Data sufficiency check: If statistical demand model cannot reliably predict
-    if (predictionResult.isFallback || predictionResult.dataPoints < 2) {
-      return {
-        productId: p.id,
-        productName: p.name,
-        category: p.category || 'Bakery',
-        unit: unit,
-        usableStock,
-        scheduledProduction,
-        tomorrowDemand,
-        recommended: 0,
-        status: 'Insufficient Data',
-        badgeStyle: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
-        reason: 'Insufficient historical sales transactions to calculate reliable statistical demand. Additional POS data required.'
-      };
-    }
-
-    // 5. Dynamic Safety Stock & Production Optimization Formula (Calculated in backend/model; not shown as math in UI)
-    const safetyStock = Math.max(3, Math.min(15, Math.round(tomorrowDemand * 0.20)));
-    const grossNeeded = tomorrowDemand + safetyStock;
-    const availableSupply = usableStock + scheduledProduction;
-    const recommendedBake = Math.max(0, grossNeeded - availableSupply);
-
-    let status = 'Stock Sufficient';
-    let badgeStyle = 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
-    let reason = 'Available stock can cover expected demand without additional baking.';
-
-    if (recommendedBake > 0) {
-      if (usableStock < safetyStock) {
-        status = 'Low Stock';
-        badgeStyle = 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a;';
-        reason = 'Current usable inventory is below the required operational safety buffer. Baking is recommended to replenish inventory.';
-      } else {
-        status = 'Produce Now';
-        badgeStyle = 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;';
-        reason = 'Current usable inventory is insufficient to cover the expected demand and required stock allowance.';
-      }
-    } else {
-      if (scheduledProduction > 0 && usableStock < grossNeeded) {
-        status = 'Production Scheduled';
-        badgeStyle = 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;';
-        reason = 'Production is already confirmed and scheduled to cover upcoming demand.';
-      } else if (usableStock >= grossNeeded) {
-        status = 'Stock Sufficient';
-        badgeStyle = 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
-        reason = 'Available stock comfortably covers expected demand.';
-      } else {
-        status = 'No Production Needed';
-        badgeStyle = 'background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;';
-        reason = 'Current inventory is balanced with demand. No additional production is justified.';
+    // Ensure products are available
+    if (!store.products || store.products.length === 0) {
+      try {
+        const pRes = await fetch('/api/products');
+        if (pRes.ok) store.products = await pRes.json();
+      } catch (e) {
+        console.warn("Could not fetch products for recommendations:", e);
       }
     }
 
-    return {
-      productId: p.id,
-      productName: p.name,
-      category: p.category || 'Bakery',
-      unit: unit,
-      usableStock,
-      scheduledProduction,
-      tomorrowDemand,
-      recommended: recommendedBake,
-      status,
-      badgeStyle,
-      reason
-    };
-  });
+    // Ensure inventory is available
+    if (!store.inventory || store.inventory.length === 0) {
+      try {
+        const iRes = await fetch(`/api/inventory?branch_id=${activeBranch}`);
+        if (iRes.ok) store.inventory = await iRes.json();
+      } catch (e) {
+        console.warn("Could not fetch inventory for recommendations:", e);
+      }
+    }
 
-  const recs = await Promise.all(recsPromises);
-  window._lastProductionRecs = recs;
+    const availableProducts = (store.products || []).filter(p => p.status !== 'Inactive');
+    if (availableProducts.length === 0) {
+      setSafeHtml(container, `
+        <div style="padding: 24px; text-align: center; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+          <i data-lucide="package-search" style="width: 32px; height: 32px; color: var(--primary-color); margin-bottom: 6px;"></i>
+          <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">No active products found</div>
+          <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-secondary);">Add products in Product Catalog or click Refresh Recommendations.</div>
+        </div>
+      `);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      return;
+    }
 
-  const cardsHtml = recs.map(r => `
-    <div class="ai-recommendation-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; background: var(--bg-surface); display: flex; flex-direction: column; gap: 10px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <strong style="font-size: 1.02rem; color: var(--text-primary);">${escapeHtml(r.productName)}</strong>
-            <span class="badge" style="font-size: 0.72rem; background: rgba(0,0,0,0.05); color: var(--text-secondary);">${escapeHtml(r.category)}</span>
+    const recsPromises = availableProducts.map(async p => {
+      try {
+        // 1. Usable Available Stock (exclude expired, damaged, quarantined, or spoiled)
+        const matchingInv = (store.inventory || []).filter(i => {
+          if (i.productId !== p.id && String(i.productId) !== String(p.id)) return false;
+          if (activeBranch && activeBranch !== 'all' && i.branchId && parseInt(i.branchId) !== parseInt(activeBranch)) return false;
+          return true;
+        });
+
+        let usableStock = 0;
+        let expiredStock = 0;
+        matchingInv.forEach(i => {
+          const isExp = (i.status === 'Expired' || i.status === 'Damaged' || i.status === 'Quarantined' || i.status === 'Spoiled' ||
+            (i.expiryDate && new Date(i.expiryDate) < new Date(todayStr + 'T00:00:00')));
+          if (isExp) {
+            expiredStock += (parseInt(i.stockLevel) || 0);
+          } else {
+            usableStock += (parseInt(i.stockLevel) || 0);
+          }
+        });
+
+        // 2. Confirmed Scheduled Production (Planned, In Progress, or Scheduled)
+        const matchingProd = (store.production || []).filter(pr => {
+          if (pr.productId !== p.id && String(pr.productId) !== String(p.id)) return false;
+          if (activeBranch && activeBranch !== 'all' && pr.branchId && parseInt(pr.branchId) !== parseInt(activeBranch)) return false;
+          return (pr.status === 'Planned' || pr.status === 'In Progress' || pr.status === 'Scheduled');
+        });
+        const scheduledProduction = matchingProd.reduce((sum, pr) => sum + (parseInt(pr.planned) || 0), 0);
+
+        // 3. Tomorrow's Forecasted Demand
+        const predictionResult = await getAIPredictedDemand(p.id, activeBranch);
+        const tomorrowDemand = predictionResult.demand;
+        const unit = p.unit || predictionResult.unit || 'pcs';
+
+        // 4. Data sufficiency check: If statistical demand model cannot reliably predict
+        if (predictionResult.isFallback || predictionResult.dataPoints < 2) {
+          return {
+            productId: p.id,
+            productName: p.name,
+            category: p.category || 'Bakery',
+            unit: unit,
+            usableStock,
+            scheduledProduction,
+            tomorrowDemand,
+            recommended: 0,
+            status: 'Insufficient Data',
+            badgeStyle: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
+            reason: 'Insufficient historical sales transactions to calculate reliable statistical demand. Additional POS data required.'
+          };
+        }
+
+        // 5. Dynamic Safety Stock & Production Optimization Formula
+        const safetyStock = Math.max(3, Math.min(15, Math.round(tomorrowDemand * 0.20)));
+        const grossNeeded = tomorrowDemand + safetyStock;
+        const availableSupply = usableStock + scheduledProduction;
+        const recommendedBake = Math.max(0, grossNeeded - availableSupply);
+
+        let status = 'Stock Sufficient';
+        let badgeStyle = 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
+        let reason = 'Available stock can cover expected demand without additional baking.';
+
+        if (recommendedBake > 0) {
+          if (usableStock < safetyStock) {
+            status = 'Low Stock';
+            badgeStyle = 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a;';
+            reason = 'Current usable inventory is below the required operational safety buffer. Baking is recommended to replenish inventory.';
+          } else {
+            status = 'Produce Now';
+            badgeStyle = 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;';
+            reason = 'Current usable inventory is insufficient to cover the expected demand and required stock allowance.';
+          }
+        } else {
+          if (scheduledProduction > 0 && usableStock < grossNeeded) {
+            status = 'Production Scheduled';
+            badgeStyle = 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;';
+            reason = 'Production is already confirmed and scheduled to cover upcoming demand.';
+          } else if (usableStock >= grossNeeded) {
+            status = 'Stock Sufficient';
+            badgeStyle = 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
+            reason = 'Available stock comfortably covers expected demand.';
+          } else {
+            status = 'No Production Needed';
+            badgeStyle = 'background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;';
+            reason = 'Current inventory is balanced with demand. No additional production is justified.';
+          }
+        }
+
+        return {
+          productId: p.id,
+          productName: p.name,
+          category: p.category || 'Bakery',
+          unit: unit,
+          usableStock,
+          scheduledProduction,
+          tomorrowDemand,
+          recommended: recommendedBake,
+          status,
+          badgeStyle,
+          reason
+        };
+      } catch (prodErr) {
+        console.warn(`Error generating recommendation for ${p.name}:`, prodErr);
+        return {
+          productId: p.id,
+          productName: p.name,
+          category: p.category || 'Bakery',
+          unit: p.unit || 'pcs',
+          usableStock: 0,
+          scheduledProduction: 0,
+          tomorrowDemand: 0,
+          recommended: 0,
+          status: 'Insufficient Data',
+          badgeStyle: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
+          reason: 'Insufficient historical sales transactions to calculate reliable statistical demand.'
+        };
+      }
+    });
+
+    const recs = await Promise.all(recsPromises);
+    window._lastProductionRecs = recs;
+
+    const cardsHtml = recs.map(r => `
+      <div class="ai-recommendation-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; background: var(--bg-surface); display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <strong style="font-size: 1.02rem; color: var(--text-primary);">${escapeHtml(r.productName)}</strong>
+              <span class="badge" style="font-size: 0.72rem; background: rgba(0,0,0,0.05); color: var(--text-secondary);">${escapeHtml(r.category)}</span>
+            </div>
+            <div style="font-size: 0.83rem; color: var(--text-secondary); margin-top: 2px;">
+              Available Stock: <strong style="color: var(--text-primary);">${r.usableStock} ${escapeHtml(r.unit)}</strong>
+              ${r.scheduledProduction > 0 ? ` &bull; <span style="color: #0369a1; font-weight: 600;">Scheduled: ${r.scheduledProduction} ${escapeHtml(r.unit)}</span>` : ''}
+            </div>
           </div>
-          <div style="font-size: 0.83rem; color: var(--text-secondary); margin-top: 2px;">
-            Available Stock: <strong style="color: var(--text-primary);">${r.usableStock} ${escapeHtml(r.unit)}</strong>
-            ${r.scheduledProduction > 0 ? ` &bull; <span style="color: #0369a1; font-weight: 600;">Scheduled: ${r.scheduledProduction} ${escapeHtml(r.unit)}</span>` : ''}
+
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <span class="badge" style="${r.badgeStyle} font-weight: 800; font-size: 0.76rem; padding: 3px 8px; border-radius: 6px;">
+              ${r.status}
+            </span>
+            <div style="font-size: 0.83rem; color: var(--text-muted); text-align: right;">
+              Recommended: <strong style="font-size: 1.1rem; color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'};">${r.status === 'Insufficient Data' ? '--' : r.recommended} ${escapeHtml(r.unit)}</strong>
+            </div>
           </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-          <span class="badge" style="${r.badgeStyle} font-weight: 800; font-size: 0.76rem; padding: 3px 8px; border-radius: 6px;">
-            ${r.status}
-          </span>
-          <div style="font-size: 0.83rem; color: var(--text-muted); text-align: right;">
-            Recommended: <strong style="font-size: 1.1rem; color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'};">${r.status === 'Insufficient Data' ? '--' : r.recommended} ${escapeHtml(r.unit)}</strong>
-          </div>
+        <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <strong>Reason:</strong> ${escapeHtml(r.reason)}
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 4px;">
+          <button type="button" class="btn-secondary btn-rec-view-product" data-pid="${escapeHtml(r.productId)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+            <i data-lucide="eye" style="width: 13px; height: 13px;"></i> View Product
+          </button>
+
+          ${(r.status === 'Produce Now' || r.status === 'Low Stock' || r.status === 'Insufficient Data') ? `
+            <button type="button" class="btn-primary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.recommended > 0 ? r.recommended : 20}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+              <i data-lucide="calendar-plus" style="width: 13px; height: 13px;"></i> Schedule Production
+            </button>
+          ` : (r.status === 'Production Scheduled') ? `
+            <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.scheduledProduction}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; color: #0369a1; border-color: #bae6fd; cursor: pointer;">
+              <i data-lucide="calendar" style="width: 13px; height: 13px;"></i> View Schedule
+            </button>
+          ` : `
+            <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="15" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; opacity: 0.85; cursor: pointer;">
+              <i data-lucide="plus" style="width: 13px; height: 13px;"></i> Schedule Custom
+            </button>
+          `}
         </div>
       </div>
+    `).join('');
 
-      <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-        <span style="font-weight: 600; color: var(--text-primary);">Reason:</span> ${escapeHtml(r.reason)}
-      </div>
+    setSafeHtml(container, cardsHtml);
 
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px;">
-        <button type="button" class="btn-secondary btn-rec-view-product" data-pid="${escapeHtml(r.productId)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-          <i data-lucide="eye" style="width: 13px; height: 13px;"></i> View Product
-        </button>
-        ${(r.status === 'Produce Now' || r.status === 'Low Stock' || r.status === 'Insufficient Data') ? `
-          <button type="button" class="btn-primary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.recommended > 0 ? r.recommended : 20}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
-            <i data-lucide="calendar-plus" style="width: 13px; height: 13px;"></i> Schedule Production
-          </button>
-        ` : (r.status === 'Production Scheduled') ? `
-          <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="${r.scheduledProduction}" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; color: #0369a1; border-color: #bae6fd; cursor: pointer;">
-            <i data-lucide="calendar" style="width: 13px; height: 13px;"></i> View Schedule
-          </button>
-        ` : `
-          <button type="button" class="btn-secondary btn-rec-schedule-prod" data-pid="${escapeHtml(r.productId)}" data-qty="15" data-unit="${escapeHtml(r.unit)}" data-name="${escapeHtml(r.productName)}" data-cat="${escapeHtml(r.category)}" style="font-size: 0.78rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; opacity: 0.85; cursor: pointer;">
-            <i data-lucide="plus" style="width: 13px; height: 13px;"></i> Schedule Custom
-          </button>
-        `}
-      </div>
-    </div>
-  `).join('');
-
-  setSafeHtml(container, cardsHtml);
-
-  // Attach button click events
-  document.querySelectorAll(".btn-rec-schedule-prod").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const pid = btn.getAttribute("data-pid");
-      const qty = parseInt(btn.getAttribute("data-qty") || 0);
-      const unit = btn.getAttribute("data-unit") || 'pcs';
-      const name = btn.getAttribute("data-name");
-      const cat = btn.getAttribute("data-cat");
-      openScheduleProductionModal(pid, qty, unit, name, cat);
+    // Attach button click events
+    document.querySelectorAll(".btn-rec-schedule-prod").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pid = btn.getAttribute("data-pid");
+        const qty = parseInt(btn.getAttribute("data-qty") || 0);
+        const unit = btn.getAttribute("data-unit") || 'pcs';
+        const name = btn.getAttribute("data-name");
+        const cat = btn.getAttribute("data-cat");
+        openScheduleProductionModal(pid, qty, unit, name, cat);
+      });
     });
-  });
 
-  document.querySelectorAll(".btn-rec-view-product").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const pid = btn.getAttribute("data-pid");
-      openProductDetailsModal(pid);
+    document.querySelectorAll(".btn-rec-view-product").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pid = btn.getAttribute("data-pid");
+        openProductDetailsModal(pid);
+      });
     });
-  });
 
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    console.error("renderBakeRecommendations fatal error:", err);
+    setSafeHtml(container, `
+      <div style="padding: 20px; text-align: center; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+        <i data-lucide="alert-circle" style="width: 28px; height: 28px; color: var(--primary-color); margin-bottom: 6px;"></i>
+        <div style="font-weight: 600; font-size: 0.9rem;">Unable to display recommendations right now.</div>
+        <div style="font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">Please click "Refresh Recommendations" to reload latest branch data.</div>
+      </div>
+    `);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
 
 // --------------------------------------------------------------------
@@ -6787,305 +6859,345 @@ async function renderRepurposingAlerts() {
   if (!container) return;
   container.replaceChildren();
 
-  const activeBranch = (store.getSelectedBranchId() === 'all') ? getDefaultBranchId() : store.getSelectedBranchId();
-  let batches = [];
-
-  // 1. Fetch live batches from backend API
   try {
-    const branchQuery = (activeBranch && activeBranch !== 'all') ? `?branch_id=${activeBranch}` : '';
-    const res = await fetch(`/api/inventory/batches${branchQuery}`);
-    if (res.ok) {
-      batches = await res.json();
-    }
-  } catch (err) {
-    console.warn("Could not fetch batches from API, checking store inventory:", err.message);
-  }
+    const activeBranch = (store.getSelectedBranchId() === 'all') ? getDefaultBranchId() : store.getSelectedBranchId();
+    let batches = [];
 
-  // Fallback to store inventory if API batches empty
-  if (!Array.isArray(batches) || batches.length === 0) {
-    batches = (store.inventory || []).map(i => {
-      const p = (store.products || []).find(x => x.id === i.productId);
+    // Ensure products and inventory are loaded
+    if (!store.products || store.products.length === 0) {
+      try {
+        const pRes = await fetch('/api/products');
+        if (pRes.ok) store.products = await pRes.json();
+      } catch (e) {
+        console.warn("Could not fetch products for repurposing:", e);
+      }
+    }
+
+    // 1. Fetch live batches from backend API
+    try {
+      const branchQuery = (activeBranch && activeBranch !== 'all') ? `?branch_id=${activeBranch}` : '';
+      const res = await fetch(`/api/inventory/batches${branchQuery}`);
+      if (res.ok) {
+        batches = await res.json();
+      }
+    } catch (err) {
+      console.warn("Could not fetch batches from API, checking store inventory:", err.message);
+    }
+
+    // Fallback to store inventory if API batches empty
+    if (!Array.isArray(batches) || batches.length === 0) {
+      if (!store.inventory || store.inventory.length === 0) {
+        try {
+          const invRes = await fetch(`/api/inventory?branch_id=${activeBranch}`);
+          if (invRes.ok) store.inventory = await invRes.json();
+        } catch(e) {}
+      }
+      batches = (store.inventory || []).map(i => {
+        const p = (store.products || []).find(x => x.id === i.productId);
+        return {
+          id: i.id,
+          batch_id: i.batchId || `BAT-B${i.branchId || 212}-${i.productId}-${(i.productionDate || '').replace(/-/g, '')}`,
+          batch_code: i.batchId || `BAT-B${i.branchId || 212}-${i.productId}-${(i.productionDate || '').replace(/-/g, '')}`,
+          branch_id: i.branchId || 212,
+          branch_name: 'Lasang',
+          product_id: i.productId,
+          product_name: p ? p.name : i.productId,
+          category: p ? p.category : (i.category || 'Bread'),
+          unit: i.unit || (p ? p.unit : 'pcs'),
+          cost_price: p ? (p.cost || p.cost_price || 15) : 15,
+          price: p ? p.price : 25,
+          current_quantity: i.stockLevel,
+          production_date: i.productionDate,
+          production_time: i.productionTime || '06:00:00',
+          expiry_date: i.expiryDate,
+          expiry_time: i.expiryTime || '18:00:00',
+          shelf_life_days: i.shelfLifeDays || (p ? p.shelf_life_days : 2),
+          status: i.status || 'In Stock',
+          repurpose_recipe: p ? (p.repurposeRecipe || p.repurpose_recipe) : 'Bread Crumbs',
+          degradation_percent: i.degradationPercent || 20,
+          shelf_status: i.shelfStatus || 'Fresh'
+        };
+      });
+    }
+
+    // Filter batches by selected branch
+    if (activeBranch && activeBranch !== 'all') {
+      batches = batches.filter(b => b.branch_id == null || parseInt(b.branch_id) === parseInt(activeBranch));
+    }
+
+    if (!Array.isArray(batches) || batches.length === 0) {
+      setSafeHtml(container, `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+          <i data-lucide="package-search" style="width: 36px; height: 36px; color: var(--primary-color); margin-bottom: 8px;"></i>
+          <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No inventory batches found.</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">Batch records are automatically synchronized from Lasang inventory management.</p>
+        </div>
+      `);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      return;
+    }
+
+    const now = new Date();
+
+    // Evaluate Food Safety Eligibility Rules for every batch individually
+    const evaluatedBatches = batches.map(batch => {
+      const p = (store.products || []).find(x => x.id === batch.product_id || x.id === `p${batch.product_id}` || `p${x.id}` === batch.product_id);
+      const pName = batch.product_name || (p ? p.name : batch.product_id);
+      const category = (batch.category || (p ? p.category : '')).toLowerCase();
+      const recipe = batch.repurpose_recipe || (p ? (p.repurposeRecipe || p.repurpose_recipe) : null);
+      const qty = parseInt(batch.current_quantity) || 0;
+
+      // Rule 1: INSUFFICIENT DATA
+      if (!batch.expiry_date || !batch.batch_code || !batch.production_date) {
+        return {
+          ...batch,
+          product_name: pName,
+          status_category: 'INSUFFICIENT DATA',
+          eligibility_label: 'INSUFFICIENT DATA',
+          badge_style: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
+          reason: 'Missing batch traceability, production timestamp, or validated expiration date. Food safety standards require verifiable batch records.',
+          repurpose_recipe: 'N/A',
+          is_repurposable: false
+        };
+      }
+
+      const expiryTimeStr = batch.expiry_time || '18:00:00';
+      const expiryDateTime = new Date(`${batch.expiry_date.split('T')[0]}T${expiryTimeStr}`);
+      const remainingMs = expiryDateTime.getTime() - now.getTime();
+      const remainingHours = Math.round(remainingMs / (1000 * 60 * 60));
+
+      const prodDateStr = (batch.production_date ? batch.production_date.split('T')[0] : batch.expiry_date.split('T')[0]);
+      const prodDateTime = new Date(`${prodDateStr}T${batch.production_time || '06:00:00'}`);
+      const totalLifeMs = Math.max(1, expiryDateTime.getTime() - prodDateTime.getTime());
+      const degradationScore = Math.max(0, Math.min(100, Math.round(((totalLifeMs - remainingMs) / totalLifeMs) * 100)));
+
+      // Rule 2: EXPIRED / UNSAFE (Expired food must NEVER be recommended for repurposing!)
+      if (remainingMs <= 0 || batch.status === 'Expired' || batch.status === 'Spoiled' || batch.status === 'Damaged') {
+        return {
+          ...batch,
+          product_name: pName,
+          status_category: 'EXPIRED / UNSAFE',
+          eligibility_label: 'EXPIRED / UNSAFE',
+          badge_style: 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;',
+          remaining_hours: 0,
+          degradation_score: 100,
+          reason: `Product has reached the end of its validated shelf life (Expired on ${batch.expiry_date.split('T')[0]}). Repurposing expired bread is strictly prohibited under food-safety regulations. Disposal required.`,
+          repurpose_recipe: 'N/A - Disposal Required',
+          is_repurposable: false
+        };
+      }
+
+      // Rule 3: NOT ELIGIBLE - Packaged commercial beverages (Coke, etc.)
+      if (category.includes('drink') || category.includes('beverage') || pName.toLowerCase().includes('coke')) {
+        return {
+          ...batch,
+          product_name: pName,
+          status_category: 'NOT ELIGIBLE',
+          eligibility_label: 'NOT ELIGIBLE',
+          badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
+          remaining_hours: remainingHours,
+          degradation_score: degradationScore,
+          reason: 'Commercial packaged beverage. Ineligible for bakery culinary repurposing.',
+          repurpose_recipe: 'N/A',
+          is_repurposable: false
+        };
+      }
+
+      // Rule 4: NOT ELIGIBLE - Perishable cream/custard cakes requiring cold-chain
+      const isPerishableCake = (category.includes('cake') && !pName.toLowerCase().includes('chocolate')) || pName.toLowerCase().includes('cream');
+      if (isPerishableCake) {
+        return {
+          ...batch,
+          product_name: pName,
+          status_category: 'NOT ELIGIBLE',
+          eligibility_label: 'NOT ELIGIBLE',
+          badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
+          remaining_hours: remainingHours,
+          degradation_score: degradationScore,
+          reason: 'Perishable dairy cream/custard filling requires strict continuous refrigeration. Prohibited from repurposing under bakery food-safety standards.',
+          repurpose_recipe: 'N/A - Perishable Cake',
+          is_repurposable: false
+        };
+      }
+
+      // Rule 5: NOT ELIGIBLE - No approved recipe or disqualified by staff
+      if (!recipe || recipe === 'N/A' || batch.status === 'Not Eligible') {
+        return {
+          ...batch,
+          product_name: pName,
+          status_category: 'NOT ELIGIBLE',
+          eligibility_label: 'NOT ELIGIBLE',
+          badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
+          remaining_hours: remainingHours,
+          degradation_score: degradationScore,
+          reason: batch.status === 'Not Eligible' ? 'Disqualified from repurposing by authorized staff decision.' : 'No approved repurposing recipe is registered for this bakery product.',
+          repurpose_recipe: 'N/A',
+          is_repurposable: false
+        };
+      }
+
+      // Rule 6: ELIGIBLE - Safe, unexpired bakery item within permitted repurposing window
       return {
-        id: i.id,
-        batch_id: i.batchId || `BAT-B${i.branchId || 212}-${i.productId}-${(i.productionDate || '').replace(/-/g, '')}`,
-        batch_code: i.batchId || `BAT-B${i.branchId || 212}-${i.productId}-${(i.productionDate || '').replace(/-/g, '')}`,
-        branch_id: i.branchId || 212,
-        branch_name: 'Lasang',
-        product_id: i.productId,
-        product_name: p ? p.name : i.productId,
-        category: p ? p.category : (i.category || 'Bread'),
-        unit: i.unit || (p ? p.unit : 'pcs'),
-        cost_price: p ? (p.cost || p.cost_price || 15) : 15,
-        price: p ? p.price : 25,
-        current_quantity: i.stockLevel,
-        production_date: i.productionDate,
-        production_time: i.productionTime || '06:00:00',
-        expiry_date: i.expiryDate,
-        expiry_time: i.expiryTime || '18:00:00',
-        shelf_life_days: i.shelfLifeDays || (p ? p.shelf_life_days : 2),
-        status: i.status || 'In Stock',
-        repurpose_recipe: p ? (p.repurposeRecipe || p.repurpose_recipe) : 'Bread Crumbs',
-        degradation_percent: i.degradationPercent || 20,
-        shelf_status: i.shelfStatus || 'Fresh'
+        ...batch,
+        product_name: pName,
+        status_category: 'ELIGIBLE',
+        eligibility_label: 'ELIGIBLE',
+        badge_style: 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;',
+        remaining_hours: remainingHours,
+        degradation_score: degradationScore,
+        reason: `Batch is safe and within permitted use window (${remainingHours}h remaining, ${degradationScore}% freshness degradation). Approved recipe '${recipe}' available to prevent waste.`,
+        repurpose_recipe: recipe,
+        is_repurposable: true
       };
     });
-  }
 
-  // Filter batches by selected branch
-  if (activeBranch && activeBranch !== 'all') {
-    batches = batches.filter(b => parseInt(b.branch_id) === parseInt(activeBranch));
-  }
+    window._lastEvaluatedBatches = evaluatedBatches;
 
-  const now = new Date();
-
-  // Evaluate Food Safety Eligibility Rules for every batch individually
-  const evaluatedBatches = batches.map(batch => {
-    const p = (store.products || []).find(x => x.id === batch.product_id || x.id === `p${batch.product_id}` || `p${x.id}` === batch.product_id);
-    const pName = batch.product_name || (p ? p.name : batch.product_id);
-    const category = (batch.category || (p ? p.category : '')).toLowerCase();
-    const recipe = batch.repurpose_recipe || (p ? (p.repurposeRecipe || p.repurpose_recipe) : null);
-    const qty = parseInt(batch.current_quantity) || 0;
-
-    // Rule 1: INSUFFICIENT DATA
-    if (!batch.expiry_date || !batch.batch_code || !batch.production_date) {
-      return {
-        ...batch,
-        product_name: pName,
-        status_category: 'INSUFFICIENT DATA',
-        eligibility_label: 'INSUFFICIENT DATA',
-        badge_style: 'background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;',
-        reason: 'Missing batch traceability, production timestamp, or validated expiration date. Food safety standards require verifiable batch records.',
-        repurpose_recipe: 'N/A',
-        is_repurposable: false
-      };
+    // Filter based on active category filter tab
+    let filteredBatches = evaluatedBatches;
+    if (currentRepurposeFilter && currentRepurposeFilter !== 'all') {
+      filteredBatches = evaluatedBatches.filter(b => b.status_category === currentRepurposeFilter);
     }
 
-    const expiryTimeStr = batch.expiry_time || '18:00:00';
-    const expiryDateTime = new Date(`${batch.expiry_date.split('T')[0]}T${expiryTimeStr}`);
-    const remainingMs = expiryDateTime.getTime() - now.getTime();
-    const remainingHours = Math.round(remainingMs / (1000 * 60 * 60));
-
-    const prodDateStr = (batch.production_date ? batch.production_date.split('T')[0] : batch.expiry_date.split('T')[0]);
-    const prodDateTime = new Date(`${prodDateStr}T${batch.production_time || '06:00:00'}`);
-    const totalLifeMs = Math.max(1, expiryDateTime.getTime() - prodDateTime.getTime());
-    const degradationScore = Math.max(0, Math.min(100, Math.round(((totalLifeMs - remainingMs) / totalLifeMs) * 100)));
-
-    // Rule 2: EXPIRED / UNSAFE (Expired food must NEVER be recommended for repurposing!)
-    if (remainingMs <= 0 || batch.status === 'Expired' || batch.status === 'Spoiled' || batch.status === 'Damaged') {
-      return {
-        ...batch,
-        product_name: pName,
-        status_category: 'EXPIRED / UNSAFE',
-        eligibility_label: 'EXPIRED / UNSAFE',
-        badge_style: 'background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;',
-        remaining_hours: 0,
-        degradation_score: 100,
-        reason: `Product has reached the end of its validated shelf life (Expired on ${batch.expiry_date.split('T')[0]}). Repurposing expired bread is strictly prohibited under food-safety regulations. Disposal required.`,
-        repurpose_recipe: 'N/A - Disposal Required',
-        is_repurposable: false
-      };
+    if (filteredBatches.length === 0) {
+      setSafeHtml(container, `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+          <i data-lucide="shield-check" style="width: 36px; height: 36px; color: var(--color-success); margin-bottom: 8px;"></i>
+          <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No batches matching filter "${escapeHtml(currentRepurposeFilter)}".</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">All batches in Lasang branch are evaluated against live inventory and food safety standards.</p>
+        </div>
+      `);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      return;
     }
 
-    // Rule 3: NOT ELIGIBLE - Packaged commercial beverages (Coke, etc.)
-    if (category.includes('drink') || category.includes('beverage') || pName.toLowerCase().includes('coke')) {
-      return {
-        ...batch,
-        product_name: pName,
-        status_category: 'NOT ELIGIBLE',
-        eligibility_label: 'NOT ELIGIBLE',
-        badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
-        remaining_hours: remainingHours,
-        degradation_score: degradationScore,
-        reason: 'Commercial packaged beverage. Ineligible for bakery culinary repurposing.',
-        repurpose_recipe: 'N/A',
-        is_repurposable: false
-      };
-    }
+    const cardsHtml = filteredBatches.map(b => {
+      const branchName = b.branch_name || 'Lasang';
+      const expiryFormatted = b.expiry_date ? b.expiry_date.split('T')[0] : 'N/A';
+      const remainingText = b.remaining_hours !== undefined ? `${b.remaining_hours}h remaining` : 'N/A';
 
-    // Rule 4: NOT ELIGIBLE - Perishable cream/custard cakes requiring cold-chain
-    const isPerishableCake = (category.includes('cake') && !pName.toLowerCase().includes('chocolate')) || pName.toLowerCase().includes('cream');
-    if (isPerishableCake) {
-      return {
-        ...batch,
-        product_name: pName,
-        status_category: 'NOT ELIGIBLE',
-        eligibility_label: 'NOT ELIGIBLE',
-        badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
-        remaining_hours: remainingHours,
-        degradation_score: degradationScore,
-        reason: 'Perishable dairy cream/custard filling requires strict continuous refrigeration. Prohibited from repurposing under bakery food-safety standards.',
-        repurpose_recipe: 'N/A - Perishable Cake',
-        is_repurposable: false
-      };
-    }
+      return `
+        <div class="repurpose-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+              <div>
+                <strong style="font-size: 1rem; color: var(--text-primary);">${escapeHtml(b.product_name)}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">Batch: ${escapeHtml(b.batch_code || 'N/A')} &bull; ${escapeHtml(branchName)}</div>
+              </div>
+              <span class="badge" style="${b.badge_style} font-weight: 800; font-size: 0.74rem; padding: 3px 8px; border-radius: 6px;">
+                ${b.eligibility_label}
+              </span>
+            </div>
 
-    // Rule 5: NOT ELIGIBLE - No approved recipe or disqualified by staff
-    if (!recipe || recipe === 'N/A' || batch.status === 'Not Eligible') {
-      return {
-        ...batch,
-        product_name: pName,
-        status_category: 'NOT ELIGIBLE',
-        eligibility_label: 'NOT ELIGIBLE',
-        badge_style: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;',
-        remaining_hours: remainingHours,
-        degradation_score: degradationScore,
-        reason: batch.status === 'Not Eligible' ? 'Disqualified from repurposing by authorized staff decision.' : 'No approved repurposing recipe is registered for this bakery product.',
-        repurpose_recipe: 'N/A',
-        is_repurposable: false
-      };
-    }
+            <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; font-size: 0.8rem; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <span style="color: var(--text-secondary);">Current Stock:</span>
+                <strong style="color: var(--text-primary);">${b.current_quantity} ${escapeHtml(b.unit || 'pcs')}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <span style="color: var(--text-secondary);">Expiry Timestamp:</span>
+                <span>${expiryFormatted} ${escapeHtml(b.expiry_time || '')}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">Remaining Shelf Life:</span>
+                <strong style="color: ${b.remaining_hours <= 12 ? 'var(--color-error)' : 'var(--text-primary)'};">${remainingText} (${b.degradation_score || 0}% Degraded)</strong>
+              </div>
+            </div>
 
-    // Rule 6: ELIGIBLE - Safe, unexpired bakery item within permitted repurposing window
-    return {
-      ...batch,
-      product_name: pName,
-      status_category: 'ELIGIBLE',
-      eligibility_label: 'ELIGIBLE',
-      badge_style: 'background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;',
-      remaining_hours: remainingHours,
-      degradation_score: degradationScore,
-      reason: `Batch is safe and within permitted use window (${remainingHours}h remaining, ${degradationScore}% freshness degradation). Approved recipe '${recipe}' available to prevent waste.`,
-      repurpose_recipe: recipe,
-      is_repurposable: true
-    };
-  });
+            <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
+              <strong>Reason:</strong> ${escapeHtml(b.reason)}
+            </div>
 
-  window._lastEvaluatedBatches = evaluatedBatches;
+            <div style="font-size: 0.8rem; background: rgba(217, 119, 6, 0.08); border-left: 3px solid var(--primary-color); padding: 6px 8px; border-radius: 4px; margin-bottom: 4px;">
+              <strong>Approved Recipe:</strong> ${escapeHtml(b.repurpose_recipe || 'N/A')}
+            </div>
+          </div>
 
-  // Filter based on active category filter tab
-  let filteredBatches = evaluatedBatches;
-  if (currentRepurposeFilter && currentRepurposeFilter !== 'all') {
-    filteredBatches = evaluatedBatches.filter(b => b.status_category === currentRepurposeFilter);
-  }
+          <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn-secondary btn-repurpose-view-batch" data-batch="${escapeHtml(b.batch_code)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
+                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> View Batch
+              </button>
+              ${(b.repurpose_recipe && b.repurpose_recipe !== 'N/A' && !b.repurpose_recipe.includes('Disposal')) ? `
+                <button type="button" class="btn-secondary btn-repurpose-view-recipe" data-recipe="${escapeHtml(b.repurpose_recipe)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
+                  <i data-lucide="book-open" style="width: 12px; height: 12px;"></i> View Recipe
+                </button>
+              ` : ''}
+            </div>
 
-  if (filteredBatches.length === 0) {
+            ${b.is_repurposable ? `
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-primary btn-repurpose-create-prod" 
+                  data-batch="${escapeHtml(b.batch_code)}" 
+                  data-pid="${escapeHtml(b.product_id)}" 
+                  data-name="${escapeHtml(b.product_name)}" 
+                  data-qty="${b.current_quantity}" 
+                  data-unit="${escapeHtml(b.unit || 'pcs')}" 
+                  data-recipe="${escapeHtml(b.repurpose_recipe)}" 
+                  style="flex: 2; font-size: 0.78rem; padding: 6px 10px; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
+                  <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Create Repurposing Production
+                </button>
+                <button type="button" class="btn-secondary btn-repurpose-not-eligible" data-batch="${escapeHtml(b.batch_code)}" data-pid="${escapeHtml(b.product_id)}" style="flex: 1; font-size: 0.74rem; padding: 4px 6px; color: var(--color-error); border-color: #fecaca; display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+                  <i data-lucide="slash" style="width: 12px; height: 12px;"></i> Disqualify
+                </button>
+              </div>
+            ` : `
+              <button class="btn-secondary" disabled style="width: 100%; font-size: 0.76rem; padding: 5px 8px; opacity: 0.65; cursor: not-allowed; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i> Repurposing Prohibited (Food-Safety Rule)
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    setSafeHtml(container, cardsHtml);
+
+    // Attach click handlers
+    document.querySelectorAll(".btn-repurpose-view-batch").forEach(btn => {
+      btn.addEventListener("click", () => {
+        openBatchDetailsModal(btn.getAttribute("data-batch"));
+      });
+    });
+
+    document.querySelectorAll(".btn-repurpose-view-recipe").forEach(btn => {
+      btn.addEventListener("click", () => {
+        openRepurposeRecipeModal(btn.getAttribute("data-recipe"));
+      });
+    });
+
+    document.querySelectorAll(".btn-repurpose-create-prod").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const batchCode = btn.getAttribute("data-batch");
+        const pid = btn.getAttribute("data-pid");
+        const name = btn.getAttribute("data-name");
+        const qty = parseInt(btn.getAttribute("data-qty") || 0);
+        const unit = btn.getAttribute("data-unit") || 'pcs';
+        const recipe = btn.getAttribute("data-recipe");
+        openCreateRepurposingModal(batchCode, pid, name, qty, unit, recipe);
+      });
+    });
+
+    document.querySelectorAll(".btn-repurpose-not-eligible").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const batchCode = btn.getAttribute("data-batch");
+        const pid = btn.getAttribute("data-pid");
+        openMarkNotEligibleModal(batchCode, pid);
+      });
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } catch (err) {
+    console.error("renderRepurposingAlerts fatal error:", err);
     setSafeHtml(container, `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
-        <i data-lucide="shield-check" style="width: 36px; height: 36px; color: var(--color-success); margin-bottom: 8px;"></i>
-        <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No batches matching filter "${escapeHtml(currentRepurposeFilter)}".</h4>
-        <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">All batches in Lasang branch are evaluated against live inventory and food safety standards.</p>
+      <div style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+        <i data-lucide="alert-circle" style="width: 28px; height: 28px; color: var(--primary-color); margin-bottom: 6px;"></i>
+        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary);">Unable to display repurposing recommendations right now.</div>
+        <div style="font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">Please click "Refresh Batches" to reload live inventory records.</div>
       </div>
     `);
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    return;
   }
-
-  const cardsHtml = filteredBatches.map(b => {
-    const branchName = b.branch_name || 'Lasang';
-    const expiryFormatted = b.expiry_date ? b.expiry_date.split('T')[0] : 'N/A';
-    const remainingText = b.remaining_hours !== undefined ? `${b.remaining_hours}h remaining` : 'N/A';
-
-    return `
-      <div class="repurpose-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
-        <div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
-            <div>
-              <strong style="font-size: 1rem; color: var(--text-primary);">${escapeHtml(b.product_name)}</strong>
-              <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">Batch: ${escapeHtml(b.batch_code || 'N/A')} &bull; ${escapeHtml(branchName)}</div>
-            </div>
-            <span class="badge" style="${b.badge_style} font-weight: 800; font-size: 0.74rem; padding: 3px 8px; border-radius: 6px;">
-              ${b.eligibility_label}
-            </span>
-          </div>
-
-          <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; font-size: 0.8rem; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-              <span style="color: var(--text-secondary);">Current Stock:</span>
-              <strong style="color: var(--text-primary);">${b.current_quantity} ${escapeHtml(b.unit || 'pcs')}</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-              <span style="color: var(--text-secondary);">Expiry Timestamp:</span>
-              <span>${expiryFormatted} ${escapeHtml(b.expiry_time || '')}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary);">Remaining Shelf Life:</span>
-              <strong style="color: ${b.remaining_hours <= 12 ? 'var(--color-error)' : 'var(--text-primary)'};">${remainingText} (${b.degradation_score || 0}% Degraded)</strong>
-            </div>
-          </div>
-
-          <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
-            <strong>Reason:</strong> ${escapeHtml(b.reason)}
-          </div>
-
-          <div style="font-size: 0.8rem; background: rgba(217, 119, 6, 0.08); border-left: 3px solid var(--primary-color); padding: 6px 8px; border-radius: 4px; margin-bottom: 4px;">
-            <strong>Approved Recipe:</strong> ${escapeHtml(b.repurpose_recipe || 'N/A')}
-          </div>
-        </div>
-
-        <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="btn-secondary btn-repurpose-view-batch" data-batch="${escapeHtml(b.batch_code)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-              <i data-lucide="layers" style="width: 12px; height: 12px;"></i> View Batch
-            </button>
-            ${(b.repurpose_recipe && b.repurpose_recipe !== 'N/A' && !b.repurpose_recipe.includes('Disposal')) ? `
-              <button type="button" class="btn-secondary btn-repurpose-view-recipe" data-recipe="${escapeHtml(b.repurpose_recipe)}" style="flex: 1; font-size: 0.76rem; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-                <i data-lucide="book-open" style="width: 12px; height: 12px;"></i> View Recipe
-              </button>
-            ` : ''}
-          </div>
-
-          ${b.is_repurposable ? `
-            <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn-primary btn-repurpose-create-prod" 
-                data-batch="${escapeHtml(b.batch_code)}" 
-                data-pid="${escapeHtml(b.product_id)}" 
-                data-name="${escapeHtml(b.product_name)}" 
-                data-qty="${b.current_quantity}" 
-                data-unit="${escapeHtml(b.unit || 'pcs')}" 
-                data-recipe="${escapeHtml(b.repurpose_recipe)}" 
-                style="flex: 2; font-size: 0.78rem; padding: 6px 10px; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;">
-                <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Create Repurposing Production
-              </button>
-              <button type="button" class="btn-secondary btn-repurpose-not-eligible" data-batch="${escapeHtml(b.batch_code)}" data-pid="${escapeHtml(b.product_id)}" style="flex: 1; font-size: 0.74rem; padding: 4px 6px; color: var(--color-error); border-color: #fecaca; display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
-                <i data-lucide="slash" style="width: 12px; height: 12px;"></i> Disqualify
-              </button>
-            </div>
-          ` : `
-            <button class="btn-secondary" disabled style="width: 100%; font-size: 0.76rem; padding: 5px 8px; opacity: 0.65; cursor: not-allowed; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-              <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i> Repurposing Prohibited (Food-Safety Rule)
-            </button>
-          `}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  setSafeHtml(container, cardsHtml);
-
-  // Attach click handlers
-  document.querySelectorAll(".btn-repurpose-view-batch").forEach(btn => {
-    btn.addEventListener("click", () => {
-      openBatchDetailsModal(btn.getAttribute("data-batch"));
-    });
-  });
-
-  document.querySelectorAll(".btn-repurpose-view-recipe").forEach(btn => {
-    btn.addEventListener("click", () => {
-      openRepurposeRecipeModal(btn.getAttribute("data-recipe"));
-    });
-  });
-
-  document.querySelectorAll(".btn-repurpose-create-prod").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const batchCode = btn.getAttribute("data-batch");
-      const pid = btn.getAttribute("data-pid");
-      const name = btn.getAttribute("data-name");
-      const qty = parseInt(btn.getAttribute("data-qty") || 0);
-      const unit = btn.getAttribute("data-unit") || 'pcs';
-      const recipe = btn.getAttribute("data-recipe");
-      openCreateRepurposingModal(batchCode, pid, name, qty, unit, recipe);
-    });
-  });
-
-  document.querySelectorAll(".btn-repurpose-not-eligible").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const batchCode = btn.getAttribute("data-batch");
-      const pid = btn.getAttribute("data-pid");
-      openMarkNotEligibleModal(batchCode, pid);
-    });
-  });
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // --------------------------------------------------------------------
