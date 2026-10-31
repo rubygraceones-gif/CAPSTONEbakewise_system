@@ -3136,11 +3136,13 @@ body.dark-mode .dashboard-ai-insight {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   position: relative;
   box-sizing: border-box;
@@ -3149,6 +3151,10 @@ body.dark-mode .dashboard-ai-insight {
 .pos-product-card:hover:not(.disabled-card) {
   border-color: var(--primary-color);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pos-product-card:active:not(.disabled-card) {
+  border-color: var(--primary-color);
 }
 
 .pos-product-card.disabled-card {
@@ -3163,14 +3169,18 @@ body.dark-mode .dashboard-ai-insight {
   cursor: not-allowed !important;
 }
 
-.pos-product-card.disabled-card .pos-product-add-btn,
-.pos-product-card.disabled-card:hover .pos-product-add-btn {
-  pointer-events: none !important;
-  cursor: not-allowed !important;
-  background-color: var(--border-color) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-muted) !important;
-  opacity: 0.6 !important;
+.pos-card-cart-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: var(--primary-light, #fef3c7);
+  color: var(--primary-color, #d97706);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  pointer-events: none;
 }
 
 .pos-product-icon {

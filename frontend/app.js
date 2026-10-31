@@ -3532,32 +3532,34 @@ function updateProductCardCartState(productId) {
     return cStr === pStr || cStr === altStr;
   });
   const inCartQty = cartItem ? cartItem.qty : 0;
-  const remainingStock = Math.max(0, stockAvailable - inCartQty);
   const isOutOfStock = stockAvailable <= 0;
-  const isMaxInCart = remainingStock <= 0;
-
-  const btn = card.querySelector('.pos-product-add-btn');
-  if (btn) {
-    btn.disabled = isOutOfStock || isMaxInCart;
-    const labelSpan = btn.querySelector('span');
-    const labelText = isOutOfStock
-      ? 'Out of Stock (0)'
-      : (isMaxInCart ? `All in Cart (${inCartQty})` : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'));
-    if (labelSpan) {
-      labelSpan.textContent = labelText;
-    } else {
-      btn.textContent = labelText;
-    }
-  }
 
   if (isOutOfStock) {
     card.classList.add('disabled-card');
     card.style.opacity = '0.55';
     card.style.cursor = 'not-allowed';
+    card.setAttribute('title', 'Out of Stock');
   } else {
     card.classList.remove('disabled-card');
     card.style.opacity = '';
     card.style.cursor = 'pointer';
+    card.setAttribute('title', 'Click to add to cart');
+  }
+
+  // Update in-cart quantity indicator badge
+  let badgeEl = card.querySelector('.pos-card-cart-pill');
+  if (inCartQty > 0) {
+    if (!badgeEl) {
+      const catRow = card.querySelector('.pos-product-header-row');
+      if (catRow) {
+        badgeEl = document.createElement('span');
+        badgeEl.className = 'pos-card-cart-pill';
+        catRow.appendChild(badgeEl);
+      }
+    }
+    if (badgeEl) badgeEl.textContent = `${inCartQty} in cart`;
+  } else if (badgeEl) {
+    badgeEl.remove();
   }
 }
 window.updateProductCardCartState = updateProductCardCartState;
@@ -3598,9 +3600,7 @@ function renderPosProducts() {
       return cStr === pStr || cStr === altStr;
     });
     const inCartQty = cartItem ? cartItem.qty : 0;
-    const remainingStock = Math.max(0, stockAvailable - inCartQty);
     const isOutOfStock = stockAvailable <= 0;
-    const isMaxInCart = remainingStock <= 0;
 
     let stockBadgeClass = "in-stock";
     let stockLabel = `In Stock: ${stockAvailable}${scopeLabelStr}`;
@@ -3612,25 +3612,24 @@ function renderPosProducts() {
       stockLabel = `Low Stock: ${stockAvailable}${scopeLabelStr}`;
     }
 
-    const btnDisabled = isOutOfStock || isMaxInCart;
-    const btnLabel = isOutOfStock
-      ? 'Out of Stock (0)'
-      : (isMaxInCart ? `All in Cart (${inCartQty})` : (inCartQty > 0 ? `Add (${inCartQty} in cart)` : 'Add to Cart'));
+    const inCartBadge = inCartQty > 0
+      ? `<span class="pos-card-cart-pill">${inCartQty} in cart</span>`
+      : '';
 
     return `
-      <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${isOutOfStock ? 'style="opacity: 0.55; cursor: not-allowed;"' : 'style="cursor: pointer;"'}>
+      <div class="pos-product-card ${isOutOfStock ? 'disabled-card' : ''}" data-product-id="${p.id}" ${isOutOfStock ? 'style="opacity: 0.55; cursor: not-allowed;" title="Out of Stock"' : 'style="cursor: pointer;" title="Click to add to cart"'}>
         <div class="pos-product-info">
-          <span class="pos-product-category">${p.category || 'BAKERY'}</span>
-          <h4>${p.name}</h4>
+          <div class="pos-product-header-row" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+            <span class="pos-product-category">${p.category || 'BAKERY'}</span>
+            ${inCartBadge}
+          </div>
+          <h4 style="margin: 6px 0 0 0;">${p.name}</h4>
         </div>
-        <div>
-          <div class="pos-product-price">₱${parseFloat(p.price).toFixed(2)}</div>
+        <div style="margin-top: 14px;">
+          <div class="pos-product-price" style="margin: 0 0 4px 0;">₱${parseFloat(p.price).toFixed(2)}</div>
           <div class="pos-product-stock ${stockBadgeClass}">
             <span>${stockLabel}</span>
           </div>
-          <button type="button" class="pos-product-add-btn" data-product-id="${p.id}" ${btnDisabled ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>
-            <span>${btnLabel}</span>
-          </button>
         </div>
       </div>
     `;
@@ -4590,20 +4589,15 @@ function setupPOSModule() {
     searchInput.addEventListener("input", renderPosProducts);
   }
 
-  // Event delegation on product grid with anti-jitter debounce
+  // Event delegation on product grid: 1-click adds product directly to cart
   const gridContainer = document.getElementById("pos-products-grid");
-  let lastAddToCartTime = 0;
   if (gridContainer) {
     gridContainer.addEventListener("click", (e) => {
       const card = e.target.closest(".pos-product-card");
-      if (!card || card.classList.contains("disabled-card")) return;
-
-      const now = Date.now();
-      if (now - lastAddToCartTime < 180) return; // Prevent double/rapid-click bouncing
+      if (!card) return;
 
       const productId = card.getAttribute("data-product-id");
       if (productId) {
-        lastAddToCartTime = now;
         addToPosCart(productId);
       }
     });
