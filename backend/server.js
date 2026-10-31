@@ -1236,8 +1236,26 @@ app.post('/api/users', async (req, res) => {
   }
   try {
     const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = (role || '').trim().toLowerCase();
+
+    // Strict branch assignment enforcement:
+    // System Administrators have global access and branch_id is strictly NULL
+    // Non-administrator staff accounts require a valid existing branch assignment
+    let bId = null;
+    if (cleanRole === 'admin') {
+      bId = null;
+    } else {
+      if (!branch_id || branch_id === 'all' || isNaN(parseInt(branch_id))) {
+        return res.status(400).json({ error: 'Assigned bakeshop branch is required for staff accounts.' });
+      }
+      bId = parseInt(branch_id);
+      const branchCheck = await queryDb("SELECT id FROM bw_branches WHERE id = $1", [bId]);
+      if (!branchCheck.rows || branchCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid branch ID specified. Please select an existing branch.' });
+      }
+    }
+
     const hashedPassword = bcrypt.hashSync(password.trim(), 10);
-    const bId = (role === 'admin' || !branch_id) ? null : parseInt(branch_id);
     const result = await queryDb(
       "INSERT INTO bw_users (name, email, password, role, branch_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, branch_id",
       [name.trim(), cleanEmail, hashedPassword, role, bId]
@@ -1256,9 +1274,37 @@ app.put('/api/users/:id', async (req, res) => {
   let { name, email, password, role, branch_id } = req.body;
   try {
     const cleanEmail = (email || '').trim().toLowerCase();
-    const bId = (role === 'admin' || !branch_id) ? null : parseInt(branch_id);
+    const cleanRole = (role || '').trim().toLowerCase();
+
+    // Check if target user exists and whether protected primary admin
+    const target = await queryDb("SELECT id, email, role, name FROM bw_users WHERE id = $1", [parseInt(id)]);
+    if (!target.rows || target.rows.length === 0) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+    const existingUser = target.rows[0];
+    if (existingUser.email === 'admin@bakewise.com' && cleanRole !== 'admin') {
+      return res.status(403).json({ error: 'The primary System Administrator role cannot be changed.' });
+    }
+
+    // Strict branch assignment enforcement:
+    // System Administrators have global access and branch_id is strictly NULL
+    // Non-administrator staff accounts require a valid existing branch assignment
+    let bId = null;
+    if (cleanRole === 'admin') {
+      bId = null;
+    } else {
+      if (!branch_id || branch_id === 'all' || isNaN(parseInt(branch_id))) {
+        return res.status(400).json({ error: 'Assigned bakeshop branch is required for staff accounts.' });
+      }
+      bId = parseInt(branch_id);
+      const branchCheck = await queryDb("SELECT id FROM bw_branches WHERE id = $1", [bId]);
+      if (!branchCheck.rows || branchCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid branch ID specified. Please select an existing branch.' });
+      }
+    }
+
     let query = "UPDATE bw_users SET name = $1, email = $2, role = $3, branch_id = $4";
-    let params = [name ? name.trim() : '', cleanEmail, role, bId];
+    let params = [name ? name.trim() : existingUser.name, cleanEmail || existingUser.email, role, bId];
     if (password && password.trim() !== "") {
       const hashedPassword = bcrypt.hashSync(password.trim(), 10);
       query += ", password = $5 WHERE id = $6";
@@ -1271,7 +1317,7 @@ app.put('/api/users/:id', async (req, res) => {
     }
     await queryDb(query, params);
     clearApiCache();
-    res.json({ success: true, id, name, email: cleanEmail, role, branch_id: bId });
+    res.json({ success: true, id: parseInt(id), name: params[0], email: cleanEmail || existingUser.email, role, branch_id: bId });
   } catch (err) {
     console.error("[USER UPDATE ERROR]", err);
     res.status(500).json({ error: err.message });

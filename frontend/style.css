@@ -3907,9 +3907,30 @@ body.dark-mode .dashboard-ai-insight {
 }
 /* Disabled form group styling */
 .disabled-field-group {
-  opacity: 0.55 !important;
-  pointer-events: none !important;
+  position: relative;
 }
-.disabled-field-group label {
-  color: var(--text-muted, #9ca3af) !important;
+.disabled-field-group .combobox-trigger,
+.disabled-field-group .form-input:disabled {
+  opacity: 0.65 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+.disabled-field-group .combobox-icon,
+.disabled-field-group .input-icon {
+  color: var(--text-secondary) !important;
+  opacity: 0.7;
+}
+.disabled-field-group .form-label {
+  color: var(--text-secondary) !important;
+}
+.form-helper-text {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  line-height: 1.35;
+  font-weight: 500;
 }

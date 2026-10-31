@@ -1711,6 +1711,7 @@ class SearchableCombobox {
   }
 
   toggleDropdown() {
+    if (this.disabled) return;
     const isOpen = this.wrapper.classList.contains('open');
     if (isOpen) {
       this.closeDropdown();
@@ -1881,11 +1882,15 @@ class SearchableCombobox {
       this.trigger.disabled = this.disabled;
       if (this.disabled) {
         this.trigger.classList.add('disabled');
-        this.trigger.style.opacity = '0.55';
+        this.trigger.style.opacity = '0.65';
         this.trigger.style.cursor = 'not-allowed';
         this.trigger.style.pointerEvents = 'none';
         this.trigger.style.backgroundColor = 'var(--bg-secondary, #f1f5f9)';
-        if (this.wrapper) this.wrapper.classList.remove('open');
+        this.trigger.style.color = 'var(--text-secondary, #8c827a)';
+        if (this.wrapper) {
+          this.wrapper.classList.remove('open');
+          this.wrapper.classList.add('disabled');
+        }
         if (this.dropdown) this.dropdown.style.display = 'none';
         if (customLabel) {
           const label = this.trigger.querySelector('.combobox-label');
@@ -1897,6 +1902,8 @@ class SearchableCombobox {
         this.trigger.style.cursor = 'pointer';
         this.trigger.style.pointerEvents = 'auto';
         this.trigger.style.backgroundColor = '';
+        this.trigger.style.color = '';
+        if (this.wrapper) this.wrapper.classList.remove('disabled');
         this.updateTriggerText();
       }
     }
@@ -1904,6 +1911,8 @@ class SearchableCombobox {
       this.hiddenInput.disabled = this.disabled;
       if (this.disabled) {
         this.hiddenInput.removeAttribute('required');
+      } else {
+        this.hiddenInput.setAttribute('required', 'required');
       }
     }
   }
@@ -1933,31 +1942,49 @@ window.SearchableBranchCombobox = SearchableCombobox;
 
 
 function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
-  const isSysAdmin = roleVal === 'admin';
+  const isSysAdmin = (roleVal || '').trim().toLowerCase() === 'admin';
   const branchCb = window.customComboboxes ? window.customComboboxes[branchComboboxId] : null;
   const branchEl = document.getElementById(branchSelectId);
+  const helperEl = document.getElementById(`${branchSelectId}-helper`);
   const branchGroup = branchEl ? (branchEl.closest('.form-group') || branchEl.parentElement) : null;
 
   if (isSysAdmin) {
     if (branchCb) {
-      branchCb.setDisabled(true, 'Disabled (System Administrator has Global Access)');
-      branchCb.selectValue('');
+      branchCb.setDisabled(true, 'Global Access (No Branch Required)');
+      branchCb.selectedValue = '';
+      if (branchCb.hiddenInput) {
+        branchCb.hiddenInput.value = '';
+        branchCb.hiddenInput.disabled = true;
+        branchCb.hiddenInput.removeAttribute('required');
+      }
+      branchCb.updateTriggerText();
+      branchCb.updateOptionHighlights();
     }
     if (branchEl) {
+      branchEl.value = '';
       branchEl.disabled = true;
       branchEl.required = false;
-      branchEl.value = '';
+    }
+    if (helperEl) {
+      helperEl.style.display = 'block';
     }
     if (branchGroup) {
       branchGroup.classList.add('disabled-field-group');
-      branchGroup.style.opacity = '0.55';
-      branchGroup.style.pointerEvents = 'none';
     }
   } else {
     if (branchCb) {
       branchCb.setDisabled(false);
-      if (!branchCb.selectedValue && store.branches && store.branches.length > 0) {
-        branchCb.selectValue(String(store.branches[0].id));
+      if (branchCb.hiddenInput) {
+        branchCb.hiddenInput.disabled = false;
+        branchCb.hiddenInput.setAttribute('required', 'required');
+      }
+      if (!branchCb.selectedValue || branchCb.selectedValue === '') {
+        const availableBranches = store.branches || [];
+        if (availableBranches.length > 0) {
+          branchCb.selectValue(String(availableBranches[0].id));
+        }
+      } else {
+        branchCb.updateTriggerText();
       }
     }
     if (branchEl) {
@@ -1967,10 +1994,11 @@ function syncRoleBranchField(roleVal, branchComboboxId, branchSelectId) {
         branchEl.value = store.branches[0].id;
       }
     }
+    if (helperEl) {
+      helperEl.style.display = 'none';
+    }
     if (branchGroup) {
       branchGroup.classList.remove('disabled-field-group');
-      branchGroup.style.opacity = '1';
-      branchGroup.style.pointerEvents = 'auto';
     }
   }
 }
@@ -2081,6 +2109,23 @@ function populateSelectDropdowns() {
     items: userRoleItems,
     onChange: (val) => syncRoleBranchField(val, "edit-usr-branch", "edit-usr-branch")
   });
+
+  const nativeEditUsrRoleSelect = document.getElementById("edit-usr-role");
+  if (nativeEditUsrRoleSelect && !nativeEditUsrRoleSelect.dataset.syncBound) {
+    nativeEditUsrRoleSelect.dataset.syncBound = "true";
+    nativeEditUsrRoleSelect.addEventListener("change", (e) => {
+      syncRoleBranchField(e.target.value, "edit-usr-branch", "edit-usr-branch");
+    });
+  }
+
+  // Initial synchronization for user creation and edit dropdowns
+  const activeCreateRole = (window.customComboboxes && window.customComboboxes["usr-role-select"] ? window.customComboboxes["usr-role-select"].selectedValue : null) || document.getElementById("usr-role-select")?.value || "admin";
+  syncRoleBranchField(activeCreateRole, "usr-branch-select", "usr-branch-select");
+
+  const activeEditRole = (window.customComboboxes && window.customComboboxes["edit-usr-role"] ? window.customComboboxes["edit-usr-role"].selectedValue : null) || document.getElementById("edit-usr-role")?.value;
+  if (activeEditRole) {
+    syncRoleBranchField(activeEditRole, "edit-usr-branch", "edit-usr-branch");
+  }
 
   initCombobox("waste-reason-select", {
     icon: "alert-triangle",
@@ -2209,12 +2254,8 @@ function setupFormSubmissions() {
           userForm.reset();
           if (usrPassController) usrPassController.setVisibility(false);
           const usrRoleCb = window.customComboboxes ? window.customComboboxes["usr-role-select"] : null;
-          if (usrRoleCb) usrRoleCb.selectValue("");
-          const usrBranchCb = window.customComboboxes ? window.customComboboxes["usr-branch-select"] : null;
-          if (usrBranchCb) {
-            usrBranchCb.setDisabled(false);
-            if (store.branches && store.branches[0]) usrBranchCb.selectValue(String(store.branches[0].id));
-          }
+          if (usrRoleCb) usrRoleCb.selectValue("admin");
+          syncRoleBranchField("admin", "usr-branch-select", "usr-branch-select");
           refreshAdminUsersPane();
         }
       } catch (err) {
@@ -5046,6 +5087,10 @@ async function refreshAdminUsersPane() {
   const tbody = document.getElementById("admin-users-tbody");
   if (!tbody) return;
 
+  // Re-sync Create Staff Account role & branch state on refresh
+  const activeCreateRole = (window.customComboboxes && window.customComboboxes["usr-role-select"] ? window.customComboboxes["usr-role-select"].selectedValue : null) || document.getElementById("usr-role-select")?.value || "admin";
+  syncRoleBranchField(activeCreateRole, "usr-branch-select", "usr-branch-select");
+
   if (store.isBackendOnline) {
     try {
       const res = await fetch('/api/users');
@@ -5190,29 +5235,12 @@ async function refreshAdminUsersPane() {
         }
 
         const editBranchCb = window.customComboboxes ? window.customComboboxes["edit-usr-branch"] : null;
-        if (user.role === 'admin') {
-          if (editBranchCb) {
-            editBranchCb.setDisabled(true, 'All Branches (Global Admin)');
-            editBranchCb.selectValue('');
-          } else {
-            const bSelect = document.getElementById("edit-usr-branch");
-            if (bSelect) {
-              bSelect.value = '';
-              bSelect.disabled = true;
-            }
-          }
-        } else {
-          if (editBranchCb) {
-            editBranchCb.setDisabled(false);
-            editBranchCb.selectValue(String(user.branch_id || (store.branches[0] ? store.branches[0].id : '')));
-          } else {
-            const bSelect = document.getElementById("edit-usr-branch");
-            if (bSelect) {
-              bSelect.disabled = false;
-              bSelect.value = user.branch_id || (store.branches[0] ? store.branches[0].id : '');
-            }
-          }
+        if (user.role !== 'admin' && user.branch_id) {
+          if (editBranchCb) editBranchCb.selectValue(String(user.branch_id));
+          const editBranchEl = document.getElementById("edit-usr-branch");
+          if (editBranchEl) editBranchEl.value = String(user.branch_id);
         }
+        syncRoleBranchField(user.role, "edit-usr-branch", "edit-usr-branch");
 
         document.getElementById("user-edit-modal").style.display = "block";
         document.getElementById("modal-overlay").classList.add("visible");
