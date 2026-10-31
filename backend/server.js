@@ -2619,8 +2619,8 @@ app.post('/api/repurpose', async (req, res) => {
     ).catch(e => console.warn("production repurpose notice:", e.message));
 
     // Calculate prevented waste savings value
-    const prodPriceRes = await queryDb("SELECT cost_price, price FROM bw_products WHERE id = $1 LIMIT 1", [String(product_id)]).catch(() => ({ rows: [] }));
-    const unitCost = prodPriceRes.rows && prodPriceRes.rows[0] ? parseFloat(prodPriceRes.rows[0].cost_price || 0) : 15;
+    const prodPriceRes = await queryDb("SELECT cost, price FROM bw_products WHERE id = $1 LIMIT 1", [String(product_id)]).catch(() => ({ rows: [] }));
+    const unitCost = prodPriceRes.rows && prodPriceRes.rows[0] ? parseFloat(prodPriceRes.rows[0].cost || 0) : 15;
     const wastePreventedCost = parseFloat((qtyNum * unitCost).toFixed(2));
 
     const createdLog = (logRes.rows && logRes.rows[0]) ? logRes.rows[0] : {
@@ -2704,7 +2704,8 @@ app.get('/api/inventory/batches', async (req, res) => {
         COALESCE(p.category, 'Bread') as category,
         COALESCE(p.unit, 'pcs') as unit,
         COALESCE(p.repurpose_recipe, 'Bread Crumbs') as repurpose_recipe,
-        p.cost_price,
+        COALESCE(p.cost, 15) as cost_price,
+        p.cost,
         p.price,
         i.stock_level as current_quantity,
         i.stock_level,
