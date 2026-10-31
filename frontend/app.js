@@ -5497,8 +5497,22 @@ function refreshInventoryPane() {
     if (searchVal && !pName.includes(searchVal)) return false;
     if (categoryVal !== 'all' && pCat !== categoryVal.toUpperCase()) return false;
     
-    const prodStr = item.productionDate ? String(item.productionDate).split('T')[0] : '';
-    const expStr = item.expiryDate ? String(item.expiryDate).split('T')[0] : '';
+    const getCleanDate = (val) => {
+      if (!val) return '';
+      const s = String(val).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+      return s;
+    };
+    const prodStr = getCleanDate(item.productionDate);
+    const expStr = getCleanDate(item.expiryDate);
     if (dateVal && prodStr !== dateVal && !prodStr.startsWith(dateVal)) return false;
     if (expiryVal && expStr !== expiryVal && !expStr.startsWith(expiryVal)) return false;
 

@@ -198,7 +198,8 @@ async function setupDatabaseConnection() {
         uri: connUrl,
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
+        queueLimit: 0,
+        dateStrings: true
       });
       await mysqlPool.query("SELECT 1");
       activeDbDriver = 'mysql';
@@ -251,7 +252,8 @@ async function setupDatabaseConnection() {
         database: mysqlDatabase,
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
+        queueLimit: 0,
+        dateStrings: true
       });
 
       await mysqlPool.query("SELECT 1");
@@ -2325,10 +2327,31 @@ app.get('/api/inventory', async (req, res) => {
     query += " ORDER BY b.name ASC, p.name ASC, i.id ASC";
     const result = await queryDb(query, params);
 
+    const toCleanDateStr = (val) => {
+      if (!val) return '';
+      if (val instanceof Date) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      const s = String(val).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+      const parsed = new Date(s);
+      if (!isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      return s;
+    };
+
     // Compute dynamic freshness degradation % and shelf status
     const enrichedRows = (result.rows || []).map(row => {
-      const prodDateStr = row.production_date ? String(row.production_date).split('T')[0] : '2026-10-14';
-      const expDateStr = row.expiry_date ? String(row.expiry_date).split('T')[0] : '2026-10-16';
+      const prodDateStr = toCleanDateStr(row.production_date) || '2026-10-14';
+      const expDateStr = toCleanDateStr(row.expiry_date) || '2026-10-16';
       const prodTime = new Date(`${prodDateStr}T${row.production_time || '00:00:00'}`).getTime();
       const expTime = new Date(`${expDateStr}T${row.expiry_time || '23:59:59'}`).getTime();
       const now = Date.now();
