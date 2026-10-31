@@ -973,20 +973,51 @@ async function initializePgSchema() {
 // Auto-heal orphaned branch IDs pointing to deleted branches and synchronize financial totals
 async function healOrphanedBranchRecords() {
   try {
-    const brRes = await queryDb("SELECT id FROM bw_branches ORDER BY id ASC LIMIT 1");
-    if (!brRes || !brRes.rows || brRes.rows.length === 0) return;
-    const fallbackBranchId = brRes.rows[0].id;
+    // 0. Ensure EXACTLY 2 target branches exist: Lasang and Tibungco 2
+    let allBr = await queryDb("SELECT id, name FROM bw_branches");
+    let brRows = allBr.rows || [];
+    let bLasang = brRows.find(b => b.name && b.name.toLowerCase().includes('lasang'));
+    let bTibungco = brRows.find(b => b.name && b.name.toLowerCase().includes('tibungco'));
 
-    const allBr = await queryDb("SELECT id FROM bw_branches");
-    const validBranchIds = (allBr.rows || []).map(r => r.id);
-    if (validBranchIds.length === 0) return;
+    if (!bLasang) {
+      try {
+        await queryDb(
+          "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          ['Lasang', 14.5995, 120.984, 'Daang Maharlika Hwy, Bunawan, Davao City, Davao del Sur', '5:00 AM – 10:00 PM', '09935981766', 'Active']
+        );
+      } catch (e) {}
+      const res = await queryDb("SELECT id, name FROM bw_branches WHERE name LIKE '%Lasang%' ORDER BY id DESC LIMIT 1");
+      bLasang = res.rows[0];
+    }
 
+    if (!bTibungco) {
+      try {
+        await queryDb(
+          "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          ['Tibungco 2', 130, 230, 'Along National Highway, Tibungco', '5:00 AM – 9:00 PM', '09929888211', 'Active']
+        );
+      } catch (e) {}
+      const res = await queryDb("SELECT id, name FROM bw_branches WHERE name LIKE '%Tibungco%' ORDER BY id DESC LIMIT 1");
+      bTibungco = res.rows[0];
+    }
+
+    if (!bLasang || !bTibungco) return;
+
+    const lasangId = parseInt(bLasang.id);
+    const tibungcoId = parseInt(bTibungco.id);
+    const validBranchIds = [lasangId, tibungcoId];
     const idList = validBranchIds.join(',');
 
-    await queryDb(`UPDATE bw_inventory SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
-    await queryDb(`UPDATE bw_production SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
-    await queryDb(`UPDATE bw_waste SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
-    await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [fallbackBranchId]);
+    // Delete any stray non-target branches
+    try {
+      await queryDb(`DELETE FROM bw_branches WHERE id NOT IN (${idList})`);
+    } catch (e) { console.warn("Notice: stray branch cleanup:", e.message); }
+
+    // Reassign any orphaned records with invalid branch_id to Lasang as default
+    await queryDb(`UPDATE bw_inventory SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
+    await queryDb(`UPDATE bw_production SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
+    await queryDb(`UPDATE bw_waste SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
+    await queryDb(`UPDATE bw_sales SET branch_id = $1 WHERE branch_id IS NULL OR branch_id NOT IN (${idList})`, [lasangId]);
 
     // 1. Clean up stray POS transactions and movements from non-existent branches (e.g. branch 1)
     try {
@@ -1037,6 +1068,19 @@ async function healOrphanedBranchRecords() {
         WHERE transaction_number LIKE '%-%'
       `);
     } catch (e) { console.warn("Notice: pos timestamp update:", e.message); }
+
+    // 7. Auto-seed Tibungco 2 & Lasang if missing completed transaction target (15,500 total, 7,750 per branch)
+    try {
+      const countRes = await queryDb(
+        "SELECT COUNT(*) as count FROM bw_pos_transactions WHERE branch_id IN ($1, $2) AND date >= '2026-10-14' AND date <= '2026-11-13'",
+        [lasangId, tibungcoId]
+      );
+      const totalCount = parseInt(countRes.rows[0]?.count || 0);
+      if (totalCount < 15000) {
+        console.log(`[DATA HEALING] POS transactions count (${totalCount}) is below target 15,500. Seeding demo transactions now...`);
+        runAutoSeeder(queryDb, true).catch(err => console.error("Auto-seeder run error:", err.message));
+      }
+    } catch (e) { console.warn("Notice: transaction count verification:", e.message); }
   } catch (err) {
     console.warn("Notice: branch record alignment:", err.message);
   }

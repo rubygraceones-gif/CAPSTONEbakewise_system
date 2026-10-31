@@ -58,18 +58,24 @@ async function runAutoSeeder(queryDb, force = false) {
   let bTibungco = branchRows.find(b => b.name && b.name.toLowerCase().includes('tibungco'));
 
   if (!bLasang) {
-    const ins = await queryDb(
-      "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      ['Lasang', 14.5995, 120.984, 'Daang Maharlika Hwy, Bunawan, Davao City', '5:00 AM – 10:00 PM', '09935981766', 'Active']
-    );
-    bLasang = { id: ins.rows[0].id, name: 'Lasang' };
+    try {
+      await queryDb(
+        "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        ['Lasang', 14.5995, 120.984, 'Daang Maharlika Hwy, Bunawan, Davao City, Davao del Sur', '5:00 AM – 10:00 PM', '09935981766', 'Active']
+      );
+    } catch (e) {}
+    const r = await queryDb("SELECT id, name FROM bw_branches WHERE name LIKE '%Lasang%' ORDER BY id DESC LIMIT 1");
+    bLasang = r.rows[0];
   }
   if (!bTibungco) {
-    const ins = await queryDb(
-      "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      ['Tibungco 2', 130, 230, 'Along National Highway, Tibungco', '5:00 AM – 9:00 PM', '09929888211', 'Active']
-    );
-    bTibungco = { id: ins.rows[0].id, name: 'Tibungco 2' };
+    try {
+      await queryDb(
+        "INSERT INTO bw_branches (name, latitude, longitude, address, store_hours, contact_no, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        ['Tibungco 2', 130, 230, 'Along National Highway, Tibungco', '5:00 AM – 9:00 PM', '09929888211', 'Active']
+      );
+    } catch (e) {}
+    const r = await queryDb("SELECT id, name FROM bw_branches WHERE name LIKE '%Tibungco%' ORDER BY id DESC LIMIT 1");
+    bTibungco = r.rows[0];
   }
 
   const lasangId = parseInt(bLasang.id);
