@@ -11,7 +11,7 @@
 
 const bcrypt = require('bcryptjs');
 
-const SEED_IDENTIFIER = 'ROSE_BAKEWISE_LASANG_ONLY_CATALINA_KATO_2026';
+const SEED_IDENTIFIER = 'ROSE_BAKEWISE_VARIED_TIMES_CATALINA_2026';
 
 // Generate 31 calendar dates: Oct 14 to Nov 13, 2026
 const DATES = [];

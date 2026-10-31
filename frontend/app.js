@@ -243,22 +243,30 @@ function parseLocalDate(dateStr) {
 
 function parseDateTime(dateStr) {
   if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? new Date() : dateStr;
+  if (typeof dateStr === 'number') return new Date(dateStr);
   if (typeof dateStr !== 'string') return new Date(dateStr);
 
-  if (dateStr.includes('T') || dateStr.includes(' ')) {
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) return d;
+  const clean = dateStr.trim();
+  // Match YYYY-MM-DD HH:mm:ss or YYYY-MM-DDTHH:mm:ss
+  const dtMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (dtMatch) {
+    const y = parseInt(dtMatch[1]);
+    const mo = parseInt(dtMatch[2]) - 1;
+    const d = parseInt(dtMatch[3]);
+    const h = parseInt(dtMatch[4]);
+    const mi = parseInt(dtMatch[5]);
+    const s = dtMatch[6] ? parseInt(dtMatch[6]) : 0;
+    return new Date(y, mo, d, h, mi, s);
   }
 
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const dayPart = parseInt(parts[2]);
-    if (!isNaN(dayPart)) {
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, dayPart, 5, 0, 0);
-    }
+  // Match YYYY-MM-DD date only
+  const dOnlyMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dOnlyMatch) {
+    return new Date(parseInt(dOnlyMatch[1]), parseInt(dOnlyMatch[2]) - 1, parseInt(dOnlyMatch[3]), 8, 0, 0);
   }
 
-  const d = new Date(dateStr);
+  const d = new Date(clean);
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
@@ -332,13 +340,13 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v38')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v39')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
-      localStorage.setItem('bakewise_v2_data_cleared_v38', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v39', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -4488,16 +4496,29 @@ async function handlePosCheckout() {
     }
   }
 
+  const nowObj = new Date();
+  const y = nowObj.getFullYear();
+  const m = String(nowObj.getMonth() + 1).padStart(2, '0');
+  const d = String(nowObj.getDate()).padStart(2, '0');
+  const hh = String(nowObj.getHours()).padStart(2, '0');
+  const mm = String(nowObj.getMinutes()).padStart(2, '0');
+  const ss = String(nowObj.getSeconds()).padStart(2, '0');
+  const curDateStr = `${y}-${m}-${d}`;
+  const curDateTimeStr = `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+
   const payload = {
     branch_id: effBranchId,
     cashier_id: store.currentUser ? store.currentUser.id : 1,
-    cashier_name: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato', cashier: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato',
+    cashier_name: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato',
+    cashier: (store.currentUser && store.currentUser.role === 'sales') ? store.currentUser.name : 'Catalina Kato',
     subtotal: subtotal,
     discount: discount,
     total: total,
     payment_amount: currentPosPaymentMethod === 'Cash' ? tendered : total,
     change_amount: currentPosPaymentMethod === 'Cash' ? Math.max(0, tendered - total) : 0,
     payment_method: currentPosPaymentMethod || 'Cash',
+    date: curDateStr,
+    created_at: curDateTimeStr,
     items: posCart.map(item => ({
       product_id: item.productId,
       product_name: item.name,
@@ -4943,26 +4964,13 @@ async function refreshPosHistory() {
       // Clean transaction number (strip SIM- if present)
       const cleanTxNumber = String(tx.transaction_number || '').replace(/^SIM-/, '');
 
-      // Ensure each transaction sequence has a unique, sequential realistic timestamp (05:15 AM - 08:45 PM)
-      const seqMatch = cleanTxNumber.match(/-(\d{1,3})$/);
-      if (seqMatch && txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
-        const seq = parseInt(seqMatch[1]);
-        if (seq >= 1 && seq <= 300) {
-          const totalMins = 315 + Math.floor((seq - 1) * 3.68);
-          const hour = Math.floor(totalMins / 60);
-          const minute = totalMins % 60;
-          const h12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-          const ampm = hour >= 12 ? 'PM' : 'AM';
-          const parts = txDateStr.split('-');
-          const expectedDatePrefix = `${parts[1]}/${parts[2]}/${parts[0]}`;
-          dateFormatted = `${expectedDatePrefix} ${String(h12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${ampm}`;
-        }
-      } else if (txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
+      // Preserve true date and time from database record
+      if (txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
         const parts = txDateStr.split('-');
         const expectedDatePrefix = `${parts[1]}/${parts[2]}/${parts[0]}`;
         if (!dateFormatted.startsWith(expectedDatePrefix)) {
-          const timeMatch = dateFormatted.match(/\d{1,2}:\d{2}\s*(?:AM|PM)/i);
-          dateFormatted = `${expectedDatePrefix} ${timeMatch ? timeMatch[0] : '08:00 AM'}`;
+          const timeMatch = dateFormatted.match(/\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)/i);
+          dateFormatted = `${expectedDatePrefix} ${timeMatch ? timeMatch[0] : ''}`.trim();
         }
       }
       const itemsCount = tx.items ? tx.items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0) : 0;
@@ -5032,18 +5040,12 @@ async function viewPosTransactionDetails(txId) {
     let dateVal = tx.created_at || tx.transaction_date || tx.date;
     let dateFormatted = formatDateTimeDisplay(dateVal);
     const cleanTxNumber = String(tx.transaction_number || '').replace(/^SIM-/, '');
-    const seqMatch = cleanTxNumber.match(/-(\d{1,3})$/);
-    if (seqMatch && txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
-      const seq = parseInt(seqMatch[1]);
-      if (seq >= 1 && seq <= 300) {
-        const totalMins = 315 + Math.floor((seq - 1) * 3.68);
-        const hour = Math.floor(totalMins / 60);
-        const minute = totalMins % 60;
-        const h12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const parts = txDateStr.split('-');
-        const expectedDatePrefix = `${parts[1]}/${parts[2]}/${parts[0]}`;
-        dateFormatted = `${expectedDatePrefix} ${String(h12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${ampm}`;
+    if (txDateStr && /^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) {
+      const parts = txDateStr.split('-');
+      const expectedDatePrefix = `${parts[1]}/${parts[2]}/${parts[0]}`;
+      if (!dateFormatted.startsWith(expectedDatePrefix)) {
+        const timeMatch = dateFormatted.match(/\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)/i);
+        dateFormatted = `${expectedDatePrefix} ${timeMatch ? timeMatch[0] : ''}`.trim();
       }
     }
     const branchName = tx.branch_name || (store.branches.find(b => parseInt(b.id) === parseInt(tx.branch_id))?.name) || 'Main Branch';

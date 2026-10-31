@@ -18,6 +18,33 @@ const apicache = require('apicache');
 require('dotenv').config();
 const { runAutoSeeder } = require('./auto_seeder');
 
+// Helper to get current date, time, and full timestamp in Philippine Standard Time (Asia/Manila, UTC+8)
+function getPhilippineNow() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const m = {};
+  parts.forEach(p => { m[p.type] = p.value; });
+  const dateStr = `${m.year}-${m.month}-${m.day}`;
+  const timeStr = `${m.hour}:${m.minute}:${m.second}`;
+  return {
+    date: dateStr,
+    time: timeStr,
+    datetime: `${dateStr} ${timeStr}`,
+    now
+  };
+}
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -1079,14 +1106,7 @@ async function healOrphanedBranchRecords() {
       `);
     } catch (e) { console.warn("Notice: transaction number normalization:", e.message); }
 
-    // 10. Update bw_pos_transactions timestamps to eliminate identical duplicate minute timestamps
-    try {
-      await queryDb(`
-        UPDATE bw_pos_transactions
-        SET created_at = TIMESTAMP(date, SEC_TO_TIME((315 + FLOOR((CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) - 1) * 3.68)) * 60 + MOD(CAST(SUBSTRING_INDEX(transaction_number, '-', -1) AS UNSIGNED) * 19 + 7, 60)))
-        WHERE transaction_number LIKE '%-%'
-      `);
-    } catch (e) { console.warn("Notice: pos timestamp update:", e.message); }
+    // 10. Multi-day varied timestamps preserved (no static overwrite)
 
     // 11. Verify full transaction population for Lasang (target: 7,750 total across 31 days, 250/day, Cashier: Catalina Kato)
     try {
@@ -1095,8 +1115,14 @@ async function healOrphanedBranchRecords() {
         [lasangId]
       );
       const totalCount = parseInt(countRes.rows[0]?.count || 0);
-      if (totalCount < 7500) {
-        console.log(`[DATA HEALING] POS transactions count (${totalCount}) for Lasang with Cashier Catalina Kato is below target 7,750. Seeding now...`);
+      // Check if timestamps are already varied across days (sample tx 1 on 10-14 vs 10-15)
+      const sampleTxs = await queryDb(
+        "SELECT date, created_at FROM bw_pos_transactions WHERE transaction_number LIKE '%-001' AND date IN ('2026-10-14', '2026-10-15') ORDER BY date ASC"
+      );
+      const timesDiffer = (sampleTxs.rows && sampleTxs.rows.length >= 2 && String(sampleTxs.rows[0].created_at).slice(-8) !== String(sampleTxs.rows[1].created_at).slice(-8));
+      
+      if (totalCount < 7500 || !timesDiffer) {
+        console.log(`[DATA HEALING] Reseeding with varied daily timestamps for Lasang (Cashier: Catalina Kato)...`);
         runAutoSeeder(queryDb, true).catch(err => console.error("Auto-seeder run error:", err.message));
       }
     } catch (e) { console.warn("Notice: transaction count verification:", e.message); }
@@ -1863,12 +1889,16 @@ app.get('/api/sales', async (req, res) => {
 });
 
 app.post('/api/sales', async (req, res) => {
-  const { product_id, qty, price, date, cashier, branch_id } = req.body;
+  const { product_id, qty, price, date, cashier, branch_id, created_at } = req.body;
   try {
     const bId = branch_id ? parseInt(branch_id) : 1;
+    const phNow = getPhilippineNow();
+    const saleDate = date || phNow.date;
+    const saleCreatedAt = created_at || phNow.datetime;
+    const activeCashier = cashier || 'Catalina Kato';
     const result = await queryDb(
-      "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [product_id, parseInt(qty), parseFloat(price), date, cashier, bId]
+      "INSERT INTO bw_sales (product_id, qty, price, date, cashier, branch_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      [product_id, parseInt(qty || 1), parseFloat(price || 0), saleDate, activeCashier, bId, saleCreatedAt]
     );
     clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, qty, price, date, cashier, branch_id: bId });
@@ -1988,8 +2018,10 @@ app.post('/api/pos/checkout', async (req, res) => {
   }
 
   const bId = branch_id ? parseInt(branch_id) : 1;
-  const txDate = date || new Date().toISOString().split('T')[0];
+  const phNow = getPhilippineNow();
+  const txDate = date || phNow.date;
   const activeCashier = cashier_name || cashier || 'Catalina Kato';
+  const txCreatedAt = req.body.created_at || phNow.datetime;
   const payMethod = payment_method || 'Cash';
   const numSubtotal = parseFloat(subtotal || 0);
   const numDiscount = parseFloat(discount || 0);
@@ -2051,12 +2083,11 @@ app.post('/api/pos/checkout', async (req, res) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const txNumber = `POS-${dateFormatted}-${nextSeq}-${randomSuffix}`;
 
-    // 5. INSERT POS TRANSACTION HEADER
-    const nowIso = new Date().toISOString();
+    // 5. INSERT POS TRANSACTION HEADER WITH ACCURATE PHILIPPINE DATE & TIME
     const txInsert = await queryDb(
       `INSERT INTO bw_pos_transactions 
-       (transaction_number, branch_id, cashier, subtotal, discount, total, payment_amount, change_amount, payment_method, status, date) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Completed', $10) RETURNING *`,
+       (transaction_number, branch_id, cashier, subtotal, discount, total, payment_amount, change_amount, payment_method, status, date, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Completed', $10, $11) RETURNING *`,
       [
         txNumber,
         bId,
@@ -2067,7 +2098,8 @@ app.post('/api/pos/checkout', async (req, res) => {
         numPayment,
         numChange,
         payMethod,
-        txDate
+        txDate,
+        txCreatedAt
       ]
     );
 
@@ -2084,9 +2116,9 @@ app.post('/api/pos/checkout', async (req, res) => {
       payment_method: payMethod,
       status: 'Completed',
       date: txDate,
-      created_at: nowIso
+      created_at: txCreatedAt
     };
-    if (!createdTx.created_at) createdTx.created_at = nowIso;
+    if (!createdTx.created_at) createdTx.created_at = txCreatedAt;
     createdTx.branch_name = branchName;
     const txId = createdTx.id || Date.now();
 
@@ -2527,10 +2559,12 @@ app.post('/api/inventory', async (req, res) => {
   }
 
   const qty = parseInt(stock_level);
-  const prodDate = production_date || new Date().toISOString().split('T')[0];
+  const phNow = getPhilippineNow();
+  const prodDate = production_date || phNow.date;
   const expDate = expiry_date || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const prodTime = production_time || '06:00:00';
+  const prodTime = production_time || phNow.time;
   const expTime = expiry_time || '18:00:00';
+  const invCreatedAt = phNow.datetime;
   const unitStr = unit || 'pcs';
   const performer = performed_by || (req.user ? (req.user.name || req.user.email) : 'Inventory Staff');
 
@@ -2834,12 +2868,18 @@ app.get('/api/production', async (req, res) => {
 });
 
 app.post('/api/production', async (req, res) => {
-  const { product_id, planned, actual, date, baker, status, code, branch_id } = req.body;
+  const { product_id, planned, actual, date, baker, status, code, branch_id, created_at } = req.body;
   try {
     const bId = branch_id ? parseInt(branch_id) : 1;
+    const phNow = getPhilippineNow();
+    const prodDate = date || phNow.date;
+    const prodCreatedAt = created_at || phNow.datetime;
+    const activeBaker = baker || 'Marco Reyes';
+    const activeStatus = status || 'Completed';
+    const prodCode = code || `PRD-B${bId}-${product_id}-${prodDate.replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
     const result = await queryDb(
-      "INSERT INTO bw_production (product_id, planned, actual, date, baker, status, code, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
-      [product_id, parseInt(planned), parseInt(actual), date, baker, status, code, bId]
+      "INSERT INTO bw_production (product_id, planned, actual, date, baker, status, code, branch_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+      [product_id, parseInt(planned || 0), parseInt(actual || planned || 0), prodDate, activeBaker, activeStatus, prodCode, bId, prodCreatedAt]
     );
     clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, planned, actual, date, baker, status, code, branch_id: bId });
@@ -2867,12 +2907,16 @@ app.get('/api/waste', async (req, res) => {
 });
 
 app.post('/api/waste', async (req, res) => {
-  const { product_id, qty, cost, reason, date, branch_id } = req.body;
+  const { product_id, qty, cost, reason, date, branch_id, created_at } = req.body;
   try {
     const bId = branch_id ? parseInt(branch_id) : 1;
+    const phNow = getPhilippineNow();
+    const wasteDate = date || phNow.date;
+    const wasteCreatedAt = created_at || phNow.datetime;
+    const wasteCost = parseFloat(cost || 25.00);
     const result = await queryDb(
-      "INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [product_id, parseInt(qty), parseFloat(cost), reason, date, bId]
+      "INSERT INTO bw_waste (product_id, qty, cost, reason, date, branch_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      [product_id, parseInt(qty || 1), wasteCost, reason || 'Display Scrap / Overbaked', wasteDate, bId, wasteCreatedAt]
     );
     clearApiCache();
     res.status(201).json(result.rows[0] || { product_id, qty, cost, reason, date, branch_id: bId });
