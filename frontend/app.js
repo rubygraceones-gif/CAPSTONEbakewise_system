@@ -327,30 +327,24 @@ class BakeWiseStore {
     this.save("bakewise_v2_branches", this.branches);
     this.save("bakewise_v2_users", this.users);
     if (typeof populateSelectDropdowns === 'function') populateSelectDropdowns();
-    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof refreshActiveView === 'function') refreshActiveView();
+    else if (typeof refreshDashboard === 'function') refreshDashboard();
   }
 
   async syncWithBackend() {
     this.isBackendOnline = false;
-    try {
-      const statusRes = await fetch('/api/status');
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        if (statusData.dbConnection === 'healthy') {
-          this.isBackendOnline = true;
-        }
-      }
-    } catch (e) {
-      console.log("MySQL backend is OFFLINE. Using LocalStorage fallback.");
-    }
+    const activeBranch = this.getSelectedBranchId();
+    const queryStr = (activeBranch && activeBranch !== 'all') ? `?branch_id=${activeBranch}` : '';
 
-    if (this.isBackendOnline) {
-      try {
-        // Fetch products
-        const prodRes = await fetch('/api/products');
-        if (prodRes.ok) {
-          const rawProds = await prodRes.json();
-          this.products = rawProds.map(p => ({
+    try {
+      // 1. Unified Fast Batch Sync (1 single network roundtrip instead of 8)
+      const res = await fetch(`/api/sync${queryStr}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        this.isBackendOnline = true;
+
+        if (Array.isArray(data.products)) {
+          this.products = data.products.map(p => ({
             id: p.id,
             name: p.name,
             category: p.category,
@@ -362,28 +356,18 @@ class BakeWiseStore {
           this.save("bakewise_v2_products", this.products);
         }
 
-        // Fetch branches
-        const brRes = await fetch('/api/branches');
-        if (brRes.ok) {
-          this.branches = await brRes.json();
+        if (Array.isArray(data.branches)) {
+          this.branches = data.branches;
           this.save("bakewise_v2_branches", this.branches);
         }
 
-        // Fetch users
-        const usrRes = await fetch('/api/users');
-        if (usrRes.ok) {
-          this.users = await usrRes.json();
+        if (Array.isArray(data.users)) {
+          this.users = data.users;
           this.save("bakewise_v2_users", this.users);
         }
 
-        const activeBranch = this.getSelectedBranchId();
-        let queryStr = activeBranch !== 'all' ? `?branch_id=${activeBranch}` : '';
-
-        // Fetch sales
-        const sRes = await fetch(`/api/sales${queryStr}`);
-        if (sRes.ok) {
-          const fetchedSales = await sRes.json();
-          this._sales = fetchedSales.map(s => ({
+        if (Array.isArray(data.sales)) {
+          this._sales = data.sales.map(s => ({
             id: s.id.toString(),
             productId: s.product_id,
             qty: parseInt(s.qty),
@@ -395,11 +379,8 @@ class BakeWiseStore {
           this.save("bakewise_v2_sales", this._sales);
         }
 
-        // Fetch inventory (always fetch complete multi-branch inventory for accurate POS sync)
-        const iRes = await fetch('/api/inventory');
-        if (iRes.ok) {
-          const fetchedInv = await iRes.json();
-          this._inventory = fetchedInv.map(inv => ({
+        if (Array.isArray(data.inventory)) {
+          this._inventory = data.inventory.map(inv => ({
             id: inv.id.toString(),
             productId: inv.product_id,
             stockLevel: parseInt(inv.stock_level),
@@ -410,11 +391,8 @@ class BakeWiseStore {
           this.save("bakewise_v2_inventory", this._inventory);
         }
 
-        // Fetch production
-        const pRes = await fetch(`/api/production${queryStr}`);
-        if (pRes.ok) {
-          const fetchedProd = await pRes.json();
-          this._production = fetchedProd.map(p => ({
+        if (Array.isArray(data.production)) {
+          this._production = data.production.map(p => ({
             id: p.id.toString(),
             productId: p.product_id,
             planned: parseInt(p.planned),
@@ -428,11 +406,8 @@ class BakeWiseStore {
           this.save("bakewise_v2_production", this._production);
         }
 
-        // Fetch waste
-        const wRes = await fetch(`/api/waste${queryStr}`);
-        if (wRes.ok) {
-          const fetchedWaste = await wRes.json();
-          this._waste = fetchedWaste.map(w => ({
+        if (Array.isArray(data.waste)) {
+          this._waste = data.waste.map(w => ({
             id: w.id.toString(),
             productId: w.product_id,
             qty: parseInt(w.qty),
@@ -445,9 +420,113 @@ class BakeWiseStore {
         }
 
         this.commitAll();
-      } catch (err) {
-        console.error("Error syncing data from database API:", err);
+        return true;
       }
+    } catch (e) {
+      console.warn("Unified /api/sync error, trying parallel fallback:", e.message);
+    }
+
+    // 2. Parallel Fallback (runs all fetches simultaneously with Promise.allSettled)
+    try {
+      const [statusRes, prodRes, brRes, usrRes, sRes, iRes, pRes, wRes] = await Promise.allSettled([
+        fetch('/api/status', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
+        fetch('/api/branches', { cache: 'no-store' }),
+        fetch('/api/users', { cache: 'no-store' }),
+        fetch(`/api/sales${queryStr}`, { cache: 'no-store' }),
+        fetch('/api/inventory', { cache: 'no-store' }),
+        fetch(`/api/production${queryStr}`, { cache: 'no-store' }),
+        fetch(`/api/waste${queryStr}`, { cache: 'no-store' })
+      ]);
+
+      if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+        this.isBackendOnline = true;
+      }
+
+      if (prodRes.status === 'fulfilled' && prodRes.value.ok) {
+        const rawProds = await prodRes.value.json();
+        this.products = rawProds.map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          price: parseFloat(p.price),
+          cost: parseFloat(p.cost),
+          shelfLifeDays: p.shelf_life_days,
+          repurposeRecipe: p.repurpose_recipe
+        }));
+        this.save("bakewise_v2_products", this.products);
+      }
+
+      if (brRes.status === 'fulfilled' && brRes.value.ok) {
+        this.branches = await brRes.value.json();
+        this.save("bakewise_v2_branches", this.branches);
+      }
+
+      if (usrRes.status === 'fulfilled' && usrRes.value.ok) {
+        this.users = await usrRes.value.json();
+        this.save("bakewise_v2_users", this.users);
+      }
+
+      if (sRes.status === 'fulfilled' && sRes.value.ok) {
+        const fetchedSales = await sRes.value.json();
+        this._sales = fetchedSales.map(s => ({
+          id: s.id.toString(),
+          productId: s.product_id,
+          qty: parseInt(s.qty),
+          price: parseFloat(s.price),
+          date: s.date ? s.date.split('T')[0] : getRelativeDateString(0),
+          cashier: s.cashier,
+          branchId: s.branch_id
+        }));
+        this.save("bakewise_v2_sales", this._sales);
+      }
+
+      if (iRes.status === 'fulfilled' && iRes.value.ok) {
+        const fetchedInv = await iRes.value.json();
+        this._inventory = fetchedInv.map(inv => ({
+          id: inv.id.toString(),
+          productId: inv.product_id,
+          stockLevel: parseInt(inv.stock_level),
+          productionDate: inv.production_date ? inv.production_date : (getRelativeDateString(0) + 'T05:00:00'),
+          expiryDate: inv.expiry_date ? inv.expiry_date : (getRelativeDateString(1) + 'T05:00:00'),
+          branchId: inv.branch_id
+        }));
+        this.save("bakewise_v2_inventory", this._inventory);
+      }
+
+      if (pRes.status === 'fulfilled' && pRes.value.ok) {
+        const fetchedProd = await pRes.value.json();
+        this._production = fetchedProd.map(p => ({
+          id: p.id.toString(),
+          productId: p.product_id,
+          planned: parseInt(p.planned),
+          actual: parseInt(p.actual),
+          date: p.date ? p.date.split('T')[0] : getRelativeDateString(0),
+          baker: p.baker,
+          status: p.status,
+          code: p.code,
+          branchId: p.branch_id
+        }));
+        this.save("bakewise_v2_production", this._production);
+      }
+
+      if (wRes.status === 'fulfilled' && wRes.value.ok) {
+        const fetchedWaste = await wRes.value.json();
+        this._waste = fetchedWaste.map(w => ({
+          id: w.id.toString(),
+          productId: w.product_id,
+          qty: parseInt(w.qty),
+          cost: parseFloat(w.cost),
+          reason: w.reason,
+          date: w.date ? w.date.split('T')[0] : getRelativeDateString(0),
+          branchId: w.branch_id
+        }));
+        this.save("bakewise_v2_waste", this._waste);
+      }
+
+      this.commitAll();
+    } catch (err) {
+      console.error("Parallel sync error:", err);
     }
   }
 
@@ -1186,6 +1265,66 @@ function navigateToPane(paneId) {
   else if (paneId === "pane-admin-branches") refreshAdminBranchesPane();
 }
 window.navigateToPane = navigateToPane;
+
+// --- HIGH-SPEED REAL-TIME VIEW REFRESHER & AUTO-SYNC ---
+function refreshActiveView() {
+  const activePane = document.querySelector('.view-pane.active');
+  if (!activePane) return;
+  const id = activePane.id;
+  if (id === 'pane-dashboard') {
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+  } else if (id === 'pane-sales') {
+    if (typeof refreshSalesPane === 'function') refreshSalesPane();
+  } else if (id === 'pane-inventory') {
+    if (typeof refreshInventoryPane === 'function') refreshInventoryPane();
+  } else if (id === 'pane-production') {
+    if (typeof refreshProductionPane === 'function') refreshProductionPane();
+  } else if (id === 'pane-waste') {
+    if (typeof refreshWastePane === 'function') refreshWastePane();
+  } else if (id === 'pane-ai-analytics') {
+    if (typeof refreshAIAnalyticsPane === 'function') refreshAIAnalyticsPane();
+  } else if (id === 'pane-shelf-life') {
+    if (typeof refreshShelfLifePane === 'function') refreshShelfLifePane();
+  } else if (id === 'pane-products') {
+    if (typeof refreshProductsPane === 'function') refreshProductsPane();
+  } else if (id === 'pane-reports') {
+    if (typeof refreshReportsPane === 'function') refreshReportsPane();
+  } else if (id === 'pane-admin-users') {
+    if (typeof refreshAdminUsersPane === 'function') refreshAdminUsersPane();
+  } else if (id === 'pane-admin-branches') {
+    if (typeof refreshAdminBranchesPane === 'function') refreshAdminBranchesPane();
+  } else if (id === 'pane-pos') {
+    if (typeof renderPosProducts === 'function') renderPosProducts();
+    if (typeof updatePosCartUI === 'function') updatePosCartUI();
+  }
+}
+window.refreshActiveView = refreshActiveView;
+
+let bgSyncTimer = null;
+function startRealtimeSync() {
+  if (bgSyncTimer) clearInterval(bgSyncTimer);
+  bgSyncTimer = setInterval(async () => {
+    if (store.currentUser && store.isBackendOnline && !document.hidden) {
+      await store.syncWithBackend();
+    }
+  }, 12000); // Live background sync interval
+}
+window.startRealtimeSync = startRealtimeSync;
+
+window.addEventListener('focus', async () => {
+  if (store.currentUser && store.isBackendOnline) {
+    await store.syncWithBackend();
+    refreshActiveView();
+  }
+});
+
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && store.currentUser && store.isBackendOnline) {
+    await store.syncWithBackend();
+    refreshActiveView();
+  }
+});
+
 
 // --- SESSION CHECK ---
 async function checkSessionState() {

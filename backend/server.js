@@ -47,28 +47,16 @@ app.use(cors());
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
-// High-Performance In-Memory API Cache Engine
-const cache = apicache.options({
-  statusCodes: {
-    include: [200]
-  },
-  appendKey: (req, res) => {
-    // Isolate cache by user role and authorization to prevent cross-account cache leakage
-    return req.headers['authorization'] || req.user?.role || 'public';
-  },
-  headers: {
-    'X-Cache-Provider': 'BakeWise-MemoryCache',
-    'Cache-Control': 'public, max-age=15, stale-while-revalidate=60'
-  }
-}).middleware;
+// Real-Time Dynamic API Headers: Prevent stale HTTP/CDN caching on live database data
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
 
-const clearApiCache = () => {
-  try {
-    apicache.clear();
-  } catch (e) {
-    console.warn('Cache clear notice:', e.message);
-  }
-};
+const clearApiCache = () => {};
 
 // Rate Limiters
 const loginLimiter = rateLimit({
@@ -78,8 +66,8 @@ const loginLimiter = rateLimit({
 });
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Limit each IP to 500 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 2000,
   message: { error: 'Too many requests from this IP, please try again later' }
 });
 
@@ -91,7 +79,7 @@ function authenticateToken(req, res, next) {
   if (req.method === 'OPTIONS') return next();
 
   // Allow /api/auth/login, /api/status, /api/pos, /api/inventory, /api/products, /api/branches, and /api/users without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/users')) return next();
+  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/users')) return next();
 
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -1057,8 +1045,65 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   }
 });
 
+
+// --- UNIFIED HIGH-SPEED BATCH SYNC API ---
+app.get('/api/sync', async (req, res) => {
+  const { branch_id } = req.query;
+  const bId = (branch_id && branch_id !== 'all') ? parseInt(branch_id) : null;
+
+  try {
+    const branchesPromise = queryDb("SELECT * FROM bw_branches ORDER BY id ASC");
+    const usersPromise = queryDb("SELECT id, email, name, role, branch_id FROM bw_users ORDER BY id ASC");
+    const productsPromise = queryDb("SELECT * FROM bw_products ORDER BY id ASC");
+    const inventoryPromise = queryDb("SELECT * FROM bw_inventory ORDER BY id ASC");
+
+    const salesSql = bId
+      ? "SELECT * FROM bw_sales WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
+      : "SELECT * FROM bw_sales ORDER BY date DESC, id DESC LIMIT 1000";
+    const salesParams = bId ? [bId] : [];
+    const salesPromise = queryDb(salesSql, salesParams);
+
+    const prodSql = bId
+      ? "SELECT * FROM bw_production WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
+      : "SELECT * FROM bw_production ORDER BY date DESC, id DESC LIMIT 500";
+    const prodParams = bId ? [bId] : [];
+    const prodPromise = queryDb(prodSql, prodParams);
+
+    const wasteSql = bId
+      ? "SELECT * FROM bw_waste WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
+      : "SELECT * FROM bw_waste ORDER BY date DESC, id DESC LIMIT 500";
+    const wasteParams = bId ? [bId] : [];
+    const wastePromise = queryDb(wasteSql, wasteParams);
+
+    const [branchesRes, usersRes, productsRes, salesRes, inventoryRes, prodRes, wasteRes] = await Promise.all([
+      branchesPromise,
+      usersPromise,
+      productsPromise,
+      salesPromise,
+      inventoryPromise,
+      prodPromise,
+      wastePromise
+    ]);
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      branches: branchesRes.rows || [],
+      users: usersRes.rows || [],
+      products: productsRes.rows || [],
+      sales: salesRes.rows || [],
+      inventory: inventoryRes.rows || [],
+      production: prodRes.rows || [],
+      waste: wasteRes.rows || []
+    });
+  } catch (err) {
+    console.error("[SYNC API ERROR]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 3. BRANCH NETWORK API
-app.get('/api/branches', cache('5 minutes'), async (req, res) => {
+app.get('/api/branches', async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_branches ORDER BY id ASC");
     res.json(result.rows);
@@ -1150,7 +1195,7 @@ app.delete('/api/branches/:id', async (req, res) => {
 });
 
 // 4. USER ACCOUNTS MANAGEMENT API
-app.get('/api/users', cache('2 minutes'), async (req, res) => {
+app.get('/api/users', async (req, res) => {
   try {
     const result = await queryDb("SELECT id, email, name, role, branch_id FROM bw_users ORDER BY id ASC");
     res.json(result.rows);
@@ -1220,7 +1265,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // 5. PRODUCTS API
-app.get('/api/products', cache('5 minutes'), async (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const result = await queryDb("SELECT * FROM bw_products ORDER BY id ASC");
     res.json(result.rows);
@@ -1271,7 +1316,7 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // 6. SALES API
-app.get('/api/sales', cache('30 seconds'), async (req, res) => {
+app.get('/api/sales', async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_sales";
@@ -1306,7 +1351,7 @@ app.post('/api/sales', async (req, res) => {
 // --- REAL-TIME POINT OF SALE (POS) API ENDPOINTS ---
 
 // 1. GET ALL POS TRANSACTIONS (WITH ITEMIZED PRODUCTS)
-app.get('/api/pos/transactions', cache('30 seconds'), async (req, res) => {
+app.get('/api/pos/transactions', async (req, res) => {
   const { branch_id, date, payment_method, status, search } = req.query;
   try {
     let query = "SELECT * FROM bw_pos_transactions";
@@ -1649,7 +1694,7 @@ app.post('/api/repurpose', async (req, res) => {
   }
 });
 
-app.get('/api/repurpose/logs', cache('1 minute'), async (req, res) => {
+app.get('/api/repurpose/logs', async (req, res) => {
   const { branch_id } = req.query;
   const bId = branch_id && branch_id !== 'all' ? parseInt(branch_id) : null;
   try {
@@ -1668,7 +1713,7 @@ app.get('/api/repurpose/logs', cache('1 minute'), async (req, res) => {
 });
 
 // 7. INVENTORY API
-app.get('/api/inventory', cache('30 seconds'), async (req, res) => {
+app.get('/api/inventory', async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_inventory";
@@ -1713,7 +1758,7 @@ app.post('/api/inventory', async (req, res) => {
 });
 
 // 8. PRODUCTION API
-app.get('/api/production', cache('30 seconds'), async (req, res) => {
+app.get('/api/production', async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_production";
@@ -1746,7 +1791,7 @@ app.post('/api/production', async (req, res) => {
 });
 
 // 9. WASTE API
-app.get('/api/waste', cache('30 seconds'), async (req, res) => {
+app.get('/api/waste', async (req, res) => {
   const { branch_id } = req.query;
   try {
     let query = "SELECT * FROM bw_waste";
@@ -1844,12 +1889,15 @@ app.post('/api/forecast', (req, res) => {
 const ROOT_DIR = path.resolve(__dirname, '..');
 const frontendDir = fs.existsSync(path.join(ROOT_DIR, 'frontend')) ? path.join(ROOT_DIR, 'frontend') : path.join(ROOT_DIR, 'public');
 app.use(express.static(frontendDir, {
-  maxAge: '1d',
+  etag: true,
+  lastModified: true,
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (filePath.match(/\.(css|js)$/)) {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    } else if (filePath.match(/\.(css|js|png|jpg|jpeg|svg|woff2?|ico)$/)) {
-      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    } else if (filePath.match(/\.(png|jpg|jpeg|svg|woff2?|ico)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     }
   }
 }));
