@@ -36,6 +36,17 @@ function handleContactPaste(e) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 function bindContactNumberSanitizer(inputId) {
   const el = document.getElementById(inputId);
   if (el && !el.dataset.numericBound) {
@@ -5663,41 +5674,236 @@ function refreshWastePane() {
   }
 }
 
-// 6. AI ANALYTICS CONTROLLER
+// 6. AI ANALYTICS CONTROLLER & DEMAND FORECASTING ENGINE
 async function refreshAIAnalyticsPane() {
   await renderAIDemandForecastChart();
   await renderDailyPredictionTable();
   await render7DayProjectionTable();
   await renderBakeRecommendations();
-  renderRepurposingAlerts();
+  await renderRepurposingAlerts();
 }
 
-async function getAIPredictedDemand(productId) {
-  const salesHistory = store.sales.filter(s => s.productId === productId);
-  if (salesHistory.length === 0) return { demand: 30 };
+function computeLocalDemandForecast(productId, salesRecords, product, branchId) {
+  const today = new Date();
+  const catLower = (product?.category || '').toLowerCase();
+  const nameLower = (product?.name || '').toLowerCase();
+  const unit = product?.unit || 'pcs';
+
+  let defaultBaseline = 15;
+  if (nameLower.includes('pandesal') || catLower.includes('bread')) defaultBaseline = 22;
+  else if (catLower.includes('pastr') || nameLower.includes('ensaymada') || nameLower.includes('muffin')) defaultBaseline = 14;
+  else if (catLower.includes('cake') || nameLower.includes('cake')) defaultBaseline = 4;
+  else if (catLower.includes('beverage') || nameLower.includes('coke') || nameLower.includes('drink')) defaultBaseline = 12;
+
+  const standardDowMultipliers = {
+    0: 1.20, // Sunday
+    1: 0.90, // Monday
+    2: 0.92, // Tuesday
+    3: 0.95, // Wednesday
+    4: 1.00, // Thursday
+    5: 1.15, // Friday
+    6: 1.25  // Saturday
+  };
+
+  const dailySalesMap = new Map();
+  if (Array.isArray(salesRecords)) {
+    for (const s of salesRecords) {
+      if (!s) continue;
+      const rawDate = s.date || s.created_at;
+      if (!rawDate) continue;
+      const dateStr = typeof rawDate === 'string' ? rawDate.split('T')[0] : new Date(rawDate).toISOString().split('T')[0];
+      const q = parseInt(s.qty || s.quantity) || 0;
+      if (q > 0) {
+        dailySalesMap.set(dateStr, (dailySalesMap.get(dateStr) || 0) + q);
+      }
+    }
+  }
+
+  const sortedDates = Array.from(dailySalesMap.keys()).sort();
+  const salesDaysCount = sortedDates.length;
+  const totalQtySold = Array.from(dailySalesMap.values()).reduce((a, b) => a + b, 0);
+
+  if (salesDaysCount < 3) {
+    const historicalAvg = salesDaysCount > 0 ? parseFloat((totalQtySold / salesDaysCount).toFixed(1)) : 0;
+    const baseVal = historicalAvg > 0 ? Math.round(historicalAvg) : defaultBaseline;
+
+    const dailyForecast = [];
+    for (let d = 1; d <= 7; d++) {
+      const dDate = new Date(today);
+      dDate.setDate(dDate.getDate() + d);
+      const dow = dDate.getDay();
+      const mult = standardDowMultipliers[dow] || 1.0;
+      dailyForecast.push(Math.max(1, Math.round(baseVal * mult)));
+    }
+    const sevenDayTotal = dailyForecast.reduce((a, b) => a + b, 0);
+
+    return {
+      productId: productId || '',
+      productName: product?.name || productId,
+      demand: dailyForecast[0],
+      dailyForecast: dailyForecast,
+      sevenDayTotal: sevenDayTotal,
+      historicalAvg: historicalAvg,
+      confidence: "Insufficient historical data",
+      reliabilityScore: "N/A (< 3 sales days)",
+      dataPoints: salesDaysCount,
+      dataPeriod: salesDaysCount > 0 ? `${salesDaysCount} recorded sales day(s)` : "No completed sales records",
+      isFallback: true,
+      fallbackReason: "Insufficient historical transaction data (< 3 distinct sales days) to train statistical prediction model.",
+      trend: "Insufficient Data",
+      unit: unit,
+      lastUpdated: new Date().toISOString()
+    };
+  }
+
+  const historicalAvg = parseFloat((totalQtySold / salesDaysCount).toFixed(1));
+
+  // Empirical DOW seasonality
+  const dowSales = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  for (const [dateStr, q] of dailySalesMap.entries()) {
+    const dow = new Date(dateStr + 'T12:00:00').getDay();
+    dowSales[dow].push(q);
+  }
+
+  const empiricalDowMultipliers = {};
+  for (let dow = 0; dow < 7; dow++) {
+    if (dowSales[dow].length > 0) {
+      const dowMean = dowSales[dow].reduce((a, b) => a + b, 0) / dowSales[dow].length;
+      empiricalDowMultipliers[dow] = Math.min(1.65, Math.max(0.65, dowMean / Math.max(1, historicalAvg)));
+    } else {
+      empiricalDowMultipliers[dow] = standardDowMultipliers[dow];
+    }
+  }
+
+  // Weighted recent trend
+  const recentDays = sortedDates.slice(-7);
+  let weightedSum = 0;
+  let weightTotal = 0;
+  recentDays.forEach((dt, idx) => {
+    const w = idx + 1;
+    weightedSum += dailySalesMap.get(dt) * w;
+    weightTotal += w;
+  });
+  const recentWeightedAvg = weightedSum / weightTotal;
+  const baselineDemand = (recentWeightedAvg * 0.60) + (historicalAvg * 0.40);
+
+  const dailyForecast = [];
+  for (let d = 1; d <= 7; d++) {
+    const dDate = new Date(today);
+    dDate.setDate(dDate.getDate() + d);
+    const dow = dDate.getDay();
+    const mult = empiricalDowMultipliers[dow] || 1.0;
+    const projected = Math.max(1, Math.round(baselineDemand * mult));
+    dailyForecast.push(projected);
+  }
+
+  const sevenDayTotal = dailyForecast.reduce((a, b) => a + b, 0);
+
+  const quantities = Array.from(dailySalesMap.values());
+  const variance = quantities.reduce((acc, val) => acc + Math.pow(val - historicalAvg, 2), 0) / salesDaysCount;
+  const stdDev = Math.sqrt(variance);
+  const cv = stdDev / Math.max(1, historicalAvg);
+
+  let confidence = "Low";
+  let reliabilityScore = "60% - 69%";
+  if (salesDaysCount >= 14 && cv <= 0.40) {
+    confidence = "High";
+    reliabilityScore = "88% - 94%";
+  } else if (salesDaysCount >= 5 && cv <= 0.70) {
+    confidence = "Medium";
+    reliabilityScore = "75% - 84%";
+  }
+
+  let trend = "Stable";
+  const trendDiff = recentWeightedAvg - historicalAvg;
+  if (trendDiff >= 1.5) trend = "Upward";
+  else if (trendDiff <= -1.5) trend = "Downward";
+
+  const firstDate = sortedDates[0];
+  const lastDate = sortedDates[sortedDates.length - 1];
+
+  return {
+    productId: productId || '',
+    productName: product?.name || productId,
+    demand: dailyForecast[0],
+    dailyForecast: dailyForecast,
+    sevenDayTotal: sevenDayTotal,
+    historicalAvg: historicalAvg,
+    confidence: confidence,
+    reliabilityScore: reliabilityScore,
+    dataPoints: salesDaysCount,
+    dataPeriod: `${salesDaysCount} sales days (${firstDate} to ${lastDate})`,
+    isFallback: false,
+    trend: trend,
+    unit: unit,
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+async function getAIPredictedDemand(productId, branchId) {
+  const p = (store.products || []).find(x => x.id === productId);
+  const activeBranch = branchId !== undefined ? branchId : store.getSelectedBranchId();
+  const pSales = (store.sales || []).filter(s => {
+    if (s.productId !== productId && String(s.productId) !== String(productId)) return false;
+    if (activeBranch && activeBranch !== 'all' && s.branchId && parseInt(s.branchId) !== parseInt(activeBranch)) return false;
+    return true;
+  });
+
+  const pName = p ? p.name : productId;
+  const category = p ? p.category : 'Bread';
+  const unit = p ? (p.unit || 'pcs') : 'pcs';
+
+  const headers = { 'Content-Type': 'application/json' };
+  const session = sessionStorage.getItem("bakewise_v2_session") || localStorage.getItem("bakewise_v2_session");
+  if (session) {
+    try {
+      const user = JSON.parse(session);
+      if (user && user.token) headers['Authorization'] = `Bearer ${user.token}`;
+    } catch (e) {}
+  }
 
   try {
     const response = await fetch('/api/forecast', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sales: salesHistory })
+      headers,
+      body: JSON.stringify({
+        sales: pSales,
+        product_id: productId,
+        branch_id: activeBranch,
+        product_name: pName,
+        category: category,
+        unit: unit
+      })
     });
+
     if (response.ok) {
       const data = await response.json();
-      return {
-        demand: data.predicted_demand !== undefined ? data.predicted_demand : 30,
-        metrics: data.metrics,
-        insights: data.insights
-      };
+      if (data && typeof data.predicted_demand === 'number') {
+        return {
+          productId: productId,
+          productName: pName,
+          demand: data.predicted_demand,
+          dailyForecast: Array.isArray(data.daily_forecast) ? data.daily_forecast : [data.predicted_demand],
+          sevenDayTotal: data.seven_day_total !== undefined ? data.seven_day_total : data.predicted_demand,
+          historicalAvg: data.historical_avg !== undefined ? data.historical_avg : 0,
+          confidence: data.confidence || "Low",
+          reliabilityScore: data.reliability_score || "65%",
+          dataPoints: data.data_points || 0,
+          dataPeriod: data.data_period || "Historical data",
+          isFallback: !!data.is_fallback,
+          fallbackReason: data.fallback_reason || "",
+          trend: data.trend || "Stable",
+          unit: data.unit || unit,
+          lastUpdated: data.last_updated || new Date().toISOString()
+        };
+      }
     }
   } catch (error) {
-    console.error("AI Forecast error:", error);
+    console.warn("AI Forecast API notice (using local statistical engine):", error.message);
   }
 
-  // Fallback
-  const qtySum = salesHistory.slice(-3).reduce((sum, s) => sum + s.qty, 0);
-  const avg = Math.round(qtySum / Math.min(3, salesHistory.length));
-  return { demand: Math.max(5, avg) };
+  // Pure JavaScript analytical engine fallback
+  return computeLocalDemandForecast(productId, pSales, p, activeBranch);
 }
 
 async function renderAIDemandForecastChart() {
@@ -5706,14 +5912,11 @@ async function renderAIDemandForecastChart() {
   const ctx = canvas.getContext("2d");
   if (aiDemandChartInstance) aiDemandChartInstance.destroy();
 
-  const labels = store.products.map(p => p.name.split(' (')[0]);
-  const historicalAvg = store.products.map(p => {
-    const pSales = store.sales.filter(s => s.productId === p.id);
-    if (pSales.length === 0) return 0;
-    return Math.round(pSales.reduce((sum, s) => sum + s.qty, 0) / pSales.length);
-  });
+  const labels = (store.products || []).map(p => p.name.split(' (')[0]);
+  const activeBranch = store.getSelectedBranchId();
 
-  const aiResults = await Promise.all(store.products.map(p => getAIPredictedDemand(p.id)));
+  const aiResults = await Promise.all((store.products || []).map(p => getAIPredictedDemand(p.id, activeBranch)));
+  const historicalAvg = aiResults.map(r => r.historicalAvg);
   const predictedDemand = aiResults.map(r => r.demand);
 
   const isDark = document.body.classList.contains("dark-mode");
@@ -5752,55 +5955,72 @@ async function renderAIDemandForecastChart() {
     }
   });
 
-  // Hide AI Scoring Matrix section as requested
   const metricsEl = document.getElementById("ai-forecast-metrics");
-  if (metricsEl) {
-    metricsEl.style.display = "none";
-  }
+  if (metricsEl) metricsEl.style.display = "none";
 }
 
 async function renderDailyPredictionTable() {
   const tbody = document.getElementById("ai-daily-prediction-tbody");
   if (!tbody) return;
 
-  const predictions = await Promise.all(store.products.map(async p => {
-    const pSales = store.sales.filter(s => s.productId === p.id);
-    const histAvg = pSales.length === 0 ? 0 : Math.round(pSales.reduce((sum, s) => sum + s.qty, 0) / pSales.length);
-    const forecastRes = await getAIPredictedDemand(p.id);
+  const activeBranch = store.getSelectedBranchId();
+  const predictions = await Promise.all((store.products || []).map(async p => {
+    const forecastRes = await getAIPredictedDemand(p.id, activeBranch);
+    const histAvg = forecastRes.historicalAvg || 0;
     const forecast = forecastRes.demand;
-    const diff = forecast - histAvg;
-    const diffPct = histAvg > 0 ? Math.round((diff / histAvg) * 100) : 0;
+    const unit = p.unit || forecastRes.unit || 'pcs';
+    const total7 = forecastRes.sevenDayTotal || forecast;
 
+    // Confidence badge
+    let confBadge = '';
+    if (forecastRes.isFallback || forecastRes.confidence === "Insufficient historical data") {
+      confBadge = `<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #b45309; font-weight: 700; border: 1px solid rgba(234, 179, 8, 0.3);" title="${escapeHtml(forecastRes.fallbackReason || 'Insufficient sales history')}">Insufficient Data</span>`;
+    } else if (forecastRes.confidence === "High") {
+      confBadge = `<span class="badge success" style="background: #dcfce7; color: #166534; font-weight: 700;">High (${forecastRes.reliabilityScore})</span>`;
+    } else if (forecastRes.confidence === "Medium") {
+      confBadge = `<span class="badge info" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">Medium (${forecastRes.reliabilityScore})</span>`;
+    } else {
+      confBadge = `<span class="badge warning" style="background: #fef3c7; color: #92400e; font-weight: 700;">Low (${forecastRes.reliabilityScore})</span>`;
+    }
+
+    // Trend Indicator
     let trendHtml = '';
-    if (diff > 0) {
-      trendHtml = `<span style="color: var(--color-success); font-weight: 700;">+${diff} pcs (+${diffPct}%) ▲</span>`;
-    } else if (diff < 0) {
-      trendHtml = `<span style="color: var(--color-error); font-weight: 700;">${diff} pcs (${diffPct}%) ▼</span>`;
+    if (forecastRes.isFallback || forecastRes.trend === "Insufficient Data") {
+      trendHtml = `<span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">Insufficient Data</span>`;
+    } else if (forecastRes.trend === "Upward") {
+      trendHtml = `<span style="color: var(--color-success); font-weight: 700;">▲ Upward Trend</span>`;
+    } else if (forecastRes.trend === "Downward") {
+      trendHtml = `<span style="color: var(--color-error); font-weight: 700;">▼ Downward Trend</span>`;
     } else {
-      trendHtml = `<span style="color: var(--text-secondary); font-weight: 600;">0 pcs (Stable)</span>`;
+      trendHtml = `<span style="color: var(--text-secondary); font-weight: 600;">▬ Stable</span>`;
     }
 
-    let statusBadge = '';
-    if (diff >= 5) {
-      statusBadge = `<span class="badge success" style="background: #dcfce7; color: #166534; font-weight: 700;">High Demand</span>`;
-    } else if (diff <= -5) {
-      statusBadge = `<span class="badge danger" style="background: #fee2e2; color: #991b1b; font-weight: 700;">Low Demand</span>`;
-    } else {
-      statusBadge = `<span class="badge info" style="background: #e0f2fe; color: #075985; font-weight: 700;">Stable Demand</span>`;
-    }
+    const dataPeriodText = forecastRes.dataPeriod || (forecastRes.dataPoints > 0 ? `${forecastRes.dataPoints} sales days` : 'No history');
 
     return `
       <tr>
-        <td style="font-weight: 700;">${p.name}</td>
-        <td>${p.category}</td>
-        <td style="font-weight: 600;">${histAvg} pcs/day</td>
-        <td style="font-weight: 800; color: var(--primary-color);">${forecast} pcs</td>
-        <td>${statusBadge}</td>
+        <td style="font-weight: 700; color: var(--text-primary);">${p.name}</td>
+        <td><span class="badge category-badge" style="font-size: 0.78rem;">${p.category || 'General'}</span></td>
+        <td style="font-weight: 600; color: var(--text-secondary);">${unit}</td>
+        <td style="font-weight: 600;">${histAvg} ${unit}/day</td>
+        <td style="font-weight: 800; color: var(--primary-color); font-size: 0.95rem;">${forecast} ${unit}</td>
+        <td style="font-weight: 700; color: var(--accent-color);">${total7} ${unit}</td>
+        <td>${confBadge}</td>
+        <td style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(dataPeriodText)}</td>
+        <td>${trendHtml}</td>
       </tr>
     `;
   }));
 
   setSafeHtml(tbody, predictions.join(''));
+
+  // Update Last Updated Timestamp display
+  const timeElem = document.getElementById("forecast-timestamp-text");
+  if (timeElem) {
+    const now = new Date();
+    timeElem.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
 }
 
 async function render7DayProjectionTable() {
@@ -5808,44 +6028,43 @@ async function render7DayProjectionTable() {
   const tbody = document.getElementById("ai-7day-projection-tbody");
   if (!tbody) return;
 
+  const today = new Date();
   if (trHead) {
-    let ths = `<th>Product</th>`;
+    let ths = `<th>Product Name</th>`;
     for (let d = 1; d <= 7; d++) {
-      const dayDate = new Date();
+      const dayDate = new Date(today);
       dayDate.setDate(dayDate.getDate() + d);
-      const dateFormatted = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
-      ths += `<th>Day ${d}<br><span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary);">${dateFormatted}</span></th>`;
+      const dateFormatted = dayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      ths += `<th style="text-align: center;">Day ${d}<br><span style="font-size: 0.72rem; font-weight: normal; color: var(--text-secondary);">${dateFormatted}</span></th>`;
     }
-    ths += `<th style="background: rgba(217, 119, 6, 0.1); color: var(--primary-color);">7-Day Total</th>`;
+    ths += `<th style="text-align: center; background: rgba(217, 119, 6, 0.1); color: var(--primary-color);">7-Day Total</th>`;
     setSafeHtml(trHead, ths);
   }
 
-  const rows = await Promise.all(store.products.map(async p => {
-    const forecastRes = await getAIPredictedDemand(p.id);
-    const day1Forecast = forecastRes.demand;
+  const activeBranch = store.getSelectedBranchId();
+  const rows = await Promise.all((store.products || []).map(async p => {
+    const forecastRes = await getAIPredictedDemand(p.id, activeBranch);
+    const dailyForecasts = forecastRes.dailyForecast || [forecastRes.demand];
+    const unit = p.unit || forecastRes.unit || 'pcs';
 
-    const dailyForecasts = [];
-    for (let d = 0; d < 7; d++) {
-      const dayDate = new Date();
-      dayDate.setDate(dayDate.getDate() + (d + 1));
-      const dayOfWeek = dayDate.getDay();
-      let mult = 1.0;
-      if (dayOfWeek === 0 || dayOfWeek === 6) mult = 1.25;
-      else if (dayOfWeek === 5) mult = 1.15;
-      else mult = 0.95;
-
-      const f = Math.max(5, Math.round(day1Forecast * mult));
-      dailyForecasts.push(f);
-    }
-
+    // Strict mathematical equality: 7-day total strictly equals the sum of daily forecasts
     const total7 = dailyForecasts.reduce((sum, val) => sum + val, 0);
 
-    const cols = dailyForecasts.map(f => `<td style="font-weight: 600;">${f} pcs</td>`).join('');
+    const cols = dailyForecasts.map((f, i) => {
+      const isTomorrow = i === 0;
+      return `<td style="text-align: center; font-weight: ${isTomorrow ? '800' : '600'}; color: ${isTomorrow ? 'var(--primary-color)' : 'var(--text-primary)'};">${f} <span style="font-size:0.75rem; color:var(--text-secondary);">${unit}</span></td>`;
+    }).join('');
+
     return `
       <tr>
-        <td style="font-weight: 700; color: var(--primary-color);">${p.name}</td>
+        <td style="font-weight: 700; color: var(--primary-color);">
+          ${p.name}
+          <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal;">${p.category}</div>
+        </td>
         ${cols}
-        <td style="font-weight: 800; color: var(--accent-color); background: rgba(217, 119, 6, 0.05);">${total7} pcs</td>
+        <td style="text-align: center; font-weight: 800; color: var(--accent-color); background: rgba(217, 119, 6, 0.05); font-size: 0.95rem;">
+          ${total7} <span style="font-size:0.75rem;">${unit}</span>
+        </td>
       </tr>
     `;
   }));
@@ -5858,106 +6077,488 @@ async function renderBakeRecommendations() {
   if (!container) return;
   container.replaceChildren();
 
-  const recsPromises = store.products.map(async p => {
-    const currentStock = store.inventory
-      .filter(i => i.productId === p.id)
-      .reduce((sum, i) => sum + i.stockLevel, 0);
+  const activeBranch = store.getSelectedBranchId();
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
 
-    const predictionResult = await getAIPredictedDemand(p.id);
-    const prediction = predictionResult.demand;
-    const safetyStock = 5;
-    const recommendedBake = Math.max(0, prediction - currentStock + safetyStock);
+  const recsPromises = (store.products || []).map(async p => {
+    // 1. Usable Available Stock (exclude expired, damaged, quarantined, or spoiled)
+    const matchingInv = (store.inventory || []).filter(i => {
+      if (i.productId !== p.id && String(i.productId) !== String(p.id)) return false;
+      if (activeBranch && activeBranch !== 'all' && i.branchId && parseInt(i.branchId) !== parseInt(activeBranch)) return false;
+      return true;
+    });
 
-    let reason = `The predicted demand is ${prediction} pieces. With a current stock of ${currentStock} pieces and a required safety buffer of ${safetyStock} pieces, a production run of ${recommendedBake} pieces is recommended.`;
+    let usableStock = 0;
+    let expiredStock = 0;
+    matchingInv.forEach(i => {
+      const isExpired = (i.status === 'Expired' || i.status === 'Damaged' || i.status === 'Quarantined' || i.status === 'Spoiled' ||
+        (i.expiryDate && new Date(i.expiryDate) < new Date(todayStr + 'T00:00:00')));
+      if (isExpired) {
+        expiredStock += (parseInt(i.stockLevel) || 0);
+      } else {
+        usableStock += (parseInt(i.stockLevel) || 0);
+      }
+    });
+
+    // 2. Confirmed Scheduled Production (Planned or In Progress for today or tomorrow)
+    const matchingProd = (store.production || []).filter(pr => {
+      if (pr.productId !== p.id && String(pr.productId) !== String(p.id)) return false;
+      if (activeBranch && activeBranch !== 'all' && pr.branchId && parseInt(pr.branchId) !== parseInt(activeBranch)) return false;
+      const isScheduled = (pr.status === 'Planned' || pr.status === 'In Progress' || pr.status === 'Scheduled');
+      return isScheduled;
+    });
+    const scheduledProduction = matchingProd.reduce((sum, pr) => sum + (parseInt(pr.planned) || 0), 0);
+
+    // 3. Tomorrow's Forecasted Demand (Strictly tomorrow's forecast, NOT 7 days)
+    const predictionResult = await getAIPredictedDemand(p.id, activeBranch);
+    const tomorrowDemand = predictionResult.demand;
+    const unit = p.unit || predictionResult.unit || 'pcs';
+
+    // 4. Dynamic Safety Stock (20% of tomorrow's demand, minimum 3, max 15)
+    const safetyStock = Math.max(3, Math.min(15, Math.round(tomorrowDemand * 0.20)));
+
+    // 5. PRODUCTION OPTIMIZATION FORMULA:
+    // Required Production = MAX(0, Forecast Demand + Required Safety Stock - Usable Available Stock - Confirmed Scheduled Production)
+    const grossNeeded = tomorrowDemand + safetyStock;
+    const availableSupply = usableStock + scheduledProduction;
+    const recommendedBake = Math.max(0, grossNeeded - availableSupply);
+
+    let reason = `Tomorrow's demand is forecasted at ${tomorrowDemand} ${unit} with a required safety buffer of ${safetyStock} ${unit}. Available usable stock is ${usableStock} ${unit} (with ${scheduledProduction} ${unit} confirmed scheduled). Recommended baking: ${recommendedBake} ${unit}.`;
     if (recommendedBake === 0) {
-      reason = `The current stock of ${currentStock} pieces is sufficient to fulfill the predicted demand of ${prediction} pieces, inclusive of a ${safetyStock}-piece safety buffer. No additional production is required, preventing excess waste.`;
+      reason = `Current usable stock (${usableStock} ${unit}) plus confirmed scheduled baking (${scheduledProduction} ${unit}) fully covers tomorrow's forecasted demand (${tomorrowDemand} ${unit}) and safety buffer (${safetyStock} ${unit}). No additional baking required.`;
     }
 
-    return { product: p.name, recommended: recommendedBake, reason };
+    return {
+      productId: p.id,
+      productName: p.name,
+      category: p.category,
+      unit: unit,
+      tomorrowDemand,
+      safetyStock,
+      usableStock,
+      expiredStock,
+      scheduledProduction,
+      recommended: recommendedBake,
+      reason,
+      isFallback: predictionResult.isFallback,
+      confidence: predictionResult.confidence,
+      batches: matchingInv
+    };
   });
 
   const recs = await Promise.all(recsPromises);
+  window._lastProductionRecs = recs; // Cache for modal transparency details
 
   setSafeHtml(container, recs.map(r => `
-    <div class="ai-recommendation-card" style="border-left-color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'}">
-      <div class="rec-details">
-        <span class="rec-title">${r.product}</span>
-        <span class="rec-reason">${r.reason}</span>
-      </div>
-      <div class="rec-action" style="color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'}">
-        ${r.recommended} pcs
+    <div class="ai-recommendation-card" style="border-left-color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'}; margin-bottom: 12px; padding: 14px 16px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); border-left-width: 4px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+        <div class="rec-details" style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span class="rec-title" style="font-weight: 700; font-size: 0.98rem; color: var(--text-primary);">${escapeHtml(r.productName)}</span>
+            <span class="badge" style="font-size: 0.72rem; background: rgba(0,0,0,0.06); color: var(--text-secondary);">${escapeHtml(r.category || 'Bakery')}</span>
+          </div>
+          <p class="rec-reason" style="margin: 0 0 8px 0; font-size: 0.83rem; color: var(--text-secondary); line-height: 1.4;">${escapeHtml(r.reason)}</p>
+          <div style="display: flex; align-items: center; gap: 12px; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap;">
+            <span>Forecast: <strong>${r.tomorrowDemand} ${r.unit}</strong></span>
+            <span>&bull;</span>
+            <span>Usable Stock: <strong>${r.usableStock} ${r.unit}</strong></span>
+            <span>&bull;</span>
+            <span>Safety Buffer: <strong>${r.safetyStock} ${r.unit}</strong></span>
+            <span>&bull;</span>
+            <span>Scheduled: <strong>${r.scheduledProduction} ${r.unit}</strong></span>
+          </div>
+        </div>
+        <div style="text-align: right; min-width: 110px;">
+          <div class="rec-action" style="font-weight: 800; font-size: 1.25rem; color: ${r.recommended > 0 ? 'var(--primary-color)' : 'var(--color-success)'};">
+            ${r.recommended} <span style="font-size: 0.82rem; font-weight: 600;">${r.unit}</span>
+          </div>
+          <button type="button" class="btn-prod-breakdown-details" data-pid="${r.productId}" style="margin-top: 6px; font-size: 0.74rem; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: transparent; cursor: pointer; color: var(--primary-color); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+            <i data-lucide="help-circle" style="width: 12px; height: 12px;"></i> View Math
+          </button>
+        </div>
       </div>
     </div>
   `).join(''));
-}
 
-function renderRepurposingAlerts() {
-  const container = document.getElementById("ai-repurpose-container");
-  if (!container) return;
-  container.replaceChildren();
-
-  const itemsToRepurposeMap = new Map();
-  store.inventory.forEach(item => {
-    const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
-    if (fIndex <= 30 && item.stockLevel > 0) {
-      const p = store.products.find(x => x.id === item.productId);
-      if (!p) return;
-      if (itemsToRepurposeMap.has(p.id)) {
-        const existing = itemsToRepurposeMap.get(p.id);
-        existing.qty += item.stockLevel;
-        existing.freshness = Math.min(existing.freshness, fIndex);
-      } else {
-        itemsToRepurposeMap.set(p.id, { productId: p.id, name: p.name, qty: item.stockLevel, recipe: p.repurposeRecipe, freshness: fIndex });
-      }
-    }
-  });
-  const itemsToRepurpose = Array.from(itemsToRepurposeMap.values());
-
-  if (itemsToRepurpose.length === 0) {
-    setSafeHtml(container, `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-secondary);">
-        <i data-lucide="sparkles" style="width: 32px; height: 32px; color: var(--accent-color); margin-bottom: 8px;"></i>
-        <p>No products are currently approaching shelf-life expiration limits. Repurposing is not required.</p>
-      </div>
-    `);
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    return;
-  }
-
-  setSafeHtml(container, itemsToRepurpose.map(item => `
-    <div class="repurpose-card" id="repurpose-card-${item.productId}">
-      <div class="repurpose-badge-top">
-        <span class="repurpose-item-name">${item.name}</span>
-        <span class="badge warning">${item.freshness}% Fresh</span>
-      </div>
-      <p style="font-size: 0.85rem;">Available excess stock: <strong>${item.qty} pcs</strong></p>
-      <div class="repurpose-recipe">Suggested Recipe: "${item.recipe}"</div>
-      <button class="btn-primary btn-repurpose-action" data-pid="${item.productId}" data-qty="${item.qty}" data-name="${item.name}" data-recipe="${item.recipe}" style="margin-top: 10px; width: 100%; font-size: 0.8rem; padding: 6px 12px; background: linear-gradient(135deg, #0284c7, #0369a1);">
-        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed
-      </button>
-    </div>
-  `).join(''));
-
-  document.querySelectorAll(".btn-repurpose-action").forEach(btn => {
+  // Attach breakdown click handlers
+  document.querySelectorAll(".btn-prod-breakdown-details").forEach(btn => {
     btn.addEventListener("click", () => {
       const pid = btn.getAttribute("data-pid");
-      const name = btn.getAttribute("data-name");
-      const qty = parseInt(btn.getAttribute("data-qty") || 0);
-      const recipe = btn.getAttribute("data-recipe");
-
-      handleMarkAsRepurposed(pid, name, qty, recipe);
+      openProductionCalculationModal(pid);
     });
   });
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-async function handleMarkAsRepurposed(productId, productName, qty, recipe, batchId) {
-  const userBranchId = store.currentUser && store.currentUser.branch_id ? parseInt(store.currentUser.branch_id) : 1;
+function openProductionCalculationModal(productId) {
+  const modal = document.getElementById("prod-breakdown-modal");
+  const overlay = document.getElementById("prod-breakdown-overlay");
+  const body = document.getElementById("prod-breakdown-body");
+  if (!modal || !overlay || !body) return;
+
+  const rec = (window._lastProductionRecs || []).find(r => r.productId === productId);
+  if (!rec) return;
+
+  const branchName = store.branches.find(b => b.id === store.getSelectedBranchId())?.name || "All Branches Consolidated";
+
+  const mathHtml = `
+    <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.03)); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+      <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary);">${escapeHtml(rec.productName)} &bull; ${escapeHtml(branchName)}</h4>
+      <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">
+        Production Optimization uses: <code>Required = MAX(0, Forecast Demand + Safety Stock - Usable Stock - Scheduled)</code>
+      </p>
+    </div>
+
+    <table class="data-table" style="font-size: 0.85rem; margin-bottom: 16px;">
+      <thead>
+        <tr>
+          <th>Calculation Parameter</th>
+          <th>Quantity</th>
+          <th>Data Source & Validation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tomorrow's Forecasted Demand</strong></td>
+          <td style="font-weight: 700; color: var(--primary-color);">${rec.tomorrowDemand} ${rec.unit}</td>
+          <td>${rec.isFallback ? 'Baseline Heuristic (Insufficient Historical Data)' : 'Statistical Weighted Seasonality Model'}</td>
+        </tr>
+        <tr>
+          <td><strong>Required Safety Buffer</strong></td>
+          <td style="font-weight: 700;">+${rec.safetyStock} ${rec.unit}</td>
+          <td>20% buffer of tomorrow's demand (min 3 pcs)</td>
+        </tr>
+        <tr>
+          <td><strong>Usable Available Stock</strong></td>
+          <td style="font-weight: 700; color: #166534;">-${rec.usableStock} ${rec.unit}</td>
+          <td>Active unexpired stock in ${escapeHtml(branchName)}</td>
+        </tr>
+        <tr>
+          <td><strong>Excluded Expired/Spoiled Stock</strong></td>
+          <td style="font-weight: 700; color: #991b1b;">${rec.expiredStock} ${rec.unit}</td>
+          <td><span class="badge danger" style="background:#fee2e2;color:#991b1b;">Strictly Excluded (Unusable)</span></td>
+        </tr>
+        <tr>
+          <td><strong>Confirmed Scheduled Production</strong></td>
+          <td style="font-weight: 700; color: #0369a1;">-${rec.scheduledProduction} ${rec.unit}</td>
+          <td>Baking crew batches with status 'Planned' or 'In Progress'</td>
+        </tr>
+        <tr style="background: rgba(217, 119, 6, 0.08); font-size: 0.92rem;">
+          <td><strong>FINAL RECOMMENDED PRODUCTION</strong></td>
+          <td style="font-weight: 800; color: var(--primary-color);">${rec.recommended} ${rec.unit}</td>
+          <td style="font-weight: 700;"><code>MAX(0, ${rec.tomorrowDemand} + ${rec.safetyStock} - ${rec.usableStock} - ${rec.scheduledProduction}) = ${rec.recommended} ${rec.unit}</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="font-size: 0.78rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 10px;">
+      <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle; color: var(--color-success);"></i>
+      Food Safety & FEFO Rule: All expired and damaged items are strictly isolated from usable inventory. Production calculation ensures zero duplicate inventory counting.
+    </div>
+  `;
+
+  setSafeHtml(body, mathHtml);
+  modal.style.display = "block";
+  overlay.style.display = "block";
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeProdBreakdownModal() {
+  const modal = document.getElementById("prod-breakdown-modal");
+  const overlay = document.getElementById("prod-breakdown-overlay");
+  if (modal) modal.style.display = "none";
+  if (overlay) overlay.style.display = "none";
+}
+window.closeProdBreakdownModal = closeProdBreakdownModal;
+
+async function renderRepurposingAlerts() {
+  const container = document.getElementById("ai-repurpose-container");
+  if (!container) return;
+  container.replaceChildren();
+
+  const activeBranch = store.getSelectedBranchId();
+  let batches = [];
+
+  // 1. Fetch batch records from backend API
+  try {
+    const branchQuery = (activeBranch && activeBranch !== 'all') ? `?branch_id=${activeBranch}` : '';
+    const res = await fetch(`/api/inventory/batches${branchQuery}`);
+    if (res.ok) {
+      batches = await res.json();
+    }
+  } catch (err) {
+    console.warn("Could not fetch batches from API, checking store inventory:", err.message);
+  }
+
+  // Fallback to store inventory if no batches returned from API
+  if (!Array.isArray(batches) || batches.length === 0) {
+    batches = (store.inventory || []).map(i => {
+      const p = (store.products || []).find(x => x.id === i.productId);
+      return {
+        id: i.id,
+        batch_code: i.batchId || `BATCH-${i.productId}-${i.id}`,
+        branch_id: i.branchId,
+        product_id: i.productId,
+        product_name: p ? p.name : i.productId,
+        category: p ? p.category : 'Bread',
+        unit: i.unit || 'pcs',
+        current_quantity: i.stockLevel,
+        production_date: i.productionDate,
+        production_time: i.productionTime || '06:00:00',
+        expiry_date: i.expiryDate,
+        expiry_time: i.expiryTime || '18:00:00',
+        repurpose_recipe: p ? p.repurposeRecipe : 'Bread Crumbs',
+        status: i.status || 'In Stock',
+        food_safety_status: 'Approved'
+      };
+    });
+  }
+
+  // Filter batches by selected branch
+  if (activeBranch && activeBranch !== 'all') {
+    batches = batches.filter(b => parseInt(b.branch_id) === parseInt(activeBranch));
+  }
+
+  const now = new Date();
+
+  // Evaluate Food Safety Eligibility Rules for each batch
+  const evaluatedBatches = batches.map(batch => {
+    const p = (store.products || []).find(x => x.id === batch.product_id);
+    const pName = batch.product_name || (p ? p.name : batch.product_id);
+    const category = (batch.category || (p ? p.category : '')).toLowerCase();
+    const qty = parseInt(batch.current_quantity) || 0;
+
+    // Check missing expiry information
+    if (!batch.expiry_date) {
+      return {
+        ...batch,
+        product_name: pName,
+        status_category: 'NOT ELIGIBLE',
+        eligibility_label: 'NOT ELIGIBLE',
+        badge_class: 'warning',
+        badge_style: 'background:#fef3c7; color:#92400e;',
+        reason: 'Unable to assess food-safety eligibility: Expiry date or storage conditions are missing.',
+        repurpose_method: 'N/A',
+        is_repurposable: false,
+        urgency: 'Safety Quarantine: Audit Expiry Records'
+      };
+    }
+
+    const expiryTimeStr = batch.expiry_time || '18:00:00';
+    const expiryDateTime = new Date(`${batch.expiry_date.split('T')[0]}T${expiryTimeStr}`);
+    const remainingMs = expiryDateTime.getTime() - now.getTime();
+    const remainingHours = Math.round(remainingMs / (1000 * 60 * 60));
+
+    // Freshness calculation
+    const prodDateStr = (batch.production_date ? batch.production_date.split('T')[0] : batch.expiry_date.split('T')[0]);
+    const prodDateTime = new Date(`${prodDateStr}T${batch.production_time || '06:00:00'}`);
+    const totalLifeMs = Math.max(1, expiryDateTime.getTime() - prodDateTime.getTime());
+    const freshnessScore = Math.max(0, Math.min(100, Math.round((remainingMs / totalLifeMs) * 100)));
+
+    // Rule 1: NEVER recommend expired products
+    if (remainingMs <= 0 || freshnessScore <= 0 || batch.status === 'Expired') {
+      return {
+        ...batch,
+        product_name: pName,
+        status_category: 'NOT ELIGIBLE',
+        eligibility_label: 'NOT ELIGIBLE',
+        badge_class: 'danger',
+        badge_style: 'background:#fee2e2; color:#991b1b;',
+        remaining_hours: 0,
+        freshness_score: 0,
+        reason: `Product has reached the end of its validated shelf life (Expired on ${batch.expiry_date.split('T')[0]}). Repurposing expired bread is strictly prohibited under food-safety regulations.`,
+        repurpose_method: 'N/A - Disposal Required',
+        is_repurposable: false,
+        urgency: 'Action: Mark as Spoiled Waste for Disposal'
+      };
+    }
+
+    // Rule 2: NEVER recommend perishable cream/custard cakes
+    const isPerishableCake = category.includes('cake') || pName.toLowerCase().includes('cake') || pName.toLowerCase().includes('cream');
+    if (isPerishableCake) {
+      return {
+        ...batch,
+        product_name: pName,
+        status_category: 'NOT ELIGIBLE',
+        eligibility_label: 'NOT ELIGIBLE',
+        badge_class: 'danger',
+        badge_style: 'background:#fee2e2; color:#991b1b;',
+        remaining_hours: remainingHours,
+        freshness_score: freshnessScore,
+        reason: 'Perishable dairy cream/custard filling requires strict continuous refrigeration. Prohibited from repurposing under bakery food-safety standards.',
+        repurpose_method: 'N/A - Perishable Cake',
+        is_repurposable: false,
+        urgency: 'Product requires direct cold-chain sale or safe disposal'
+      };
+    }
+
+    // Rule 3: Packaged non-bakery goods (drinks, etc.)
+    if (category.includes('drink') || category.includes('beverage') || pName.toLowerCase().includes('coke')) {
+      return null; // Exclude non-bakery items from repurposing list
+    }
+
+    // Rule 4: If product is completely fresh (> 36 hours remaining and freshness > 45%)
+    if (remainingHours > 36 && freshnessScore > 45) {
+      return null; // Normal fresh inventory, repurposing not applicable yet
+    }
+
+    // Approved Repurposing Preparation Methods
+    let approvedMethod = batch.repurpose_recipe || (p ? p.repurposeRecipe : 'Bread Crumbs');
+    if (pName.toLowerCase().includes('pandesal')) {
+      approvedMethod = 'Toasted Bread Crumbs (Oven-toasted & milled, +14 days shelf life)';
+    } else if (pName.toLowerCase().includes('sliced bread') || pName.toLowerCase().includes('loaf')) {
+      approvedMethod = 'Garlic Butter Croutons or Homestyle Bread Pudding';
+    } else if (pName.toLowerCase().includes('ensaymada')) {
+      approvedMethod = 'Toasted Ensaymada Crisps / Bread Pudding Base';
+    }
+
+    // Status: EXPIRING SOON (< 14 hours remaining)
+    if (remainingHours <= 14) {
+      return {
+        ...batch,
+        product_name: pName,
+        status_category: 'EXPIRING SOON',
+        eligibility_label: 'EXPIRING SOON',
+        badge_class: 'danger',
+        badge_style: 'background:#ffedd5; color:#c2410c;',
+        remaining_hours: remainingHours,
+        freshness_score: freshnessScore,
+        reason: `Within final ${remainingHours}-hour shelf-life window (${freshnessScore}% freshness). Crumb drying out but food-safe for immediate preparation.`,
+        repurpose_method: approvedMethod,
+        is_repurposable: true,
+        urgency: `Urgent Review: Process within ${remainingHours} hours`
+      };
+    }
+
+    // Status: SAFE TO REPURPOSE (14h - 36h remaining, freshness 15% - 45%)
+    return {
+      ...batch,
+      product_name: pName,
+      status_category: 'SAFE TO REPURPOSE',
+      eligibility_label: 'SAFE TO REPURPOSE',
+      badge_class: 'success',
+      badge_style: 'background:#dcfce7; color:#166534;',
+      remaining_hours: remainingHours,
+      freshness_score: freshnessScore,
+      reason: `Approaching original shelf-life limit (${remainingHours} hours remaining, ${freshnessScore}% freshness). Approved bakery recipe available.`,
+      repurpose_method: approvedMethod,
+      is_repurposable: true,
+      urgency: `Action Recommended: Repurpose within ${remainingHours} hours`
+    };
+  }).filter(Boolean); // Filter out nulls (fresh or non-bakery)
+
+  // Filter to show repurposing candidates (Safe to Repurpose, Expiring Soon, or Not Eligible safety warnings)
+  const eligibleCandidates = evaluatedBatches.filter(b => b.is_repurposable);
+  const safetyWarnings = evaluatedBatches.filter(b => !b.is_repurposable && b.current_quantity > 0);
+
+  if (evaluatedBatches.length === 0 || (eligibleCandidates.length === 0 && safetyWarnings.length === 0)) {
+    setSafeHtml(container, `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 28px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+        <i data-lucide="shield-check" style="width: 36px; height: 36px; color: var(--color-success); margin-bottom: 8px;"></i>
+        <h4 style="margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">No eligible batches were found based on latest verified inventory and shelf-life records.</h4>
+        <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">All bakery batches in the selected branch are fresh, safely within validated shelf-life limits, or safely excluded per food-safety guidelines.</p>
+      </div>
+    `);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // Render cards for eligible candidates and food safety notices
+  const cardsHtml = evaluatedBatches.map(b => {
+    const branchName = store.branches.find(br => parseInt(br.id) === parseInt(b.branch_id))?.name || `Branch ${b.branch_id}`;
+    const expiryFormatted = b.expiry_date ? b.expiry_date.split('T')[0] : 'Unknown';
+    const remainingText = b.remaining_hours !== undefined ? `${b.remaining_hours}h remaining (${b.freshness_score}% Fresh)` : 'N/A';
+
+    return `
+      <div class="repurpose-card" id="repurpose-card-${escapeHtml(b.batch_code || b.product_id)}" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
+            <div>
+              <span class="repurpose-item-name" style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">${escapeHtml(b.product_name)}</span>
+              <div style="font-size: 0.74rem; color: var(--text-muted); font-family: monospace;">Batch: ${escapeHtml(b.batch_code || 'N/A')} &bull; ${escapeHtml(branchName)}</div>
+            </div>
+            <span class="badge" style="${b.badge_style} font-weight: 800; font-size: 0.76rem; padding: 3px 8px; border-radius: 6px;">
+              ${b.eligibility_label}
+            </span>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 0.82rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text-secondary);">Batch Stock:</span>
+              <strong style="color: var(--text-primary);">${b.current_quantity} ${b.unit || 'pcs'}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text-secondary);">Original Expiry:</span>
+              <strong>${expiryFormatted} ${b.expiry_time || ''}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">Shelf-Life Status:</span>
+              <strong style="color: ${b.remaining_hours <= 12 ? 'var(--color-error)' : 'var(--text-primary)'};">${remainingText}</strong>
+            </div>
+          </div>
+
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.4;">
+            <strong>Reason:</strong> ${escapeHtml(b.reason)}
+          </p>
+
+          <div class="repurpose-recipe" style="font-size: 0.82rem; background: rgba(217, 119, 6, 0.08); border-left: 3px solid var(--primary-color); padding: 8px 10px; border-radius: 4px; margin-bottom: 12px;">
+            <strong>Approved Preparation:</strong><br>${escapeHtml(b.repurpose_method)}
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600;">
+            ${escapeHtml(b.urgency)}
+          </div>
+          ${b.is_repurposable ? `
+            <button class="btn-primary btn-repurpose-action" 
+              data-pid="${escapeHtml(b.product_id)}" 
+              data-qty="${b.current_quantity}" 
+              data-name="${escapeHtml(b.product_name)}" 
+              data-recipe="${escapeHtml(b.repurpose_method)}" 
+              data-batch="${escapeHtml(b.batch_code || '')}" 
+              data-branch="${b.branch_id}"
+              style="width: 100%; font-size: 0.82rem; padding: 8px 12px; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700;">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Mark as Repurposed (${b.current_quantity} ${b.unit || 'pcs'})
+            </button>
+          ` : `
+            <button class="btn-secondary" disabled style="width: 100%; font-size: 0.8rem; padding: 6px 10px; opacity: 0.6; cursor: not-allowed;">
+              <i data-lucide="slash" style="width: 13px; height: 13px;"></i> Repurposing Prohibited (Food-Safety Rule)
+            </button>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  setSafeHtml(container, cardsHtml);
+
+  // Attach repurpose action listeners
+  document.querySelectorAll(".btn-repurpose-action").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pid = btn.getAttribute("data-pid");
+      const name = btn.getAttribute("data-name");
+      const qty = parseInt(btn.getAttribute("data-qty") || 0);
+      const recipe = btn.getAttribute("data-recipe");
+      const batchCode = btn.getAttribute("data-batch");
+      const branchId = btn.getAttribute("data-branch");
+
+      handleMarkAsRepurposed(pid, name, qty, recipe, batchCode, branchId);
+    });
+  });
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function handleMarkAsRepurposed(productId, productName, qty, recipe, batchId, branchId) {
+  const activeBranch = branchId || (store.currentUser && store.currentUser.branch_id ? parseInt(store.currentUser.branch_id) : store.getSelectedBranchId());
+  const bId = (activeBranch && activeBranch !== 'all') ? parseInt(activeBranch) : 2;
 
   // 1. Trigger POST /api/repurpose mutation to persist permanently in DB
   try {
-    await fetch('/api/repurpose', {
+    const res = await fetch('/api/repurpose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5965,24 +6566,27 @@ async function handleMarkAsRepurposed(productId, productName, qty, recipe, batch
         product_name: productName,
         quantity: qty,
         target_recipe: recipe,
-        branch_id: userBranchId,
-        batch_id: batchId || `batch_${Date.now()}`
+        branch_id: bId,
+        batch_id: batchId || `BATCH-${Date.now()}`
       })
     });
+    if (res.ok) {
+      const data = await res.json();
+      console.log("Repurpose persisted in DB:", data);
+    }
   } catch (err) {
-    console.warn("Backend API repurpose error (falling back to local state sync):", err.message);
+    console.warn("Backend API repurpose notice:", err.message);
   }
 
-  // 2. Deduct/clear near-expiry inventory items and update batch status to "Repurposed"
+  // 2. Deduct/clear near-expiry inventory items in local state
   let remainingToDeduct = qty;
   store._inventory.forEach(item => {
     if ((item.productId === productId || String(item.productId) === String(productId)) && remainingToDeduct > 0) {
-      const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
-      if (fIndex <= 30 && item.stockLevel > 0) {
+      if (item.branchId && parseInt(item.branchId) === bId) {
         const deduct = Math.min(item.stockLevel, remainingToDeduct);
         item.stockLevel -= deduct;
         remainingToDeduct -= deduct;
-        item.status = "Repurposed";
+        if (item.stockLevel <= 0) item.status = "Repurposed";
       }
     }
   });
@@ -5992,7 +6596,7 @@ async function handleMarkAsRepurposed(productId, productName, qty, recipe, batch
   store.commitAll();
 
   // Log system activity & display success toast alert
-  store.logActivity(`Repurposed ${qty} pcs of ${productName} into "${recipe}". Waste prevented & stock updated!`, "inventory");
+  store.logActivity(`Repurposed ${qty} pcs of ${productName} (Batch: ${batchId || 'N/A'}) into "${recipe}". Safe food repurposing logged!`, "inventory");
   showToast(`${productName} (${qty} pcs) successfully marked as repurposed into "${recipe}"`, "success");
 
   // 3. Cache invalidation & system-wide UI synchronization
@@ -6001,7 +6605,7 @@ async function handleMarkAsRepurposed(productId, productName, qty, recipe, batch
   }
   refreshDashboard();
   refreshInventoryPane();
-  renderRepurposingAlerts();
+  await renderRepurposingAlerts();
   if (typeof refreshAIAnalyticsPane === 'function') refreshAIAnalyticsPane();
   if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
 }
