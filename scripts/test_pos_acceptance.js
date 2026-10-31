@@ -46,7 +46,8 @@ async function run() {
     }
   });
 
-  await page.goto(`http://localhost:${TEST_PORT}/index.html`, { waitUntil: 'networkidle0' });
+  await page.goto(`http://localhost:${TEST_PORT}/index.html`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForSelector('#app-sidebar', { timeout: 15000 });
 
   // Authenticate as Admin & Navigate to POS (pane-sales)
   await page.evaluate(async () => {

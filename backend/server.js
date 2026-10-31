@@ -2599,7 +2599,7 @@ app.get('/api/inventory/movements', async (req, res) => {
     }
 
     const maxLimit = parseInt(limit) || 100;
-    query += ` ORDER BY m.created_at DESC, m.id DESC LIMIT ${maxLimit}`;
+    query += ` ORDER BY m.id DESC LIMIT ${maxLimit}`;
 
     const result = await queryDb(query, params);
     res.json(result.rows || []);

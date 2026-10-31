@@ -73,13 +73,17 @@ async function runTests() {
     const { server } = require('../backend/server.js');
     serverInstance = server;
 
-    // Settle DB pool
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Get Branch IDs
-    const branchesRes = await request('GET', '/api/branches');
-    assert(branchesRes.status === 200, "Branches endpoint reachable");
-    const branches = branchesRes.data;
+    // Wait for DB pool to connect
+    let branches = [];
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const res = await request('GET', '/api/branches');
+      if (res.status === 200 && Array.isArray(res.data) && res.data.length > 0) {
+        branches = res.data;
+        break;
+      }
+    }
+    assert(branches.length > 0, "Branches endpoint reachable with records");
     const tibungco = branches.find(b => b.name === 'Tibungco 2');
     const lasang = branches.find(b => b.name === 'Lasang');
     assert(tibungco != null, "Tibungco 2 branch must exist");
