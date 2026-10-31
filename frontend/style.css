@@ -3230,10 +3230,11 @@ body.dark-mode .dashboard-ai-insight {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.pos-product-card:not(.disabled-card):hover .pos-product-add-btn:not(:disabled) {
+.pos-product-card:not(.disabled-card):hover .pos-product-add-btn:not(:disabled),
+.pos-product-add-btn:hover:not(:disabled) {
   background-color: var(--primary-color);
   color: #ffffff;
 }
