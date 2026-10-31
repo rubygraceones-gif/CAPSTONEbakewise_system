@@ -188,12 +188,14 @@ window.fetch = async function () {
     }
   }
   const response = await originalFetch(resource, config);
-  if (response.status === 401 && typeof resource === 'string' && resource.startsWith('/api') && resource !== '/api/auth/login') {
+  if ((response.status === 401 || response.status === 403) && typeof resource === 'string' && resource.startsWith('/api') && resource !== '/api/auth/login') {
     const hasToken = config && config.headers && config.headers['Authorization'];
     if (hasToken && (!window.store || window.store.isBackendOnline)) {
       sessionStorage.removeItem('bakewise_v2_session');
       localStorage.removeItem('bakewise_v2_remember_me');
       localStorage.removeItem('bakewise_v2_session');
+      localStorage.removeItem('bakewise_token');
+      sessionStorage.removeItem('bakewise_token');
       document.documentElement.classList.remove('user-logged-in');
       if (document.getElementById('app-view') && document.getElementById('app-view').style.display !== 'none') {
         window.location.reload();
@@ -525,34 +527,51 @@ class BakeWiseStore {
         }
 
         if (Array.isArray(data.sales)) {
-          this._sales = data.sales.map(s => ({
-            id: s.id.toString(),
-            productId: s.product_id,
-            qty: parseInt(s.qty),
-            price: parseFloat(s.price),
-            date: s.date ? s.date.split('T')[0] : getRelativeDateString(0),
-            cashier: s.cashier,
-            branchId: s.branch_id
-          }));
+          this._sales = data.sales.map(s => {
+            const dateStr = s.date ? String(s.date).split('T')[0] : getRelativeDateString(0);
+            const bId = s.branch_id != null ? parseInt(s.branch_id) : null;
+            return {
+              id: s.id.toString(),
+              productId: s.product_id,
+              product_id: s.product_id,
+              qty: parseInt(s.qty),
+              price: parseFloat(s.price),
+              date: dateStr,
+              cashier: s.cashier,
+              branchId: bId,
+              branch_id: bId
+            };
+          });
           this.save("bakewise_v2_sales", this._sales);
         }
 
         if (Array.isArray(data.inventory)) {
-          this._inventory = data.inventory.map(inv => ({
-            id: inv.id.toString(),
-            productId: inv.product_id,
-            stockLevel: parseInt(inv.stock_level),
-            productionDate: inv.production_date ? inv.production_date : (getRelativeDateString(0) + 'T05:00:00'),
-            expiryDate: inv.expiry_date ? inv.expiry_date : (getRelativeDateString(1) + 'T05:00:00'),
-            branchId: inv.branch_id,
-            unit: inv.unit || 'pcs',
-            status: inv.status || 'In Stock',
-            batchId: inv.batch_id || null,
-            productionTime: inv.production_time || '06:00:00',
-            expiryTime: inv.expiry_time || '18:00:00',
-            degradationPercent: inv.degradation_percent !== undefined ? inv.degradation_percent : 0,
-            shelfStatus: inv.shelf_status || 'Fresh'
-          }));
+          this._inventory = data.inventory.map(inv => {
+            const prodDateStr = inv.production_date ? String(inv.production_date).split('T')[0] : getRelativeDateString(0);
+            const expDateStr = inv.expiry_date ? String(inv.expiry_date).split('T')[0] : getRelativeDateString(1);
+            const bId = inv.branch_id != null ? parseInt(inv.branch_id) : null;
+            return {
+              id: inv.id.toString(),
+              productId: inv.product_id,
+              product_id: inv.product_id,
+              stockLevel: parseInt(inv.stock_level),
+              stock_level: parseInt(inv.stock_level),
+              productionDate: prodDateStr,
+              production_date: prodDateStr,
+              expiryDate: expDateStr,
+              expiry_date: expDateStr,
+              branchId: bId,
+              branch_id: bId,
+              unit: inv.unit || 'pcs',
+              status: inv.status || 'In Stock',
+              batchId: inv.batch_id || null,
+              batch_id: inv.batch_id || null,
+              productionTime: inv.production_time || '06:00:00',
+              expiryTime: inv.expiry_time || '18:00:00',
+              degradationPercent: inv.degradation_percent !== undefined ? inv.degradation_percent : 0,
+              shelfStatus: inv.shelf_status || 'Fresh'
+            };
+          });
           this.save("bakewise_v2_inventory", this._inventory);
         }
 
@@ -561,30 +580,45 @@ class BakeWiseStore {
         }
 
         if (Array.isArray(data.production)) {
-          this._production = data.production.map(p => ({
-            id: p.id.toString(),
-            productId: p.product_id,
-            planned: parseInt(p.planned),
-            actual: parseInt(p.actual),
-            date: p.date ? p.date.split('T')[0] : getRelativeDateString(0),
-            baker: p.baker,
-            status: p.status,
-            code: p.code,
-            branchId: p.branch_id
-          }));
+          this._production = data.production.map(p => {
+            const dateStr = p.date ? String(p.date).split('T')[0] : getRelativeDateString(0);
+            const bId = p.branch_id != null ? parseInt(p.branch_id) : null;
+            const bCode = p.code || p.batch_id || `PRD-${p.id}`;
+            return {
+              id: p.id.toString(),
+              productId: p.product_id,
+              product_id: p.product_id,
+              planned: parseInt(p.planned),
+              actual: parseInt(p.actual),
+              date: dateStr,
+              baker: p.baker,
+              status: p.status || 'Completed',
+              code: bCode,
+              batchId: bCode,
+              batch_id: bCode,
+              branchId: bId,
+              branch_id: bId
+            };
+          });
           this.save("bakewise_v2_production", this._production);
         }
 
         if (Array.isArray(data.waste)) {
-          this._waste = data.waste.map(w => ({
-            id: w.id.toString(),
-            productId: w.product_id,
-            qty: parseInt(w.qty),
-            cost: parseFloat(w.cost),
-            reason: w.reason,
-            date: w.date ? w.date.split('T')[0] : getRelativeDateString(0),
-            branchId: w.branch_id
-          }));
+          this._waste = data.waste.map(w => {
+            const dateStr = w.date ? String(w.date).split('T')[0] : getRelativeDateString(0);
+            const bId = w.branch_id != null ? parseInt(w.branch_id) : null;
+            return {
+              id: w.id.toString(),
+              productId: w.product_id,
+              product_id: w.product_id,
+              qty: parseInt(w.qty),
+              cost: parseFloat(w.cost),
+              reason: w.reason,
+              date: dateStr,
+              branchId: bId,
+              branch_id: bId
+            };
+          });
           this.save("bakewise_v2_waste", this._waste);
         }
 
@@ -4855,7 +4889,7 @@ async function refreshPosHistory() {
 
     // Filter locally (strictly isolating branch sales for non-admins)
     transactions = transactions.filter(tx => {
-      const txBranchId = parseInt(tx.branch_id || 1);
+      const txBranchId = parseInt(tx.branch_id || tx.branchId || 1);
       const matchBranch = isAdmin 
         ? (effectiveBranchId === 'all' || parseInt(effectiveBranchId) === txBranchId)
         : (txBranchId === userBranchId);
@@ -4865,8 +4899,8 @@ async function refreshPosHistory() {
         (tx.transaction_number && tx.transaction_number.toLowerCase().includes(searchInput)) ||
         cashierStr.toLowerCase().includes(searchInput) ||
         (tx.items && tx.items.some(i => (i.product_name || i.product_id || "").toLowerCase().includes(searchInput)));
-      const matchPayment = selectedPayment === 'all' || tx.payment_method === selectedPayment;
-      const matchStatus = selectedStatus === 'all' || tx.status === selectedStatus;
+      const matchPayment = selectedPayment === 'all' || (tx.payment_method || '').toLowerCase() === selectedPayment.toLowerCase();
+      const matchStatus = selectedStatus === 'all' || (tx.status || '').toLowerCase() === selectedStatus.toLowerCase();
       
       const txDateStr = getTxDateString(tx);
       const matchDate = !selectedDate || (txDateStr === selectedDate || txDateStr.startsWith(selectedDate));
@@ -5454,16 +5488,19 @@ function refreshInventoryPane() {
   const statusVal = statusFilterEl ? statusFilterEl.value : 'all';
 
   const filteredInventory = (store.inventory || []).filter(item => {
-    if (branchVal !== 'all' && parseInt(item.branchId) !== parseInt(branchVal)) return false;
+    if (branchVal !== 'all' && parseInt(item.branchId || item.branch_id) !== parseInt(branchVal)) return false;
 
-    const p = (store.products || []).find(x => x.id === item.productId);
-    const pName = p ? p.name.toLowerCase() : String(item.productId).toLowerCase();
+    const p = (store.products || []).find(x => x.id === (item.productId || item.product_id));
+    const pName = p ? p.name.toLowerCase() : String(item.productId || item.product_id).toLowerCase();
     const pCat = p ? p.category.toUpperCase() : 'BREAD';
 
     if (searchVal && !pName.includes(searchVal)) return false;
     if (categoryVal !== 'all' && pCat !== categoryVal.toUpperCase()) return false;
-    if (dateVal && !item.productionDate.startsWith(dateVal)) return false;
-    if (expiryVal && !item.expiryDate.startsWith(expiryVal)) return false;
+    
+    const prodStr = item.productionDate ? String(item.productionDate).split('T')[0] : '';
+    const expStr = item.expiryDate ? String(item.expiryDate).split('T')[0] : '';
+    if (dateVal && prodStr !== dateVal && !prodStr.startsWith(dateVal)) return false;
+    if (expiryVal && expStr !== expiryVal && !expStr.startsWith(expiryVal)) return false;
 
     const fIndex = getFreshnessIndex(item.productionDate, item.expiryDate);
     let shelfStatus = 'Fresh';
@@ -5596,12 +5633,13 @@ function refreshProductionPane() {
   const effectiveBranchId = localBranchFilter !== 'all' ? parseInt(localBranchFilter) : branchId;
 
   const sortedProd = [...store.production]
-    .filter(p => effectiveBranchId === 'all' || parseInt(p.branchId) === parseInt(effectiveBranchId))
+    .filter(p => effectiveBranchId === 'all' || parseInt(p.branchId || p.branch_id) === parseInt(effectiveBranchId))
     .filter(p => {
-      const prodObj = store.products.find(x => x.id === p.productId);
+      const prodObj = store.products.find(x => x.id === (p.productId || p.product_id));
       const nameMatch = prodObj ? prodObj.name.toLowerCase().includes(searchInput) : true;
-      const batchMatch = batchFilter ? p.batchId.toLowerCase().includes(batchFilter) : true;
-      const statusMatch = statusFilter === 'all' ? true : p.status.toLowerCase() === statusFilter.toLowerCase();
+      const bCode = p.code || p.batchId || p.batch_id || '';
+      const batchMatch = batchFilter ? bCode.toLowerCase().includes(batchFilter) : true;
+      const statusMatch = statusFilter === 'all' ? true : (p.status || '').toLowerCase() === statusFilter.toLowerCase();
       return nameMatch && batchMatch && statusMatch;
     })
     .sort((a, b) => {
@@ -7299,10 +7337,16 @@ async function refreshAdminBranchesPane() {
   const registeredBranchIds = new Set((store.branches || []).map(b => b.id != null ? b.id.toString() : null).filter(Boolean));
   const hasBranches = totalBranchesCount > 0;
   const totalNetworkSales = hasBranches
-    ? store._sales.filter(s => s.branch_id != null && registeredBranchIds.has(s.branch_id.toString())).reduce((sum, s) => sum + (s.qty * s.price), 0)
+    ? (store._sales || []).filter(s => {
+        const bId = s.branch_id != null ? s.branch_id : s.branchId;
+        return bId != null && (registeredBranchIds.size === 0 || registeredBranchIds.has(bId.toString()));
+      }).reduce((sum, s) => sum + (s.qty * s.price), 0)
     : 0;
   const totalNetworkWaste = hasBranches
-    ? store._waste.filter(w => w.branch_id != null && registeredBranchIds.has(w.branch_id.toString())).reduce((sum, w) => sum + (w.qty * w.cost), 0)
+    ? (store._waste || []).filter(w => {
+        const bId = w.branch_id != null ? w.branch_id : w.branchId;
+        return bId != null && (registeredBranchIds.size === 0 || registeredBranchIds.has(bId.toString()));
+      }).reduce((sum, w) => sum + (w.qty * w.cost), 0)
     : 0;
   const netMargin = totalNetworkSales - totalNetworkWaste;
 

@@ -84,6 +84,23 @@ function authenticateToken(req, res, next) {
   // Allow OPTIONS preflight requests
   if (req.method === 'OPTIONS') return next();
 
+  const isWhitelisted = (
+    req.path === '/auth/login' ||
+    req.path === '/status' ||
+    req.path === '/sync' ||
+    req.path.startsWith('/admin') ||
+    req.path.startsWith('/pos') ||
+    req.path.startsWith('/inventory') ||
+    req.path.startsWith('/products') ||
+    req.path.startsWith('/branches') ||
+    req.path.startsWith('/repurpose') ||
+    req.path.startsWith('/forecast') ||
+    req.path.startsWith('/users') ||
+    req.path.startsWith('/sales') ||
+    req.path.startsWith('/production') ||
+    req.path.startsWith('/waste')
+  );
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -92,17 +109,18 @@ function authenticateToken(req, res, next) {
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = decoded;
     } catch (err) {
-      if (!req.path.startsWith('/auth/login') && !req.path.startsWith('/status') && !req.path.startsWith('/sync')) {
-        return res.status(403).json({ error: 'Token is invalid or expired' });
+      req.user = null;
+      if (!isWhitelisted) {
+        return res.status(401).json({ error: 'Token is invalid or expired' });
       }
     }
   }
 
   // Allow public/system API routes without strict JWT header check
-  if (req.path === '/auth/login' || req.path === '/status' || req.path === '/sync' || req.path.startsWith('/admin') || req.path.startsWith('/pos') || req.path.startsWith('/inventory') || req.path.startsWith('/products') || req.path.startsWith('/branches') || req.path.startsWith('/repurpose') || req.path.startsWith('/forecast') || req.path.startsWith('/users') || req.path.startsWith('/sales') || req.path.startsWith('/production') || req.path.startsWith('/waste')) return next();
+  if (isWhitelisted) return next();
 
   if (token == null) return res.status(401).json({ error: 'No token provided' });
-  if (!req.user) return res.status(403).json({ error: 'Token is invalid or expired' });
+  if (!req.user) return res.status(401).json({ error: 'Token is invalid or expired' });
   next();
 }
 
@@ -1077,26 +1095,26 @@ app.get('/api/sync', async (req, res) => {
     const inventoryPromise = queryDb("SELECT * FROM bw_inventory ORDER BY id ASC");
 
     const salesSql = bId
-      ? "SELECT * FROM bw_sales WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
-      : "SELECT * FROM bw_sales ORDER BY date DESC, id DESC LIMIT 1000";
+      ? "SELECT * FROM bw_sales WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 50000"
+      : "SELECT * FROM bw_sales ORDER BY date DESC, id DESC LIMIT 50000";
     const salesParams = bId ? [bId] : [];
     const salesPromise = queryDb(salesSql, salesParams);
 
     const prodSql = bId
-      ? "SELECT * FROM bw_production WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
-      : "SELECT * FROM bw_production ORDER BY date DESC, id DESC LIMIT 500";
+      ? "SELECT * FROM bw_production WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 10000"
+      : "SELECT * FROM bw_production ORDER BY date DESC, id DESC LIMIT 10000";
     const prodParams = bId ? [bId] : [];
     const prodPromise = queryDb(prodSql, prodParams);
 
     const wasteSql = bId
-      ? "SELECT * FROM bw_waste WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 500"
-      : "SELECT * FROM bw_waste ORDER BY date DESC, id DESC LIMIT 500";
+      ? "SELECT * FROM bw_waste WHERE branch_id = $1 ORDER BY date DESC, id DESC LIMIT 5000"
+      : "SELECT * FROM bw_waste ORDER BY date DESC, id DESC LIMIT 5000";
     const wasteParams = bId ? [bId] : [];
     const wastePromise = queryDb(wasteSql, wasteParams);
 
     const movSql = bId
-      ? "SELECT * FROM bw_inventory_movements WHERE branch_id = $1 ORDER BY created_at DESC LIMIT 300"
-      : "SELECT * FROM bw_inventory_movements ORDER BY created_at DESC LIMIT 500";
+      ? "SELECT * FROM bw_inventory_movements WHERE branch_id = $1 ORDER BY created_at DESC LIMIT 2000"
+      : "SELECT * FROM bw_inventory_movements ORDER BY created_at DESC LIMIT 2000";
     const movParams = bId ? [bId] : [];
     const movementsPromise = queryDb(movSql, movParams);
 
@@ -2259,7 +2277,7 @@ app.get('/api/inventory', async (req, res) => {
         i.product_id,
         COALESCE(p.name, i.product_id) as product_name,
         i.branch_id,
-        COALESCE(b.name, 'Branch ' || i.branch_id) as branch_name,
+        COALESCE(b.name, CONCAT('Branch ', i.branch_id)) as branch_name,
         COALESCE(p.category, 'Bread') as category,
         i.stock_level,
         COALESCE(i.unit, p.unit, 'pcs') as unit,
@@ -2309,14 +2327,16 @@ app.get('/api/inventory', async (req, res) => {
 
     // Compute dynamic freshness degradation % and shelf status
     const enrichedRows = (result.rows || []).map(row => {
-      const prodTime = new Date(`${row.production_date}T${row.production_time || '00:00:00'}`).getTime();
-      const expTime = new Date(`${row.expiry_date}T${row.expiry_time || '23:59:59'}`).getTime();
+      const prodDateStr = row.production_date ? String(row.production_date).split('T')[0] : '2026-10-14';
+      const expDateStr = row.expiry_date ? String(row.expiry_date).split('T')[0] : '2026-10-16';
+      const prodTime = new Date(`${prodDateStr}T${row.production_time || '00:00:00'}`).getTime();
+      const expTime = new Date(`${expDateStr}T${row.expiry_time || '23:59:59'}`).getTime();
       const now = Date.now();
 
       let degradationPercent = 0;
       let shelfStatus = 'Fresh';
 
-      if (expTime > prodTime) {
+      if (!isNaN(expTime) && !isNaN(prodTime) && expTime > prodTime) {
         const totalDuration = expTime - prodTime;
         const elapsed = now - prodTime;
         degradationPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
@@ -2336,6 +2356,8 @@ app.get('/api/inventory', async (req, res) => {
 
       return {
         ...row,
+        production_date: prodDateStr,
+        expiry_date: expDateStr,
         degradation_percent: degradationPercent,
         shelf_status: shelfStatus
       };
