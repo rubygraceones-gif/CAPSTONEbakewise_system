@@ -5971,43 +5971,41 @@ async function renderDailyPredictionTable() {
     const unit = p.unit || forecastRes.unit || 'pcs';
     const total7 = forecastRes.sevenDayTotal || forecast;
 
-    // Confidence badge
-    let confBadge = '';
-    if (forecastRes.isFallback || forecastRes.confidence === "Insufficient historical data") {
-      confBadge = `<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #b45309; font-weight: 700; border: 1px solid rgba(234, 179, 8, 0.3);" title="${escapeHtml(forecastRes.fallbackReason || 'Insufficient sales history')}">Insufficient Data</span>`;
-    } else if (forecastRes.confidence === "High") {
-      confBadge = `<span class="badge success" style="background: #dcfce7; color: #166534; font-weight: 700;">High (${forecastRes.reliabilityScore})</span>`;
-    } else if (forecastRes.confidence === "Medium") {
-      confBadge = `<span class="badge info" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">Medium (${forecastRes.reliabilityScore})</span>`;
-    } else {
-      confBadge = `<span class="badge warning" style="background: #fef3c7; color: #92400e; font-weight: 700;">Low (${forecastRes.reliabilityScore})</span>`;
-    }
+    // Calculate Demand Trend dynamically comparing tomorrow's forecast with historical daily average
+    let trendBadge = '';
+    const hasSufficientData = !forecastRes.isFallback && forecastRes.confidence !== "Insufficient historical data" && (forecastRes.dataPoints >= 3) && histAvg > 0;
 
-    // Trend Indicator
-    let trendHtml = '';
-    if (forecastRes.isFallback || forecastRes.trend === "Insufficient Data") {
-      trendHtml = `<span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">Insufficient Data</span>`;
-    } else if (forecastRes.trend === "Upward") {
-      trendHtml = `<span style="color: var(--color-success); font-weight: 700;">▲ Upward Trend</span>`;
-    } else if (forecastRes.trend === "Downward") {
-      trendHtml = `<span style="color: var(--color-error); font-weight: 700;">▼ Downward Trend</span>`;
+    if (!hasSufficientData) {
+      // INSUFFICIENT DATA: Not enough reliable sales history (< 3 distinct sales days)
+      trendBadge = `<span class="badge" style="background: rgba(0, 0, 0, 0.05); color: var(--text-secondary); font-weight: 600; font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; border: 1px solid var(--border-color); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;" title="Not enough reliable sales history to determine trend (requires minimum 3 completed sales days)">○ INSUFFICIENT DATA</span>`;
     } else {
-      trendHtml = `<span style="color: var(--text-secondary); font-weight: 600;">▬ Stable</span>`;
-    }
+      const diffFromAvg = forecast - histAvg;
+      const pctDiff = (diffFromAvg / histAvg) * 100;
 
-    const dataPeriodText = forecastRes.dataPeriod || (forecastRes.dataPoints > 0 ? `${forecastRes.dataPoints} sales days` : 'No history');
+      if (pctDiff >= 30) {
+        // HIGH DEMAND: Strong increase (forecast is at least 30% above historical average)
+        trendBadge = `<span class="badge" style="background: #dcfce7; color: #166534; font-weight: 700; font-size: 0.78rem; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(22, 101, 52, 0.25); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;" title="${diffFromAvg >= 0 ? '+' : ''}${diffFromAvg.toFixed(1)} ${unit} (${pctDiff >= 0 ? '+' : ''}${pctDiff.toFixed(0)}% vs avg)">▲ HIGH DEMAND</span>`;
+      } else if (pctDiff >= 10) {
+        // MODERATE DEMAND: Demand is above normal baseline (10% to less than 30% above historical average)
+        trendBadge = `<span class="badge" style="background: #ffedd5; color: #c2410c; font-weight: 700; font-size: 0.78rem; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(194, 65, 12, 0.25); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;" title="${diffFromAvg >= 0 ? '+' : ''}${diffFromAvg.toFixed(1)} ${unit} (${pctDiff >= 0 ? '+' : ''}${pctDiff.toFixed(0)}% vs avg)">↗ MODERATE DEMAND</span>`;
+      } else if (pctDiff >= -10) {
+        // STABLE DEMAND: Relatively consistent (within 10% above or below historical average)
+        trendBadge = `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 0.78rem; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(3, 105, 161, 0.25); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;" title="${diffFromAvg >= 0 ? '+' : ''}${diffFromAvg.toFixed(1)} ${unit} (${pctDiff >= 0 ? '+' : ''}${pctDiff.toFixed(0)}% vs avg)">▬ STABLE DEMAND</span>`;
+      } else {
+        // LOW DEMAND: Below normal baseline (more than 10% below historical average)
+        trendBadge = `<span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 0.78rem; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(153, 27, 27, 0.25); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;" title="${diffFromAvg.toFixed(1)} ${unit} (${pctDiff.toFixed(0)}% vs avg)">▼ LOW DEMAND</span>`;
+      }
+    }
 
     return `
       <tr>
-        <td style="font-weight: 700; color: var(--text-primary);">${p.name}</td>
-        <td><span class="badge category-badge" style="font-size: 0.78rem;">${p.category || 'General'}</span></td>
-        <td style="font-weight: 600; color: var(--text-secondary);">${unit}</td>
+        <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(p.name)}</td>
+        <td><span class="badge category-badge" style="font-size: 0.78rem;">${escapeHtml(p.category || 'General')}</span></td>
+        <td style="font-weight: 600; color: var(--text-secondary);">${escapeHtml(unit)}</td>
         <td style="font-weight: 600;">${histAvg} ${unit}/day</td>
         <td style="font-weight: 800; color: var(--primary-color); font-size: 0.95rem;">${forecast} ${unit}</td>
         <td style="font-weight: 700; color: var(--accent-color);">${total7} ${unit}</td>
-        <td>${confBadge}</td>
-        <td style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(dataPeriodText)}</td>
-        <td>${trendHtml}</td>
+        <td>${trendBadge}</td>
       </tr>
     `;
   }));

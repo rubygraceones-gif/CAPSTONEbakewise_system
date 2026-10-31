@@ -192,28 +192,44 @@ async function run() {
     });
     await new Promise(r => setTimeout(r, 2500));
 
-    // Verify Table 1: Daily Demand Prediction Table
+    // Verify Table 1: Daily Demand Prediction Table (7 columns strictly)
+    const table1Headers = await page.evaluate(() => {
+      const ths = document.querySelectorAll('#pane-ai-analytics .panel-card:nth-of-type(1) thead th');
+      return Array.from(ths).map(th => th.innerText.trim());
+    });
+    assert('Table 1 has exactly 7 columns', table1Headers.length === 7);
+    assert('Table 1 removed Confidence & Reliability column', !table1Headers.some(h => h.includes('Confidence')));
+    assert('Table 1 removed Data Period column', !table1Headers.some(h => h.includes('Period')));
+    assert('Table 1 includes Demand Trend header', table1Headers.includes('Demand Trend'));
+
     const table1Rows = await page.evaluate(() => {
       const rows = document.querySelectorAll('#ai-daily-prediction-tbody tr');
       return Array.from(rows).map(r => {
         const cols = r.querySelectorAll('td');
         return {
+          colCount: cols.length,
           product: cols[0]?.innerText.trim(),
           category: cols[1]?.innerText.trim(),
           unit: cols[2]?.innerText.trim(),
           histAvg: cols[3]?.innerText.trim(),
           tomorrow: cols[4]?.innerText.trim(),
           total7: cols[5]?.innerText.trim(),
-          confidence: cols[6]?.innerText.trim(),
-          period: cols[7]?.innerText.trim()
+          trend: cols[6]?.innerText.trim(),
+          trendHtml: cols[6]?.innerHTML
         };
       });
     });
 
     assert('Daily Prediction Table rendered products', table1Rows.length > 0);
+    assert('Each row in Daily Prediction Table has exactly 7 cells', table1Rows.every(r => r.colCount === 7));
     const tomorrowValues = new Set(table1Rows.map(r => r.tomorrow));
     assert(`Tomorrow's forecast has individual distinct values across products (not all identical): [${Array.from(tomorrowValues).slice(0, 4).join(', ')}]`, tomorrowValues.size > 1);
     assert('Correct product unit is rendered (e.g. pcs)', table1Rows[0].unit && table1Rows[0].unit.length > 0);
+
+    // Verify Demand Trend badges
+    const validTrends = ['HIGH DEMAND', 'MODERATE DEMAND', 'STABLE DEMAND', 'LOW DEMAND', 'INSUFFICIENT DATA'];
+    const trendMatches = table1Rows.filter(r => validTrends.some(v => r.trend.includes(v)));
+    assert(`All rows have valid Demand Trend badges (e.g. HIGH DEMAND, INSUFFICIENT DATA): ${trendMatches.length}/${table1Rows.length}`, trendMatches.length === table1Rows.length);
 
     // Verify Table 2: 7-Day Forecast Projection Table
     const table2Data = await page.evaluate(() => {

@@ -258,25 +258,31 @@ async function setupDatabaseConnection() {
   }
 
   for (const connStr of pgCandidates) {
-    try {
-      const sanitized = connStr.replace(/:[^:@]+@/, ':***@');
-      console.log(`Attempting PostgreSQL fallback connection to: ${sanitized}`);
-      pgPool = new Pool({
-        connectionString: connStr,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000
-      });
-      await pgPool.query("SELECT 1");
-      activeDbDriver = 'pg';
-      console.log("🟢 CONNECTED TO POSTGRESQL DATABASE FALLBACK SUCCESSFULLY!");
-      console.log("--------------------------------------------------");
-      await initializePgSchema();
-      return;
-    } catch (pgErr) {
-      console.error("❌ PostgreSQL connection fallback failed:", pgErr.message);
-      if (pgPool) {
-        try { await pgPool.end(); } catch (e) {}
-        pgPool = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const sanitized = connStr.replace(/:[^:@]+@/, ':***@');
+        console.log(`Attempting PostgreSQL fallback connection (attempt ${attempt}/3) to: ${sanitized}`);
+        pgPool = new Pool({
+          connectionString: connStr,
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 15000,
+          idleTimeoutMillis: 30000
+        });
+        await pgPool.query("SELECT 1");
+        activeDbDriver = 'pg';
+        console.log("🟢 CONNECTED TO POSTGRESQL DATABASE FALLBACK SUCCESSFULLY!");
+        console.log("--------------------------------------------------");
+        await initializePgSchema();
+        return;
+      } catch (pgErr) {
+        console.error(`❌ PostgreSQL connection fallback attempt ${attempt} failed:`, pgErr.message);
+        if (pgPool) {
+          try { await pgPool.end(); } catch (e) {}
+          pgPool = null;
+        }
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
     }
   }

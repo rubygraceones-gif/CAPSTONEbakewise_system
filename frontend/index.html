@@ -20,12 +20,14 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Instant Session Anti-Flicker Script -->
   <script>
-    (function() {
+    (function () {
       try {
         var remember = localStorage.getItem('bakewise_v2_remember_me') === 'true';
         var s = sessionStorage.getItem('bakewise_v2_session');
@@ -37,7 +39,7 @@
         if (s && JSON.parse(s)) {
           document.documentElement.classList.add('user-logged-in');
         }
-      } catch(e) {}
+      } catch (e) { }
     })();
   </script>
 </head>
@@ -56,15 +58,16 @@
       <div class="animated-bg-shape shape-3"></div>
       <div class="animated-bg-shape shape-4"></div>
       <div class="hero-overlay"></div>
-      
+
       <div class="hero-content">
-        <div class="hero-logo-container" style="display: flex; gap: 20px; justify-content: center; align-items: center;">
+        <div class="hero-logo-container"
+          style="display: flex; gap: 20px; justify-content: center; align-items: center;">
           <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="hero-logo-img">
           <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="hero-logo-img">
         </div>
         <h1 class="hero-title">Rose Bakeshop x BakeWise</h1>
         <p class="hero-subtitle-gold">Advanced Bakery Operations Platform</p>
-        
+
         <div class="hero-divider-wheat">
           <div class="line"></div>
           <i data-lucide="wheat" class="wheat-icon"></i>
@@ -120,7 +123,8 @@
 
       <div class="login-wrapper">
         <header class="login-header">
-          <div class="login-brand-logo-wrapper" style="display: flex; gap: 15px; justify-content: center; align-items: center;">
+          <div class="login-brand-logo-wrapper"
+            style="display: flex; gap: 15px; justify-content: center; align-items: center;">
             <img src="assets/rose_logo.png" alt="Rose Bakeshop Logo" class="login-brand-logo-img">
             <img src="assets/bakewise_logo.png" alt="BakeWise Logo" class="login-brand-logo-img">
           </div>
@@ -138,7 +142,8 @@
             <label for="email-input" class="form-label">Work Email Address</label>
             <div class="input-container">
               <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
-              <input type="email" id="email-input" name="email" class="form-input" placeholder="youremail@example.com" required autocomplete="email">
+              <input type="email" id="email-input" name="email" class="form-input" placeholder="youremail@example.com"
+                required autocomplete="email">
             </div>
           </div>
 
@@ -146,9 +151,10 @@
             <label for="password-input" class="form-label">Account Password</label>
             <div class="input-container">
               <i data-lucide="lock" class="input-icon" style="width: 18px; height: 18px;"></i>
-              <input type="password" id="password-input" name="password" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
-              <button type="button" class="password-toggle" id="btn-toggle-password"
-                aria-label="Show password" title="Show password" data-visible="false">
+              <input type="password" id="password-input" name="password" class="form-input"
+                placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="password-toggle" id="btn-toggle-password" aria-label="Show password"
+                title="Show password" data-visible="false">
                 <i data-lucide="eye" id="icon-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
                 <i data-lucide="eye-off" id="icon-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
               </button>
@@ -169,8 +175,10 @@
             <span>Secure System Sign In</span>
             <i data-lucide="arrow-right" style="width: 18px; height: 18px; margin-left: 8px;"></i>
           </button>
-          
-          <div class="security-badge" id="btn-show-privacy-policy" style="cursor: pointer; text-decoration: underline; text-underline-offset: 4px;" title="View Data Privacy Policy">
+
+          <div class="security-badge" id="btn-show-privacy-policy"
+            style="cursor: pointer; text-decoration: underline; text-underline-offset: 4px;"
+            title="View Data Privacy Policy">
             <i data-lucide="shield-check"></i> Enterprise-grade security &bull; Encrypted connection
           </div>
         </form>
@@ -288,13 +296,18 @@
               <span class="bell-badge" id="alert-notification-badge" style="display: none;">0</span>
             </button>
             <div id="notifications-dropdown" class="panel-card notifications-dropdown" style="display: none;">
-              <div class="notifications-header" style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Notifications</h3>
+              <div class="notifications-header"
+                style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Notifications
+                </h3>
                 <div style="display:flex; gap:16px; align-items: center;">
-                  <button id="btn-new-announcement" style="color: var(--color-primary); font-size: 0.9rem; font-weight: 600; border: none; background: transparent; cursor: pointer; display: none; align-items: center; gap: 6px; padding: 0;">
+                  <button id="btn-new-announcement"
+                    style="color: var(--color-primary); font-size: 0.9rem; font-weight: 600; border: none; background: transparent; cursor: pointer; display: none; align-items: center; gap: 6px; padding: 0;">
                     <i data-lucide="megaphone" style="width: 16px; height: 16px;"></i> Broadcast
                   </button>
-                  <button id="btn-clear-notifications" style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; border: none; background: transparent; cursor: pointer; padding: 0; transition: color 0.2s;">Clear all</button>
+                  <button id="btn-clear-notifications"
+                    style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; border: none; background: transparent; cursor: pointer; padding: 0; transition: color 0.2s;">Clear
+                    all</button>
                 </div>
               </div>
               <div id="notifications-list" class="notifications-list">
@@ -388,7 +401,8 @@
               <div class="card-stats">
                 <span class="stats-label">Stock Status</span>
                 <span class="stats-value" id="dash-stock-value">0 pcs</span>
-                <span class="stats-trend up" style="color: var(--color-success);" id="dash-stock-subtext">Optimal levels</span>
+                <span class="stats-trend up" style="color: var(--color-success);" id="dash-stock-subtext">Optimal
+                  levels</span>
                 <div class="dashboard-ai-insight" id="dash-stock-insight">
                   <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
                   <span>Stock levels are optimal. No immediate restocking required.</span>
@@ -405,10 +419,13 @@
                   <span id="dash-chart-title">Daily Sales vs. Waste Trend</span>
                 </h2>
                 <div style="display: flex; gap: 10px; align-items: center; width: 100%; justify-content: flex-end;">
-                  <input type="date" id="dash-filter-start" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;" title="Start Date">
+                  <input type="date" id="dash-filter-start" class="form-input"
+                    style="padding: 4px 8px; font-size: 0.9rem;" title="Start Date">
                   <span style="color: var(--text-secondary); font-size: 0.9rem;">to</span>
-                  <input type="date" id="dash-filter-end" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;" title="End Date">
-                  <button id="btn-dash-filter-apply" class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
+                  <input type="date" id="dash-filter-end" class="form-input"
+                    style="padding: 4px 8px; font-size: 0.9rem;" title="End Date">
+                  <button id="btn-dash-filter-apply" class="btn-primary"
+                    style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
                 </div>
               </div>
               <div class="chart-container">
@@ -446,7 +463,8 @@
             </div>
           </div>
 
-          <div class="dashboard-layout-grid" id="dashboard-branches-chart-container" style="margin-top: 20px; grid-template-columns: 1fr 1fr;">
+          <div class="dashboard-layout-grid" id="dashboard-branches-chart-container"
+            style="margin-top: 20px; grid-template-columns: 1fr 1fr;">
             <div class="panel-card" style="margin-bottom: 0;">
               <div class="panel-card-header">
                 <h2 class="panel-card-title">
@@ -540,7 +558,8 @@
               <div class="card-stats">
                 <span class="stats-label">Total Net Profit</span>
                 <span class="stats-value" id="branch-kpi-net">₱0.00</span>
-                <span class="stats-trend up" style="color: var(--color-success);" id="branch-kpi-net-subtext">Real-time Net Earnings</span>
+                <span class="stats-trend up" style="color: var(--color-success);" id="branch-kpi-net-subtext">Real-time
+                  Net Earnings</span>
               </div>
             </div>
           </div>
@@ -556,27 +575,34 @@
                   <label for="br-name-input" class="form-label">Branch Name</label>
                   <div class="input-container">
                     <i data-lucide="store" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="br-name-input" class="form-input" required placeholder="e.g. Westside Branch">
+                    <input type="text" id="br-name-input" class="form-input" required
+                      placeholder="e.g. Westside Branch">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <label class="form-label" style="margin-bottom: 0;">Store Hours</label>
-                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
-                      <input type="checkbox" id="br-24hours-checkbox" style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
+                    <label
+                      style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                      <input type="checkbox" id="br-24hours-checkbox"
+                        style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
                       <span>24 Hours Open</span>
                     </label>
                   </div>
                   <div id="br-time-picker-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
-                      <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening Time</span>
+                      <span
+                        style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening
+                        Time</span>
                       <div class="input-container">
                         <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
                         <input type="time" id="br-open-time" class="form-input" required value="05:00">
                       </div>
                     </div>
                     <div>
-                      <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing Time</span>
+                      <span
+                        style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing
+                        Time</span>
                       <div class="input-container">
                         <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
                         <input type="time" id="br-close-time" class="form-input" required value="20:00">
@@ -589,14 +615,17 @@
                   <label for="br-contact-input" class="form-label">Contact Number</label>
                   <div class="input-container">
                     <i data-lucide="phone" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="tel" id="br-contact-input" class="form-input" required inputmode="numeric" pattern="^(09\d{9}|639\d{9})$" maxlength="12" placeholder="e.g. 09123456789 or 639123456789" title="Please enter a valid Philippine contact number using numbers only.">
+                    <input type="tel" id="br-contact-input" class="form-input" required inputmode="numeric"
+                      pattern="^(09\d{9}|639\d{9})$" maxlength="12" placeholder="e.g. 09123456789 or 639123456789"
+                      title="Please enter a valid Philippine contact number using numbers only.">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="br-address-input" class="form-label">Branch Address</label>
                   <div class="input-container">
                     <i data-lucide="map-pin" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="br-address-input" class="form-input" required placeholder="Street, Barangay, City">
+                    <input type="text" id="br-address-input" class="form-input" required
+                      placeholder="Street, Barangay, City">
                   </div>
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">
@@ -607,11 +636,15 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
+              <div class="panel-card-header"
+                style="flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Branch List</h2>
                 <div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 400px;">
-                  <label for="branch-search-input" style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">Search Branches:</label>
-                  <input type="text" id="branch-search-input" class="form-input" placeholder="Search branch name/address..." style="flex: 1; padding: 6px 12px; font-size: 0.82rem;">
+                  <label for="branch-search-input"
+                    style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">Search
+                    Branches:</label>
+                  <input type="text" id="branch-search-input" class="form-input"
+                    placeholder="Search branch name/address..." style="flex: 1; padding: 6px 12px; font-size: 0.82rem;">
                 </div>
               </div>
               <div class="table-responsive">
@@ -629,12 +662,15 @@
                   <tbody id="admin-branches-tbody"></tbody>
                 </table>
               </div>
-              <div id="branch-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="branch-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <div id="branch-pagination"
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="branch-prev-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
                 </button>
                 <span id="branch-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="branch-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <button id="branch-next-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
               </div>
@@ -712,18 +748,23 @@
                   <label for="usr-email-input" class="form-label">Email Address</label>
                   <div class="input-container">
                     <i data-lucide="mail" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="email" id="usr-email-input" class="form-input" required placeholder="staff@bakewise.com" pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
+                    <input type="email" id="usr-email-input" class="form-input" required
+                      placeholder="staff@bakewise.com" pattern=".*@bakewise\.com$"
+                      title="Only @bakewise.com email addresses are allowed">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="usr-password-input" class="form-label">Password</label>
                   <div class="input-container">
                     <i data-lucide="lock" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="password" id="usr-password-input" class="form-input" required placeholder="Enter secure password" autocomplete="new-password">
+                    <input type="password" id="usr-password-input" class="form-input" required
+                      placeholder="Enter secure password" autocomplete="new-password">
                     <button type="button" class="password-toggle" id="btn-toggle-usr-password"
                       aria-label="Show password" title="Show password" data-visible="false">
-                      <i data-lucide="eye" id="icon-usr-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
-                      <i data-lucide="eye-off" id="icon-usr-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
+                      <i data-lucide="eye" id="icon-usr-eye-open" class="eye-open"
+                        style="width: 18px; height: 18px;"></i>
+                      <i data-lucide="eye-off" id="icon-usr-eye-closed" class="eye-closed"
+                        style="width: 18px; height: 18px;"></i>
                     </button>
                   </div>
                 </div>
@@ -747,7 +788,8 @@
                     <i data-lucide="map-pin" class="input-icon" style="width: 18px; height: 18px;"></i>
                     <select id="usr-branch-select" class="form-input" required></select>
                   </div>
-                    <small class="form-helper-text" id="usr-branch-select-helper" style="display: none;">Admins have full access to all branches and do not require a branch assignment.</small>
+                  <small class="form-helper-text" id="usr-branch-select-helper" style="display: none;">Admins have full
+                    access to all branches and do not require a branch assignment.</small>
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">
                   <i data-lucide="user-plus" style="width: 18px; height: 18px;"></i>
@@ -757,10 +799,12 @@
             </div>
 
             <div class="panel-card">
-              <div class="panel-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
+              <div class="panel-card-header"
+                style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Staff List</h2>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                  <select id="user-role-filter" class="form-input" style="padding: 6px 10px; font-size: 0.82rem; min-width: 140px; max-width: 180px;">
+                  <select id="user-role-filter" class="form-input"
+                    style="padding: 6px 10px; font-size: 0.82rem; min-width: 140px; max-width: 180px;">
                     <option value="all">All Roles</option>
                     <option value="admin">Admin</option>
                     <option value="manager">Manager</option>
@@ -768,7 +812,8 @@
                     <option value="inventory">Inventory Specialist</option>
                     <option value="production">Baking Specialist</option>
                   </select>
-                  <input type="text" id="user-search-input" class="form-input" placeholder="Search name/email..." style="min-width: 160px; max-width: 220px; padding: 6px 10px; font-size: 0.82rem;">
+                  <input type="text" id="user-search-input" class="form-input" placeholder="Search name/email..."
+                    style="min-width: 160px; max-width: 220px; padding: 6px 10px; font-size: 0.82rem;">
                 </div>
               </div>
               <div class="table-responsive">
@@ -785,12 +830,15 @@
                   <tbody id="admin-users-tbody"></tbody>
                 </table>
               </div>
-              <div id="users-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="users-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <div id="users-pagination"
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="users-prev-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Back
                 </button>
                 <span id="users-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="users-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <button id="users-next-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
               </div>
@@ -806,7 +854,7 @@
           <div class="pos-top-header">
             <div class="pos-header-titles">
               <h2 class="pos-title">Point of Sale (POS) Terminal</h2>
-              <p class="pos-subtitle">Rose Bakeshop Multi-Product Cashier Checkout & Inventory Sync</p>
+              <p class="pos-subtitle">Rose Bakeshop Multi-Product Cashier Checkout</p>
             </div>
             <div class="pos-tab-switcher">
               <button type="button" class="pos-tab-btn active" id="btn-pos-tab-sale" onclick="switchPosTab('new-sale')">
@@ -823,14 +871,15 @@
           <!-- TAB 1: NEW SALE (POS INTERFACE) -->
           <div id="pos-view-new-sale" class="pos-tab-content">
             <div class="pos-container">
-              
+
               <!-- LEFT SIDE: PRODUCT SELECTION AREA -->
               <div class="pos-products-area panel-card">
                 <!-- Search & Category Filters -->
                 <div class="pos-filter-bar">
                   <div class="input-container pos-search-wrapper">
                     <i data-lucide="search" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="text" id="pos-product-search" class="form-input" placeholder="Search product name or category...">
+                    <input type="text" id="pos-product-search" class="form-input"
+                      placeholder="Search product name or category...">
                   </div>
                   <div class="pos-category-pills" id="pos-category-pills">
                     <button type="button" class="category-pill active" data-category="all">All Products</button>
@@ -855,10 +904,13 @@
                     </div>
                     <span class="cart-badge" id="pos-cart-count">0 items</span>
                   </div>
-                  <div class="cart-context-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                  <div class="cart-context-row"
+                    style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                       <span class="cart-ctx-pill" id="pos-ctx-branch">Branch: Main Branch</span>
-                      <select id="pos-branch-select" class="form-input" style="display: none; padding: 2px 8px; font-size: 0.8rem; height: 28px; border-radius: 6px; font-weight: 600; max-width: 170px;" title="Select POS Operating Branch"></select>
+                      <select id="pos-branch-select" class="form-input"
+                        style="display: none; padding: 2px 8px; font-size: 0.8rem; height: 28px; border-radius: 6px; font-weight: 600; max-width: 170px;"
+                        title="Select POS Operating Branch"></select>
                     </div>
                     <span class="cart-ctx-pill" id="pos-ctx-cashier">Cashier: Staff</span>
                   </div>
@@ -867,9 +919,11 @@
                 <!-- Cart Items Container -->
                 <div class="pos-cart-items" id="pos-cart-items-list">
                   <div class="cart-empty-state">
-                    <i data-lucide="shopping-cart" style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.5;"></i>
+                    <i data-lucide="shopping-cart"
+                      style="width: 44px; height: 44px; color: var(--text-muted); opacity: 0.5;"></i>
                     <p style="margin-top: 10px; font-weight: 600; color: var(--text-secondary);">Cart is empty</p>
-                    <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to start checkout</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">Select bakery products from the left to
+                      start checkout</span>
                   </div>
                 </div>
 
@@ -881,7 +935,8 @@
                   </div>
                   <div class="summary-line discount-line">
                     <span>Discount (₱)</span>
-                    <input type="number" id="pos-discount-input" class="form-input pos-discount-field" min="0" value="0.00" step="1" placeholder="0.00">
+                    <input type="number" id="pos-discount-input" class="form-input pos-discount-field" min="0"
+                      value="0.00" step="1" placeholder="0.00">
                   </div>
                   <div class="summary-line grand-total-line">
                     <span>TOTAL DUE</span>
@@ -892,28 +947,38 @@
                   <div class="pos-payment-box">
                     <label class="form-label" style="margin-bottom: 6px; font-weight: 600;">Payment Method</label>
                     <div class="payment-method-selector">
-                      <button type="button" class="pay-method-btn active" data-method="Cash" style="width: 100%; cursor: default; background: var(--accent-color); color: white; font-weight: 700;">Cash</button>
+                      <button type="button" class="pay-method-btn active" data-method="Cash"
+                        style="width: 100%; cursor: default; background: var(--accent-color); color: white; font-weight: 700;">Cash</button>
                     </div>
 
                     <div class="payment-amount-group" id="pos-cash-input-group" style="margin-top: 10px;">
                       <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label for="pos-tendered-input" class="form-label" style="font-weight: 600;">Cash Tendered (₱)</label>
+                        <label for="pos-tendered-input" class="form-label" style="font-weight: 600;">Cash Tendered
+                          (₱)</label>
                         <div class="preset-cash-buttons">
-                          <button type="button" class="preset-btn" data-preset="exact" onclick="setPosCashPreset('exact')">Exact</button>
-                          <button type="button" class="preset-btn" data-preset="100" onclick="setPosCashPreset(100)">₱100</button>
-                          <button type="button" class="preset-btn" data-preset="500" onclick="setPosCashPreset(500)">₱500</button>
-                          <button type="button" class="preset-btn" data-preset="1000" onclick="setPosCashPreset(1000)">₱1000</button>
+                          <button type="button" class="preset-btn" data-preset="exact"
+                            onclick="setPosCashPreset('exact')">Exact</button>
+                          <button type="button" class="preset-btn" data-preset="100"
+                            onclick="setPosCashPreset(100)">₱100</button>
+                          <button type="button" class="preset-btn" data-preset="500"
+                            onclick="setPosCashPreset(500)">₱500</button>
+                          <button type="button" class="preset-btn" data-preset="1000"
+                            onclick="setPosCashPreset(1000)">₱1000</button>
                         </div>
                       </div>
                       <div class="input-container" style="margin-top: 6px;">
-                        <span class="currency-prefix" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--text-secondary);">₱</span>
-                        <input type="number" id="pos-tendered-input" class="form-input" min="0" step="0.01" placeholder="Enter amount tendered..." style="padding-left: 32px;">
+                        <span class="currency-prefix"
+                          style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--text-secondary);">₱</span>
+                        <input type="number" id="pos-tendered-input" class="form-input" min="0" step="0.01"
+                          placeholder="Enter amount tendered..." style="padding-left: 32px;">
                       </div>
                     </div>
 
-                    <div class="change-display-row" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 10px 14px; border-radius: 8px;">
+                    <div class="change-display-row"
+                      style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 10px 14px; border-radius: 8px;">
                       <span style="font-weight: 600; color: var(--text-secondary);">Change</span>
-                      <strong id="pos-change-value" style="font-size: 1.2rem; color: var(--color-success);">₱0.00</strong>
+                      <strong id="pos-change-value"
+                        style="font-size: 1.2rem; color: var(--color-success);">₱0.00</strong>
                     </div>
                   </div>
 
@@ -923,7 +988,8 @@
                       <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                       <span>Clear Cart</span>
                     </button>
-                    <button type="button" class="btn-primary-gold" id="btn-pos-checkout" style="flex: 2; font-size: 1.05rem; padding: 12px;">
+                    <button type="button" class="btn-primary-gold" id="btn-pos-checkout"
+                      style="flex: 2; font-size: 1.05rem; padding: 12px;">
                       <i data-lucide="check-circle-2" style="width: 20px; height: 20px;"></i>
                       <span id="btn-pos-checkout-text">CHECKOUT (₱0.00)</span>
                     </button>
@@ -937,31 +1003,40 @@
           <!-- TAB 2: SALES HISTORY INTERFACE -->
           <div id="pos-view-history" class="pos-tab-content" style="display: none;">
             <div class="panel-card">
-              <div class="panel-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 15px; align-items: center;">
+              <div class="panel-card-header"
+                style="justify-content: space-between; flex-wrap: wrap; gap: 15px; align-items: center;">
                 <h2 class="panel-card-title">Completed POS Transactions History</h2>
-                <button type="button" class="btn-secondary" onclick="refreshPosHistory()" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 0.85rem;">
+                <button type="button" class="btn-secondary" onclick="refreshPosHistory()"
+                  style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 0.85rem;">
                   <i data-lucide="rotate-cw" style="width: 16px; height: 16px;"></i> Refresh Logs
                 </button>
               </div>
 
-              <div class="sales-filters" style="display: flex; gap: 15px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+              <div class="sales-filters"
+                style="display: flex; gap: 15px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="pos-history-search" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Search:</label>
-                  <input type="text" id="pos-history-search" class="form-input" placeholder="Tx #, Cashier, Item..." style="padding: 6px 12px; font-size: 0.85rem; width: 180px;">
+                  <label for="pos-history-search"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Search:</label>
+                  <input type="text" id="pos-history-search" class="form-input" placeholder="Tx #, Cashier, Item..."
+                    style="padding: 6px 12px; font-size: 0.85rem; width: 180px;">
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="pos-history-branch" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Branch:</label>
-                  <select id="pos-history-branch" class="form-input" style="padding: 6px 12px; font-size: 0.85rem; min-width: 140px;"></select>
+                  <label for="pos-history-branch"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Branch:</label>
+                  <select id="pos-history-branch" class="form-input"
+                    style="padding: 6px 12px; font-size: 0.85rem; min-width: 140px;"></select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="pos-history-payment" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Payment:</label>
+                  <label for="pos-history-payment"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Payment:</label>
                   <select id="pos-history-payment" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
                     <option value="all">All Methods</option>
                     <option value="Cash">Cash</option>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="pos-history-status" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Status:</label>
+                  <label for="pos-history-status"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Status:</label>
                   <select id="pos-history-status" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
                     <option value="all">All Statuses</option>
                     <option value="Completed">Completed</option>
@@ -969,8 +1044,10 @@
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="pos-history-date" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Date:</label>
-                  <input type="date" id="pos-history-date" class="form-input" style="padding: 6px 12px; font-size: 0.85rem;">
+                  <label for="pos-history-date"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Date:</label>
+                  <input type="date" id="pos-history-date" class="form-input"
+                    style="padding: 6px 12px; font-size: 0.85rem;">
                 </div>
               </div>
 
@@ -1001,7 +1078,8 @@
              ==================================================================== -->
         <section class="view-pane" id="pane-inventory">
           <div class="panel-card">
-            <div class="panel-card-header" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div class="panel-card-header"
+              style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="boxes" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
                 <span>Bakery Stock Inventory Management</span>
@@ -1024,23 +1102,30 @@
                 </button>
               </div>
             </div>
-            
-            <div class="inventory-filters" style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+
+            <div class="inventory-filters"
+              style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
-                <select id="inventory-branch-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
+                <label for="inventory-branch-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                <select id="inventory-branch-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
                   <option value="all">All Branches</option>
                 </select>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
-                <input type="text" id="inventory-search-input" class="form-input" placeholder="Search by name..." style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
+                <label for="inventory-search-input"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                <input type="text" id="inventory-search-input" class="form-input" placeholder="Search by name..."
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-category-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
-                <select id="inventory-category-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
+                <label for="inventory-category-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
+                <select id="inventory-category-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
                   <option value="all">All Categories</option>
                   <option value="BREAD">BREAD</option>
                   <option value="PASTRIES">PASTRIES</option>
@@ -1051,18 +1136,27 @@
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Production Date:</label>
-                <input type="date" id="inventory-date-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
+                <label for="inventory-date-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Production
+                  Date:</label>
+                <input type="date" id="inventory-date-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-expiry-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Expiration Date:</label>
-                <input type="date" id="inventory-expiry-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
+                <label for="inventory-expiry-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Expiration
+                  Date:</label>
+                <input type="date" id="inventory-expiry-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 135px;">
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="inventory-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Shelf Status:</label>
-                <select id="inventory-status-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
+                <label for="inventory-status-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Shelf
+                  Status:</label>
+                <select id="inventory-status-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
                   <option value="all">All Statuses</option>
                   <option value="Fresh">Fresh</option>
                   <option value="Near Expiry">Near Expiry</option>
@@ -1090,12 +1184,15 @@
                 <tbody id="inventory-tbody"></tbody>
               </table>
             </div>
-            <div id="inventory-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-              <button id="inventory-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+            <div id="inventory-pagination"
+              style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="inventory-prev-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
               </button>
               <span id="inventory-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-              <button id="inventory-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <button id="inventory-next-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
               </button>
             </div>
@@ -1103,7 +1200,8 @@
 
           <!-- Add Inventory Stock Modal -->
           <div id="inventory-modal" class="panel-card modal-dialog" style="display: none; padding: 24px;">
-            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+            <div class="panel-card-header"
+              style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="package-plus" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
                 <span>Add Inventory Stock</span>
@@ -1144,12 +1242,15 @@
                 <label for="inv-exp-date" class="form-label">Expiration Date & Time (Auto-calculated)</label>
                 <div class="input-container">
                   <i data-lucide="calendar-off" class="input-icon" style="width: 18px; height: 18px;"></i>
-                  <input type="datetime-local" id="inv-exp-date" class="form-input" required readonly style="background-color: var(--bg-secondary);">
+                  <input type="datetime-local" id="inv-exp-date" class="form-input" required readonly
+                    style="background-color: var(--bg-secondary);">
                 </div>
               </div>
-              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+              <div class="form-actions"
+                style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                 <button type="button" class="btn-secondary" id="btn-inventory-modal-cancel">Cancel</button>
-                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                <button type="submit" class="btn-primary"
+                  style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
                   <i data-lucide="save" style="width: 18px; height: 18px;"></i>
                   <span>Save Stock</span>
                 </button>
@@ -1158,13 +1259,16 @@
           </div>
 
           <!-- Branch Stock Transfer Modal -->
-          <div id="inventory-transfer-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 550px; width: 95%;">
-            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+          <div id="inventory-transfer-modal" class="panel-card modal-dialog"
+            style="display: none; padding: 24px; max-width: 550px; width: 95%;">
+            <div class="panel-card-header"
+              style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="arrow-left-right" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
                 <span>Branch Stock Transfer</span>
               </h2>
-              <button class="btn-secondary" id="btn-transfer-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+              <button class="btn-secondary" id="btn-transfer-modal-close"
+                style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
             <form id="inventory-transfer-form">
               <div class="form-group" style="margin-bottom: 14px;">
@@ -1192,20 +1296,25 @@
                 <label for="transfer-quantity-input" class="form-label">Transfer Quantity</label>
                 <div class="input-container">
                   <i data-lucide="hash" class="input-icon"></i>
-                  <input type="number" id="transfer-quantity-input" class="form-input" min="1" placeholder="e.g. 10" required>
+                  <input type="number" id="transfer-quantity-input" class="form-input" min="1" placeholder="e.g. 10"
+                    required>
                 </div>
-                <small id="transfer-avail-stock-note" style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
+                <small id="transfer-avail-stock-note"
+                  style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
               </div>
               <div class="form-group" style="margin-bottom: 14px;">
                 <label for="transfer-notes-input" class="form-label">Transfer Reason / Authorization</label>
                 <div class="input-container">
                   <i data-lucide="file-text" class="input-icon"></i>
-                  <input type="text" id="transfer-notes-input" class="form-input" placeholder="e.g. Inter-branch stock balancing" required>
+                  <input type="text" id="transfer-notes-input" class="form-input"
+                    placeholder="e.g. Inter-branch stock balancing" required>
                 </div>
               </div>
-              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+              <div class="form-actions"
+                style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                 <button type="button" class="btn-secondary" id="btn-transfer-modal-cancel">Cancel</button>
-                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                <button type="submit" class="btn-primary"
+                  style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
                   <i data-lucide="send" style="width: 18px; height: 18px;"></i>
                   <span>Execute Transfer</span>
                 </button>
@@ -1214,13 +1323,16 @@
           </div>
 
           <!-- Stock Adjustment Modal -->
-          <div id="inventory-adjust-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 550px; width: 95%;">
-            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
+          <div id="inventory-adjust-modal" class="panel-card modal-dialog"
+            style="display: none; padding: 24px; max-width: 550px; width: 95%;">
+            <div class="panel-card-header"
+              style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="sliders" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
                 <span>Stock Adjustment / Damage / Expiry</span>
               </h2>
-              <button class="btn-secondary" id="btn-adjust-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+              <button class="btn-secondary" id="btn-adjust-modal-close"
+                style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
             <form id="inventory-adjust-form">
               <input type="hidden" id="adjust-item-id">
@@ -1254,20 +1366,25 @@
                 <label for="adjust-quantity-input" class="form-label">Adjustment Quantity</label>
                 <div class="input-container">
                   <i data-lucide="hash" class="input-icon"></i>
-                  <input type="number" id="adjust-quantity-input" class="form-input" placeholder="e.g. -5 for deduction, +10 for addition" required>
+                  <input type="number" id="adjust-quantity-input" class="form-input"
+                    placeholder="e.g. -5 for deduction, +10 for addition" required>
                 </div>
-                <small id="adjust-current-stock-note" style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
+                <small id="adjust-current-stock-note"
+                  style="color: var(--text-secondary); margin-top: 4px; display: block; font-size: 0.8rem;"></small>
               </div>
               <div class="form-group" style="margin-bottom: 14px;">
                 <label for="adjust-reason-input" class="form-label">Reason / Authorization Notes</label>
                 <div class="input-container">
                   <i data-lucide="file-text" class="input-icon"></i>
-                  <input type="text" id="adjust-reason-input" class="form-input" placeholder="e.g. Broken packaging or physical recount" required>
+                  <input type="text" id="adjust-reason-input" class="form-input"
+                    placeholder="e.g. Broken packaging or physical recount" required>
                 </div>
               </div>
-              <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+              <div class="form-actions"
+                style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
                 <button type="button" class="btn-secondary" id="btn-adjust-modal-cancel">Cancel</button>
-                <button type="submit" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
+                <button type="submit" class="btn-primary"
+                  style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 24px;">
                   <i data-lucide="check" style="width: 18px; height: 18px;"></i>
                   <span>Confirm Adjustment</span>
                 </button>
@@ -1276,19 +1393,24 @@
           </div>
 
           <!-- Inventory Movements History Modal -->
-          <div id="inventory-movements-modal" class="panel-card modal-dialog" style="display: none; padding: 24px; max-width: 900px; width: 95%;">
-            <div class="panel-card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div id="inventory-movements-modal" class="panel-card modal-dialog"
+            style="display: none; padding: 24px; max-width: 900px; width: 95%;">
+            <div class="panel-card-header"
+              style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
               <h2 class="panel-card-title" style="display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="history" style="width: 22px; height: 22px; color: var(--primary-color);"></i>
                 <span>Inventory Stock Movement Audit Log</span>
               </h2>
-              <button class="btn-secondary" id="btn-movements-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
+              <button class="btn-secondary" id="btn-movements-modal-close"
+                style="padding: 4px 8px; border: none; font-size: 1.2rem; background: transparent;">&times;</button>
             </div>
             <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-              <select id="movements-branch-filter" class="form-input" style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
+              <select id="movements-branch-filter" class="form-input"
+                style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
                 <option value="all">All Branches</option>
               </select>
-              <select id="movements-type-filter" class="form-input" style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
+              <select id="movements-type-filter" class="form-input"
+                style="padding: 6px 10px; font-size: 0.85rem; min-width: 150px;">
                 <option value="all">All Movement Types</option>
                 <option value="Stock In">Stock In</option>
                 <option value="Sale Deduction">Sale Deduction</option>
@@ -1338,14 +1460,16 @@
                   <label for="prod-planned-input" class="form-label">Planned Quantity (pcs)</label>
                   <div class="input-container">
                     <i data-lucide="clipboard" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="prod-planned-input" class="form-input" min="1" required placeholder="Planned bake volume">
+                    <input type="number" id="prod-planned-input" class="form-input" min="1" required
+                      placeholder="Planned bake volume">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                   <label for="prod-actual-input" class="form-label">Actual Prepared Quantity (pcs)</label>
                   <div class="input-container">
                     <i data-lucide="check" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="prod-actual-input" class="form-input" min="1" required placeholder="Actual final quantity">
+                    <input type="number" id="prod-actual-input" class="form-input" min="1" required
+                      placeholder="Actual final quantity">
                   </div>
                 </div>
                 <button type="submit" class="btn-primary" style="margin-top: 10px;">
@@ -1359,24 +1483,34 @@
               <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Daily Baking Production Log</h2>
               </div>
-              <div class="production-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+              <div class="production-filters"
+                style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="prod-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
-                  <select id="prod-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                  <label for="prod-branch-filter"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                  <select id="prod-branch-filter" class="form-input"
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
                     <option value="all">All Branches</option>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="prod-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
-                  <input type="text" id="prod-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                  <label for="prod-search-input"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                  <input type="text" id="prod-search-input" class="form-input" placeholder="Search by name..."
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="prod-batch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Batch Code:</label>
-                  <input type="text" id="prod-batch-filter" class="form-input" placeholder="e.g. B-260..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                  <label for="prod-batch-filter"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Batch
+                    Code:</label>
+                  <input type="text" id="prod-batch-filter" class="form-input" placeholder="e.g. B-260..."
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="prod-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
-                  <select id="prod-status-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 140px;">
+                  <label for="prod-status-filter"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
+                  <select id="prod-status-filter" class="form-input"
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 140px;">
                     <option value="all">All Statuses</option>
                     <option value="Completed">Completed</option>
                     <option value="In Progress">In Progress</option>
@@ -1400,12 +1534,15 @@
                   <tbody id="production-history-tbody"></tbody>
                 </table>
               </div>
-              <div id="production-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="prod-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <div id="production-history-pagination"
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="prod-hist-prev-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
                 </button>
                 <span id="prod-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="prod-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <button id="prod-hist-next-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
               </div>
@@ -1431,7 +1568,8 @@
                   <label for="waste-qty-input" class="form-label">Discarded Quantity (pcs)</label>
                   <div class="input-container">
                     <i data-lucide="hash" class="input-icon" style="width: 18px; height: 18px;"></i>
-                    <input type="number" id="waste-qty-input" class="form-input" min="1" required placeholder="Quantity thrown away">
+                    <input type="number" id="waste-qty-input" class="form-input" min="1" required
+                      placeholder="Quantity thrown away">
                   </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
@@ -1460,23 +1598,30 @@
               <div class="panel-card-header" style="justify-content: space-between; align-items: center;">
                 <h2 class="panel-card-title">Waste Incident Ledger</h2>
               </div>
-              
-              <div class="waste-filters" style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+
+              <div class="waste-filters"
+                style="display: flex; gap: 20px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="waste-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
-                  <select id="waste-branch-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
+                  <label for="waste-branch-filter"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch:</label>
+                  <select id="waste-branch-filter" class="form-input"
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 160px; max-width: 200px;">
                     <option value="all">All Branches</option>
                   </select>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="waste-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
-                  <input type="text" id="waste-search-input" class="form-input" placeholder="Search by name..." style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
+                  <label for="waste-search-input"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product:</label>
+                  <input type="text" id="waste-search-input" class="form-input" placeholder="Search by name..."
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 220px;">
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <label for="waste-date-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Date:</label>
-                  <input type="date" id="waste-date-filter" class="form-input" style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
+                  <label for="waste-date-filter"
+                    style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Date:</label>
+                  <input type="date" id="waste-date-filter" class="form-input"
+                    style="padding: 8px 12px; font-size: 0.85rem; min-width: 150px;">
                 </div>
               </div>
               <div class="table-responsive">
@@ -1494,12 +1639,15 @@
                   <tbody id="waste-history-tbody"></tbody>
                 </table>
               </div>
-              <div id="waste-history-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-                <button id="waste-hist-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <div id="waste-history-pagination"
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+                <button id="waste-hist-prev-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
                 </button>
                 <span id="waste-hist-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-                <button id="waste-hist-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+                <button id="waste-hist-next-page" class="btn-secondary"
+                  style="display: flex; align-items: center; gap: 5px;">
                   Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
                 </button>
               </div>
@@ -1513,14 +1661,17 @@
         <section class="view-pane" id="pane-ai-analytics">
           <!-- TABLE 1: Next-Day (Tomorrow's) Daily Prediction Table -->
           <div class="panel-card" style="margin-bottom: 24px;">
-            <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div class="panel-card-header"
+              style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <h2 class="panel-card-title" style="margin: 0;">
                 <i data-lucide="calendar" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
                 <span>Next-Day (Tomorrow's) Daily Demand Prediction Table</span>
               </h2>
-              <span id="ai-forecast-last-updated" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+              <span id="ai-forecast-last-updated"
+                style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
                 <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
-                <span>Last Updated: <strong id="forecast-timestamp-text" style="color: var(--text-primary);">Oct 31, 2026</strong></span>
+                <span>Last Updated: <strong id="forecast-timestamp-text" style="color: var(--text-primary);">Oct 31,
+                    2026</strong></span>
               </span>
             </div>
             <div class="table-responsive">
@@ -1530,11 +1681,9 @@
                     <th>Product Name</th>
                     <th>Category</th>
                     <th>Unit</th>
-                    <th>Historical Daily Avg</th>
+                    <th>Historical Daily Average</th>
                     <th>Tomorrow's Forecast</th>
                     <th>7-Day Total</th>
-                    <th>Confidence & Reliability</th>
-                    <th>Data Period</th>
                     <th>Demand Trend</th>
                   </tr>
                 </thead>
@@ -1590,7 +1739,8 @@
                 </h2>
               </div>
               <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
-                Avoid throwing away safe unsold bread. BakeWise suggests repurposing near-expiry items based on system guidelines:
+                Avoid throwing away safe unsold bread. BakeWise suggests repurposing near-expiry items based on system
+                guidelines:
               </p>
               <div class="repurpose-grid" id="ai-repurpose-container"></div>
             </div>
@@ -1602,24 +1752,28 @@
              ==================================================================== -->
         <section class="view-pane" id="pane-shelf-life" aria-label="Shelf Life Prediction & Repurposing">
           <div class="shelf-life-container">
-            
+
             <!-- 1. Page Header Subtitle -->
             <div class="shelf-life-header" style="margin-bottom: 20px;">
-              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Monitor product freshness, estimate remaining shelf life, and identify spoilage risks.</p>
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Monitor product freshness,
+                estimate remaining shelf life, and identify spoilage risks.</p>
             </div>
 
             <!-- 2. Two-Column Layout (Left: Settings, Right: Results & Analysis) -->
             <div class="shelf-life-grid">
-              
+
               <!-- Left Column: Prediction Settings -->
               <div class="panel-card" style="height: fit-content;">
-                <div class="panel-card-header" style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                <div class="panel-card-header"
+                  style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
                   <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary-color);"></i>
-                  <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction Settings</h2>
+                  <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction
+                    Settings</h2>
                 </div>
-                
+
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                  <label class="form-label"
+                    style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
                     <i data-lucide="cookie" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
                     <span>Bread Type</span>
                   </label>
@@ -1629,7 +1783,8 @@
                 </div>
 
                 <div class="form-group" style="margin-bottom: 16px;">
-                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                  <label class="form-label"
+                    style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
                     <i data-lucide="box" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
                     <span>Storage Condition</span>
                   </label>
@@ -1645,16 +1800,19 @@
 
                 <div class="form-group" style="margin-bottom: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
+                    <label class="form-label"
+                      style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
                       <i data-lucide="thermometer" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
                       <span>Temperature (°C)</span>
                     </label>
-                    <span class="badge" id="shelf-temp-badge" style="background: rgba(34, 197, 94, 0.12); color: #16a34a; font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px; transition: all 0.2s ease;">
+                    <span class="badge" id="shelf-temp-badge"
+                      style="background: rgba(34, 197, 94, 0.12); color: #16a34a; font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px; transition: all 0.2s ease;">
                       <span id="shelf-temp-val">27</span>°C &bull; <span id="shelf-temp-band">Ambient</span>
                     </span>
                   </div>
                   <input type="range" id="shelf-temp" min="10" max="70" value="27" class="shelf-slider">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                  <div
+                    style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
                     <span>10°C (Cool)</span>
                     <span>25°C (Ambient)</span>
                     <span>40°C (Hot)</span>
@@ -1664,16 +1822,19 @@
 
                 <div class="form-group" style="margin-bottom: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
+                    <label class="form-label"
+                      style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
                       <i data-lucide="droplets" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
                       <span>Humidity (%)</span>
                     </label>
-                    <span class="badge" style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color); font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px;">
+                    <span class="badge"
+                      style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color); font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px;">
                       <span id="shelf-humidity-val">60</span>%
                     </span>
                   </div>
                   <input type="range" id="shelf-humidity" min="20" max="100" value="60" class="shelf-slider">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                  <div
+                    style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
                     <span>20% (Dry)</span>
                     <span>60% (Optimal)</span>
                     <span>100% (High)</span>
@@ -1681,14 +1842,16 @@
                 </div>
 
                 <div class="form-group" style="margin-bottom: 20px;">
-                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                  <label class="form-label"
+                    style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
                     <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
                     <span>Production Date</span>
                   </label>
                   <input type="date" class="form-input" id="shelf-date" style="padding-left: 12px; height: 40px;">
                 </div>
 
-                <button class="btn-primary" id="btn-predict-shelf" style="width: 100%; height: 44px; background: var(--primary-color); border: none; border-radius: 8px; font-weight: 600; font-size: 0.92rem; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; color: white;">
+                <button class="btn-primary" id="btn-predict-shelf"
+                  style="width: 100%; height: 44px; background: var(--primary-color); border: none; border-radius: 8px; font-weight: 600; font-size: 0.92rem; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; color: white;">
                   <i data-lucide="calculator" style="width: 18px; height: 18px;"></i>
                   <span>Calculate Shelf Life</span>
                 </button>
@@ -1696,44 +1859,65 @@
 
               <!-- Right Column: Results, Freshness Monitoring, & Prediction Analysis -->
               <div class="shelf-life-results" style="display: flex; flex-direction: column; gap: 20px;">
-                
+
                 <!-- 3 Summary Cards: Freshness Score, Remaining Shelf Life, Spoilage Risk -->
                 <div class="shelf-results-grid">
-                  
+
                   <!-- Card 1: Freshness Score -->
-                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                  <div class="summary-card"
+                    style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
                     <div style="position: relative; width: 76px; height: 76px; margin-bottom: 10px;">
                       <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg);">
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                           fill="none" stroke="var(--bg-secondary, #f1ede6)" stroke-width="3.5" />
-                        <path id="res-circular-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none" stroke="#22c55e" stroke-width="3.5" stroke-dasharray="100, 100" stroke-linecap="round"
+                        <path id="res-circular-progress"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
+                          stroke="#22c55e" stroke-width="3.5" stroke-dasharray="100, 100" stroke-linecap="round"
                           style="transition: stroke-dasharray 0.5s ease, stroke 0.5s ease;" />
                       </svg>
-                      <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 800; color: #22c55e;" id="res-freshness">--%</div>
+                      <div
+                        style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 800; color: #22c55e;"
+                        id="res-freshness">--%</div>
                     </div>
-                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Freshness Score</div>
-                    <span id="res-freshness-status-badge" class="badge" style="background: rgba(34, 197, 94, 0.12); color: #16a34a; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">--</span>
+                    <div class="summary-label"
+                      style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">
+                      Freshness Score</div>
+                    <span id="res-freshness-status-badge" class="badge"
+                      style="background: rgba(34, 197, 94, 0.12); color: #16a34a; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">--</span>
                   </div>
 
                   <!-- Card 2: Remaining Shelf Life -->
-                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
-                    <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; color: #3b82f6; margin-bottom: 12px;">
+                  <div class="summary-card"
+                    style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                    <div
+                      style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; color: #3b82f6; margin-bottom: 12px;">
                       <i data-lucide="clock" style="width: 22px; height: 22px;"></i>
                     </div>
-                    <div class="summary-value" id="res-days" style="font-size: 1.45rem; font-weight: 800; color: #3b82f6; margin-bottom: 2px;">-- Days</div>
-                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Remaining Shelf Life</div>
-                    <div id="res-expiry-date" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Estimated Expiry: --</div>
+                    <div class="summary-value" id="res-days"
+                      style="font-size: 1.45rem; font-weight: 800; color: #3b82f6; margin-bottom: 2px;">-- Days</div>
+                    <div class="summary-label"
+                      style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">
+                      Remaining Shelf Life</div>
+                    <div id="res-expiry-date"
+                      style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Estimated Expiry: --
+                    </div>
                   </div>
 
                   <!-- Card 3: Spoilage Risk -->
-                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
-                    <div id="res-risk-icon-container" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(34, 197, 94, 0.12); display: flex; align-items: center; justify-content: center; color: #22c55e; margin-bottom: 12px;">
+                  <div class="summary-card"
+                    style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                    <div id="res-risk-icon-container"
+                      style="width: 44px; height: 44px; border-radius: 12px; background: rgba(34, 197, 94, 0.12); display: flex; align-items: center; justify-content: center; color: #22c55e; margin-bottom: 12px;">
                       <i data-lucide="check-square" id="res-risk-icon" style="width: 22px; height: 22px;"></i>
                     </div>
-                    <div class="summary-value" id="res-risk" style="font-size: 1.4rem; font-weight: 800; color: #22c55e; margin-bottom: 2px;">--</div>
-                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Spoilage Risk</div>
-                    <span id="res-risk-subtext" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Awaiting Calculation</span>
+                    <div class="summary-value" id="res-risk"
+                      style="font-size: 1.4rem; font-weight: 800; color: #22c55e; margin-bottom: 2px;">--</div>
+                    <div class="summary-label"
+                      style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">
+                      Spoilage Risk</div>
+                    <span id="res-risk-subtext"
+                      style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Awaiting
+                      Calculation</span>
                   </div>
 
                 </div>
@@ -1742,7 +1926,8 @@
                 <div class="panel-card" style="margin-bottom: 0;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                     <div>
-                      <h3 style="margin: 0 0 2px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                      <h3
+                        style="margin: 0 0 2px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="activity" style="width: 17px; height: 17px; color: var(--primary-color);"></i>
                         <span>Product Freshness Monitoring</span>
                       </h3>
@@ -1751,25 +1936,33 @@
                       </span>
                     </div>
                     <div style="text-align: right;">
-                      <span id="res-freshness-bar-text" style="font-weight: 800; font-size: 1.15rem; color: #22c55e;">--%</span>
+                      <span id="res-freshness-bar-text"
+                        style="font-weight: 800; font-size: 1.15rem; color: #22c55e;">--%</span>
                     </div>
                   </div>
 
-                  <div style="width: 100%; height: 12px; background-color: var(--bg-secondary, #f1ede6); border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
-                    <div id="res-freshness-bar" style="width: 0%; height: 100%; background-color: #22c55e; transition: width 0.5s ease, background-color 0.5s ease;"></div>
+                  <div
+                    style="width: 100%; height: 12px; background-color: var(--bg-secondary, #f1ede6); border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
+                    <div id="res-freshness-bar"
+                      style="width: 0%; height: 100%; background-color: #22c55e; transition: width 0.5s ease, background-color 0.5s ease;">
+                    </div>
                   </div>
 
-                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary); padding-top: 4px;">
+                  <div
+                    style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary); padding-top: 4px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+                      <span
+                        style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
                       <span>Spoiled (0–24%)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+                      <span
+                        style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
                       <span>Moderate (25–74%)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                      <span
+                        style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
                       <span>Fresh (75–100%)</span>
                     </div>
                   </div>
@@ -1777,13 +1970,15 @@
 
                 <!-- Prediction Analysis Card -->
                 <div class="panel-card" style="margin-bottom: 0;">
-                  <div class="panel-card-header" style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                  <div class="panel-card-header"
+                    style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
                     <i data-lucide="bar-chart-2" style="width: 17px; height: 17px; color: var(--primary-color);"></i>
-                    <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction Analysis</h3>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction
+                      Analysis</h3>
                   </div>
 
                   <div class="analysis-factors-list">
-                    
+
                     <!-- Factor 1: Temperature -->
                     <div class="factor-row">
                       <div class="factor-icon-wrap" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
@@ -1814,7 +2009,8 @@
 
                     <!-- Factor 3: Storage Condition -->
                     <div class="factor-row">
-                      <div class="factor-icon-wrap" style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color);">
+                      <div class="factor-icon-wrap"
+                        style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color);">
                         <i data-lucide="box" style="width: 17px; height: 17px;"></i>
                       </div>
                       <div class="factor-body">
@@ -1836,7 +2032,8 @@
                           <span class="factor-name">Base Product Lifespan</span>
                           <span class="factor-value" id="res-val-product">3 Days Base</span>
                         </div>
-                        <p class="factor-desc" id="res-msg-product">Fresh lean-crust bread with daily bake formulation.</p>
+                        <p class="factor-desc" id="res-msg-product">Fresh lean-crust bread with daily bake formulation.
+                        </p>
                       </div>
                     </div>
 
@@ -1848,31 +2045,39 @@
 
             <!-- 3. Bottom Section: Recommended Repurposing Options -->
             <div class="panel-card" style="margin-bottom: 0;">
-              <div class="panel-card-header" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">
+              <div class="panel-card-header"
+                style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(234, 88, 12, 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
+                  <div
+                    style="width: 32px; height: 32px; border-radius: 8px; background: rgba(234, 88, 12, 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
                     <i data-lucide="refresh-cw" style="width: 17px; height: 17px;"></i>
                   </div>
                   <div>
-                    <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Recommended Repurposing Options</h2>
+                    <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Recommended
+                      Repurposing Options</h2>
                     <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
-                      Safe unsold or near-expiry bakery products can be repurposed into high-value items before quality declines.
+                      Safe unsold or near-expiry bakery products can be repurposed into high-value items before quality
+                      declines.
                     </p>
                   </div>
                 </div>
-                <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: #16a34a; font-weight: 600; font-size: 0.78rem; padding: 4px 10px; border-radius: 20px;">
+                <span class="badge"
+                  style="background: rgba(34, 197, 94, 0.1); color: #16a34a; font-weight: 600; font-size: 0.78rem; padding: 4px 10px; border-radius: 20px;">
                   Food Safety First
                 </span>
               </div>
 
-              <div id="shelf-repurpose-container" class="repurpose-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+              <div id="shelf-repurpose-container" class="repurpose-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
                 <!-- Populated dynamically based on evaluated bread & freshness score -->
               </div>
             </div>
 
             <!-- 4. Environmental & Freshness Notice (Compact) -->
-            <div class="panel-card" style="background: var(--bg-primary, #ffffff); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 18px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 0;">
-              <div style="width: 26px; height: 26px; border-radius: 50%; background: rgba(148, 163, 184, 0.15); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; margin-top: 1px;">
+            <div class="panel-card"
+              style="background: var(--bg-primary, #ffffff); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 18px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 0;">
+              <div
+                style="width: 26px; height: 26px; border-radius: 50%; background: rgba(148, 163, 184, 0.15); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; margin-top: 1px;">
                 <i data-lucide="info" style="width: 15px; height: 15px;"></i>
               </div>
               <div>
@@ -1880,7 +2085,9 @@
                   Prediction Information
                 </h4>
                 <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;">
-                  Shelf life estimates are based on the selected product, storage condition, temperature, humidity, and production date. Actual product freshness may vary depending on handling, packaging, and environmental conditions.
+                  Shelf life estimates are based on the selected product, storage condition, temperature, humidity, and
+                  production date. Actual product freshness may vary depending on handling, packaging, and environmental
+                  conditions.
                 </p>
               </div>
             </div>
@@ -1898,28 +2105,38 @@
                 <i data-lucide="package-search" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
                 <span>Bakery Product Catalog & Pricing Directory</span>
               </h2>
-              <button class="btn-primary" id="btn-add-product-modal" style="padding: 8px 16px; font-size: 0.85rem; width: auto; display: flex; align-items: center; gap: 6px;">
+              <button class="btn-primary" id="btn-add-product-modal"
+                style="padding: 8px 16px; font-size: 0.85rem; width: auto; display: flex; align-items: center; gap: 6px;">
                 <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
                 <span>Add New Product</span>
               </button>
             </div>
 
-            <div class="product-catalog-filters" style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+            <div class="product-catalog-filters"
+              style="display: flex; gap: 14px; padding: 15px 24px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="products-branch-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch Filter:</label>
-                <select id="products-branch-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
+                <label for="products-branch-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Branch
+                  Filter:</label>
+                <select id="products-branch-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 150px; max-width: 200px;">
                   <option value="all">All Branches</option>
                 </select>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="products-search-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product Name:</label>
-                <input type="text" id="products-search-input" class="form-input" placeholder="Search product..." style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
+                <label for="products-search-input"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Product
+                  Name:</label>
+                <input type="text" id="products-search-input" class="form-input" placeholder="Search product..."
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 180px;">
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="products-category-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
-                <select id="products-category-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
+                <label for="products-category-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Category:</label>
+                <select id="products-category-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 140px;">
                   <option value="all">All Categories</option>
                   <option value="BREAD">BREAD</option>
                   <option value="PASTRIES">PASTRIES</option>
@@ -1930,8 +2147,10 @@
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="products-status-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
-                <select id="products-status-filter" class="form-input" style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
+                <label for="products-status-filter"
+                  style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">Status:</label>
+                <select id="products-status-filter" class="form-input"
+                  style="padding: 7px 10px; font-size: 0.85rem; min-width: 130px;">
                   <option value="all">All Statuses</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -1958,12 +2177,15 @@
                 <tbody id="products-tbody"></tbody>
               </table>
             </div>
-            <div id="products-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-              <button id="products-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+            <div id="products-pagination"
+              style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="products-prev-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
               </button>
               <span id="products-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-              <button id="products-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <button id="products-next-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
               </button>
             </div>
@@ -1974,16 +2196,20 @@
              PANE: REPORTS VIEW
              ==================================================================== -->
         <section class="view-pane" id="pane-reports">
-          <div class="report-actions" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
-            <div class="report-filters" style="display: flex; gap: 10px; align-items: center; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <div class="report-actions"
+            style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center;">
+            <div class="report-filters"
+              style="display: flex; gap: 10px; align-items: center; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
               <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-color);">Date Range:</span>
               <input type="date" id="rep-filter-start" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;">
               <span style="color: var(--text-secondary); font-size: 0.9rem;">to</span>
               <input type="date" id="rep-filter-end" class="form-input" style="padding: 4px 8px; font-size: 0.9rem;">
-              <button id="btn-rep-filter-apply" class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
+              <button id="btn-rep-filter-apply" class="btn-primary"
+                style="padding: 4px 12px; font-size: 0.9rem;">Apply</button>
             </div>
             <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-              <button class="btn-primary" id="btn-export-report-csv" style="padding: 7px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; background-color: #059669; border-color: #059669; color: white;">
+              <button class="btn-primary" id="btn-export-report-csv"
+                style="padding: 7px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; background-color: #059669; border-color: #059669; color: white;">
                 <i data-lucide="file-spreadsheet" style="width: 16px; height: 16px;"></i>
                 <span>Export CSV</span>
               </button>
@@ -2012,12 +2238,15 @@
                 <tbody id="report-sales-tbody"></tbody>
               </table>
             </div>
-            <div id="report-sales-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-              <button id="rep-sales-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+            <div id="report-sales-pagination"
+              style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-sales-prev-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
               </button>
               <span id="rep-sales-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-              <button id="rep-sales-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <button id="rep-sales-next-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
               </button>
             </div>
@@ -2040,12 +2269,15 @@
                 <tbody id="report-waste-tbody"></tbody>
               </table>
             </div>
-            <div id="report-waste-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-              <button id="rep-waste-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+            <div id="report-waste-pagination"
+              style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-waste-prev-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
               </button>
               <span id="rep-waste-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-              <button id="rep-waste-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <button id="rep-waste-next-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
               </button>
             </div>
@@ -2069,12 +2301,15 @@
                 <tbody id="report-efficiency-tbody"></tbody>
               </table>
             </div>
-            <div id="report-eff-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
-              <button id="rep-eff-prev-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+            <div id="report-eff-pagination"
+              style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px;">
+              <button id="rep-eff-prev-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Previous
               </button>
               <span id="rep-eff-page-info" style="font-weight: 500; color: var(--text-muted);">Page 1 of 1</span>
-              <button id="rep-eff-next-page" class="btn-secondary" style="display: flex; align-items: center; gap: 5px;">
+              <button id="rep-eff-next-page" class="btn-secondary"
+                style="display: flex; align-items: center; gap: 5px;">
                 Next <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
               </button>
             </div>
@@ -2089,7 +2324,8 @@
   <div id="branch-edit-modal" class="panel-card modal-dialog" style="display: none;">
     <div class="panel-card-header">
       <h2 class="panel-card-title" id="branch-modal-title">Edit Branch</h2>
-      <button class="btn-secondary" id="btn-branch-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
+      <button class="btn-secondary" id="btn-branch-modal-close"
+        style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
     </div>
     <form id="branch-edit-form" method="POST">
       <input type="hidden" id="edit-branch-id">
@@ -2112,21 +2348,27 @@
       <div class="form-group" style="margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label class="form-label" style="margin-bottom: 0;">Store Hours</label>
-          <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
-            <input type="checkbox" id="edit-br-24hours-checkbox" style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
+          <label
+            style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="edit-br-24hours-checkbox"
+              style="accent-color: var(--primary-color); cursor: pointer; width: 15px; height: 15px;">
             <span>24 Hours Open</span>
           </label>
         </div>
         <div id="edit-br-time-picker-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
-            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening Time</span>
+            <span
+              style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Opening
+              Time</span>
             <div class="input-container">
               <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
               <input type="time" id="edit-br-open-time" class="form-input" required value="05:00">
             </div>
           </div>
           <div>
-            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing Time</span>
+            <span
+              style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">Closing
+              Time</span>
             <div class="input-container">
               <i data-lucide="clock" class="input-icon" style="width: 18px; height: 18px;"></i>
               <input type="time" id="edit-br-close-time" class="form-input" required value="20:00">
@@ -2137,7 +2379,10 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-br-contact" class="form-label">Contact Number</label>
-        <input type="tel" id="edit-br-contact" class="form-input" style="padding-left: 14px;" required inputmode="numeric" pattern="^(09\d{9}|639\d{9})$" maxlength="12" placeholder="e.g. 09123456789 or 639123456789" title="Please enter a valid Philippine contact number using numbers only.">
+        <input type="tel" id="edit-br-contact" class="form-input" style="padding-left: 14px;" required
+          inputmode="numeric" pattern="^(09\d{9}|639\d{9})$" maxlength="12"
+          placeholder="e.g. 09123456789 or 639123456789"
+          title="Please enter a valid Philippine contact number using numbers only.">
       </div>
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button type="button" class="btn-secondary" id="btn-switch-to-branch" style="flex: 1;">
@@ -2152,7 +2397,8 @@
   <div id="user-edit-modal" class="panel-card modal-dialog" style="display: none;">
     <div class="panel-card-header">
       <h2 class="panel-card-title">Edit Staff Account</h2>
-      <button class="btn-secondary" id="btn-user-modal-close" style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
+      <button class="btn-secondary" id="btn-user-modal-close"
+        style="padding: 4px 8px; border: none; font-size: 1.2rem;">&times;</button>
     </div>
     <form id="user-edit-form" method="POST">
       <input type="hidden" id="edit-user-id">
@@ -2162,16 +2408,19 @@
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-email" class="form-label">Email Address</label>
-        <input type="email" id="edit-usr-email" class="form-input" style="padding-left: 14px;" required pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
+        <input type="email" id="edit-usr-email" class="form-input" style="padding-left: 14px;" required
+          pattern=".*@bakewise\.com$" title="Only @bakewise.com email addresses are allowed">
       </div>
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-password" class="form-label">New Password (Leave blank to keep unchanged)</label>
         <div class="input-container">
-          <input type="password" id="edit-usr-password" class="form-input" style="padding-left: 14px; padding-right: 44px;" placeholder="••••••••" autocomplete="new-password">
-          <button type="button" class="password-toggle" id="btn-toggle-edit-usr-password"
-            aria-label="Show password" title="Show password" data-visible="false">
+          <input type="password" id="edit-usr-password" class="form-input"
+            style="padding-left: 14px; padding-right: 44px;" placeholder="••••••••" autocomplete="new-password">
+          <button type="button" class="password-toggle" id="btn-toggle-edit-usr-password" aria-label="Show password"
+            title="Show password" data-visible="false">
             <i data-lucide="eye" id="icon-edit-usr-eye-open" class="eye-open" style="width: 18px; height: 18px;"></i>
-            <i data-lucide="eye-off" id="icon-edit-usr-eye-closed" class="eye-closed" style="width: 18px; height: 18px;"></i>
+            <i data-lucide="eye-off" id="icon-edit-usr-eye-closed" class="eye-closed"
+              style="width: 18px; height: 18px;"></i>
           </button>
         </div>
       </div>
@@ -2189,7 +2438,8 @@
       <div class="form-group" style="margin-bottom: 12px;">
         <label for="edit-usr-branch" class="form-label">Assigned Branch</label>
         <select id="edit-usr-branch" class="form-input" style="padding-left: 14px;"></select>
-        <small class="form-helper-text" id="edit-usr-branch-helper" style="display: none;">Admins have full access to all branches and do not require a branch assignment.</small>
+        <small class="form-helper-text" id="edit-usr-branch-helper" style="display: none;">Admins have full access to
+          all branches and do not require a branch assignment.</small>
       </div>
       <div class="form-actions" style="margin-top: 16px;">
         <button type="button" class="btn-secondary" id="btn-user-modal-cancel">Cancel</button>
@@ -2202,7 +2452,8 @@
   <div class="panel-card modal-dialog" id="product-modal" style="display: none; max-width: 600px; width: 95%;">
     <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center;">
       <h2 class="panel-card-title" id="product-modal-title">Add Bakery Product</h2>
-      <button class="kanban-action-btn" id="btn-product-modal-close"><i data-lucide="x" style="width: 16px; height: 16px;"></i></button>
+      <button class="kanban-action-btn" id="btn-product-modal-close"><i data-lucide="x"
+          style="width: 16px; height: 16px;"></i></button>
     </div>
     <form id="product-form" method="POST">
       <input type="hidden" id="product-id-hidden">
@@ -2308,54 +2559,73 @@
 
   <!-- Announcement Modal -->
   <div class="modal-overlay" id="announcement-modal-overlay"></div>
-  <div class="panel-card modal-dialog" id="announcement-modal" style="display: none; max-width: 500px; z-index: 2000; padding: 32px;">
-    <div class="panel-card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 16px; margin-bottom: 24px; display: flex; align-items: center;">
-      <i data-lucide="megaphone" style="width: 24px; height: 24px; margin-right: 12px; color: var(--color-primary);"></i>
+  <div class="panel-card modal-dialog" id="announcement-modal"
+    style="display: none; max-width: 500px; z-index: 2000; padding: 32px;">
+    <div class="panel-card-header"
+      style="border-bottom: 1px solid var(--border-light); padding-bottom: 16px; margin-bottom: 24px; display: flex; align-items: center;">
+      <i data-lucide="megaphone"
+        style="width: 24px; height: 24px; margin-right: 12px; color: var(--color-primary);"></i>
       <h2 class="panel-card-title" style="margin: 0; font-size: 1.25rem;">Broadcast Announcement</h2>
     </div>
     <form id="announcement-form" method="POST">
       <div class="form-group" style="margin-bottom: 20px;">
-        <label class="form-label" for="announcement-message" style="font-weight: 600; color: var(--text-primary);">Announcement Message</label>
-        <textarea id="announcement-message" class="form-input" rows="4" placeholder="Enter your announcement here..." required style="resize: vertical; padding: 16px; border-radius: 8px;"></textarea>
+        <label class="form-label" for="announcement-message"
+          style="font-weight: 600; color: var(--text-primary);">Announcement Message</label>
+        <textarea id="announcement-message" class="form-input" rows="4" placeholder="Enter your announcement here..."
+          required style="resize: vertical; padding: 16px; border-radius: 8px;"></textarea>
       </div>
       <div class="form-group" style="margin-bottom: 32px;">
-        <label class="form-label" for="announcement-target" style="font-weight: 600; color: var(--text-primary);">Target Branch</label>
+        <label class="form-label" for="announcement-target" style="font-weight: 600; color: var(--text-primary);">Target
+          Branch</label>
         <select id="announcement-target" class="form-input" style="padding: 12px 16px; border-radius: 8px;">
           <option value="all">All Branches (Entire Business)</option>
           <!-- Dynamic branch options -->
         </select>
       </div>
       <div class="form-actions" style="justify-content: flex-end; gap: 12px; margin-top: 0;">
-        <button type="button" class="btn-secondary" id="btn-announcement-cancel" style="padding: 10px 24px; border-radius: 8px; width: auto;">Cancel</button>
-        <button type="submit" class="btn-primary" style="width: auto; padding: 10px 24px; border-radius: 8px;">Send Announcement</button>
+        <button type="button" class="btn-secondary" id="btn-announcement-cancel"
+          style="padding: 10px 24px; border-radius: 8px; width: auto;">Cancel</button>
+        <button type="submit" class="btn-primary" style="width: auto; padding: 10px 24px; border-radius: 8px;">Send
+          Announcement</button>
       </div>
     </form>
   </div>
 
   <!-- Global Confirmation Modal -->
   <div class="modal-overlay" id="confirm-modal-overlay"></div>
-  <div class="panel-card modal-dialog" id="confirm-modal" style="display: none; max-width: 400px; text-align: center; z-index: 2000;">
+  <div class="panel-card modal-dialog" id="confirm-modal"
+    style="display: none; max-width: 400px; text-align: center; z-index: 2000;">
     <div id="confirm-modal-icon-container" style="margin-bottom: 20px;">
-      <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: var(--color-error); margin: 0 auto; display: block;"></i>
+      <i data-lucide="alert-triangle"
+        style="width: 48px; height: 48px; color: var(--color-error); margin: 0 auto; display: block;"></i>
     </div>
     <h3 id="confirm-modal-title" style="margin-bottom: 10px; font-weight: 600; font-size: 1.25rem;">Confirm Action</h3>
     <p id="confirm-modal-message" style="margin-bottom: 24px; color: var(--text-secondary); line-height: 1.5;"></p>
     <div class="form-actions" style="justify-content: center; gap: 12px;">
-      <button type="button" class="btn-secondary" id="btn-confirm-cancel" style="width: auto; padding: 10px 24px;">Cancel</button>
-      <button type="button" class="btn-primary" id="btn-confirm-ok" style="width: auto; padding: 10px 24px; background-color: var(--color-error);">Delete</button>
+      <button type="button" class="btn-secondary" id="btn-confirm-cancel"
+        style="width: auto; padding: 10px 24px;">Cancel</button>
+      <button type="button" class="btn-primary" id="btn-confirm-ok"
+        style="width: auto; padding: 10px 24px; background-color: var(--color-error);">Delete</button>
     </div>
   </div>
 
   <!-- Privacy Policy Modal -->
-  <div class="panel-card modal-dialog" id="privacy-policy-modal" style="display: none; max-width: 500px; z-index: 2000;">
+  <div class="panel-card modal-dialog" id="privacy-policy-modal"
+    style="display: none; max-width: 500px; z-index: 2000;">
     <div class="panel-card-header" style="justify-content: space-between;">
       <h2 class="panel-card-title">Data Privacy & Security Statement</h2>
-      <button class="kanban-action-btn" id="btn-privacy-modal-close" style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;"><i data-lucide="x" style="width: 20px; height: 20px;"></i></button>
+      <button class="kanban-action-btn" id="btn-privacy-modal-close"
+        style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;"><i data-lucide="x"
+          style="width: 20px; height: 20px;"></i></button>
     </div>
     <div style="padding: 16px 0; color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem;">
-      <p style="margin-bottom: 12px;"><strong>BakeWise</strong> is committed to protecting the confidentiality and security of all enterprise data.</p>
-      <p style="margin-bottom: 12px;">By accessing this system, you acknowledge that all activities are monitored and that the information contained within (including inventory levels, production recipes, financial data, and user details) is strictly confidential.</p>
-      <p style="margin-bottom: 12px;">Your session is secured with end-to-end encryption. Unauthorized access, sharing of credentials, or data extraction is strictly prohibited and may result in disciplinary action.</p>
+      <p style="margin-bottom: 12px;"><strong>BakeWise</strong> is committed to protecting the confidentiality and
+        security of all enterprise data.</p>
+      <p style="margin-bottom: 12px;">By accessing this system, you acknowledge that all activities are monitored and
+        that the information contained within (including inventory levels, production recipes, financial data, and user
+        details) is strictly confidential.</p>
+      <p style="margin-bottom: 12px;">Your session is secured with end-to-end encryption. Unauthorized access, sharing
+        of credentials, or data extraction is strictly prohibited and may result in disciplinary action.</p>
       <p>For support or security concerns, please contact your System Administrator.</p>
     </div>
     <div class="form-actions" style="margin-top: 16px;">
@@ -2365,7 +2635,8 @@
 
   <!-- POS Receipt Preview Modal -->
   <div class="modal-overlay" id="pos-receipt-overlay" style="display: none;" onclick="closePosReceiptModal()"></div>
-  <div class="panel-card modal-dialog" id="pos-receipt-modal" style="display: none; max-width: 440px; z-index: 2100; padding: 24px;">
+  <div class="panel-card modal-dialog" id="pos-receipt-modal"
+    style="display: none; max-width: 440px; z-index: 2100; padding: 24px;">
     <div id="pos-receipt-printable" class="thermal-receipt-preview">
       <!-- Receipt content injected by JS -->
     </div>
@@ -2380,21 +2651,27 @@
 
   <!-- POS Transaction Details Modal (Sales History) -->
   <div class="modal-overlay" id="pos-details-overlay" style="display: none;" onclick="closePosDetailsModal()"></div>
-  <div class="panel-card modal-dialog" id="pos-details-modal" style="display: none; max-width: 600px; z-index: 2050; padding: 24px;">
-    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+  <div class="panel-card modal-dialog" id="pos-details-modal"
+    style="display: none; max-width: 600px; z-index: 2050; padding: 24px;">
+    <div class="panel-card-header"
+      style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
       <h2 class="panel-card-title" id="pos-details-modal-title">Transaction Details</h2>
-      <button type="button" class="kanban-action-btn" onclick="closePosDetailsModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+      <button type="button" class="kanban-action-btn" onclick="closePosDetailsModal()"><i data-lucide="x"
+          style="width: 18px; height: 18px;"></i></button>
     </div>
     <div id="pos-details-body" style="margin-top: 16px;">
       <!-- Detailed item list & info injected by JS -->
     </div>
-    <div class="modal-actions" style="display: flex; justify-content: space-between; margin-top: 20px; align-items: center;">
-      <button type="button" class="btn-danger" id="btn-pos-void-tx" style="display: none; background: #dc2626; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer;">
+    <div class="modal-actions"
+      style="display: flex; justify-content: space-between; margin-top: 20px; align-items: center;">
+      <button type="button" class="btn-danger" id="btn-pos-void-tx"
+        style="display: none; background: #dc2626; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer;">
         <i data-lucide="slash" style="width: 16px; height: 16px;"></i> Void Transaction
       </button>
       <div style="display: flex; gap: 10px; margin-left: auto;">
         <button type="button" class="btn-secondary" onclick="closePosDetailsModal()">Close</button>
-        <button type="button" class="btn-primary-gold" id="btn-pos-details-reprint" onclick="printPosReceiptFromDetails()">
+        <button type="button" class="btn-primary-gold" id="btn-pos-details-reprint"
+          onclick="printPosReceiptFromDetails()">
           <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Print Receipt
         </button>
       </div>
@@ -2402,14 +2679,19 @@
   </div>
 
   <!-- Production Optimization Details & Math Breakdown Modal -->
-  <div class="modal-overlay" id="prod-breakdown-overlay" style="display: none;" onclick="closeProdBreakdownModal()"></div>
-  <div class="panel-card modal-dialog" id="prod-breakdown-modal" style="display: none; max-width: 640px; z-index: 2150; padding: 24px;">
-    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-      <h2 class="panel-card-title" id="prod-breakdown-modal-title" style="display: flex; align-items: center; gap: 8px; margin: 0;">
+  <div class="modal-overlay" id="prod-breakdown-overlay" style="display: none;" onclick="closeProdBreakdownModal()">
+  </div>
+  <div class="panel-card modal-dialog" id="prod-breakdown-modal"
+    style="display: none; max-width: 640px; z-index: 2150; padding: 24px;">
+    <div class="panel-card-header"
+      style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+      <h2 class="panel-card-title" id="prod-breakdown-modal-title"
+        style="display: flex; align-items: center; gap: 8px; margin: 0;">
         <i data-lucide="calculator" style="width: 20px; height: 20px; color: var(--primary-color);"></i>
         <span>Production Calculation Breakdown</span>
       </h2>
-      <button type="button" class="kanban-action-btn" onclick="closeProdBreakdownModal()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+      <button type="button" class="kanban-action-btn" onclick="closeProdBreakdownModal()"><i data-lucide="x"
+          style="width: 18px; height: 18px;"></i></button>
     </div>
     <div id="prod-breakdown-body" style="margin-top: 16px;">
       <!-- Detailed calculation transparency injected by JS -->
@@ -2423,7 +2705,7 @@
   <div id="toast-container"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=30"></script>
 </body>
 
 </html>
