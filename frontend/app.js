@@ -3901,6 +3901,7 @@ function renderRealtimeAlerts() {
 
 // 2. POINT-OF-SALE (POS) CONTROLLER & REFRESHER
 let posCart = [];
+window.getPosCart = () => posCart;
 let activePosCategory = 'all';
 let currentPosPaymentMethod = 'Cash';
 let currentReceiptTxData = null;
@@ -4382,7 +4383,10 @@ function setPosCashPreset(value) {
 }
 window.setPosCashPreset = setPosCashPreset;
 
+let isPosCheckoutInProgress = false;
+
 async function handlePosCheckout() {
+  if (isPosCheckoutInProgress) return;
   if (!posCart.length) {
     showToast("Shopping cart is empty. Please add products before checking out.", "warning");
     return;
@@ -4445,6 +4449,7 @@ async function handlePosCheckout() {
   const checkoutBtnText = document.getElementById("btn-pos-checkout-text");
 
   try {
+    isPosCheckoutInProgress = true;
     if (checkoutBtn) checkoutBtn.disabled = true;
     if (checkoutBtnText) checkoutBtnText.textContent = "Processing...";
 
@@ -4513,6 +4518,7 @@ async function handlePosCheckout() {
       renderPosProducts();
     } catch(e) {}
   } finally {
+    isPosCheckoutInProgress = false;
     if (checkoutBtn) checkoutBtn.disabled = false;
     updatePosCartUI();
   }
@@ -5099,17 +5105,94 @@ function setupPOSModule() {
     searchInput.addEventListener("input", renderPosProducts);
   }
 
-  // Event delegation on product grid: 1-click adds product directly to cart
+  // Event delegation on product grid: STRICT intentional left-click adds product directly to cart
   const gridContainer = document.getElementById("pos-products-grid");
+  let cardMouseDownTarget = null;
+  let cardMouseDownX = 0;
+  let cardMouseDownY = 0;
+  let lastCardClickTime = 0;
+  let lastCardClickProductId = null;
+
   if (gridContainer) {
-    gridContainer.addEventListener("click", (e) => {
+    // 1. Explicitly ignore and block all non-click / hover / mouse movement triggers from altering cart
+    const passiveHoverHandler = (e) => {
+      // Hover and movement events are purely visual; never trigger cart modifications
+    };
+    gridContainer.addEventListener("mouseover", passiveHoverHandler, { passive: true });
+    gridContainer.addEventListener("mouseenter", passiveHoverHandler, { passive: true });
+    gridContainer.addEventListener("mousemove", passiveHoverHandler, { passive: true });
+    gridContainer.addEventListener("pointerover", passiveHoverHandler, { passive: true });
+    gridContainer.addEventListener("pointerenter", passiveHoverHandler, { passive: true });
+    gridContainer.addEventListener("pointermove", passiveHoverHandler, { passive: true });
+
+    // 2. Track mousedown to verify intentional primary click on the exact same product card
+    gridContainer.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) {
+        cardMouseDownTarget = null;
+        return;
+      }
       const card = e.target.closest(".pos-product-card");
-      if (!card) return;
+      if (card && !card.classList.contains("disabled-card")) {
+        cardMouseDownTarget = card;
+        cardMouseDownX = e.clientX;
+        cardMouseDownY = e.clientY;
+      } else {
+        cardMouseDownTarget = null;
+      }
+    });
+
+    window.addEventListener("mouseup", (e) => {
+      // If mouse is released outside or moved away, reset target
+      if (cardMouseDownTarget && e.target && !cardMouseDownTarget.contains(e.target) && e.target !== cardMouseDownTarget) {
+        cardMouseDownTarget = null;
+      }
+    });
+
+    // 3. Strict click verification: must be intentional left click, same card, minimal movement, not a drag
+    gridContainer.addEventListener("click", (e) => {
+      // Strictly require primary left-click
+      if (e.button !== 0) return;
+
+      const card = e.target.closest(".pos-product-card");
+      if (!card || card.classList.contains("disabled-card")) {
+        cardMouseDownTarget = null;
+        return;
+      }
+
+      // Verify that this click was initiated on this exact same card
+      if (cardMouseDownTarget && cardMouseDownTarget !== card) {
+        // Pointer was dragged across from another card: reject!
+        cardMouseDownTarget = null;
+        return;
+      }
+
+      // Reject drag-over / moving across cards
+      if (cardMouseDownX || cardMouseDownY) {
+        const dist = Math.hypot(e.clientX - cardMouseDownX, e.clientY - cardMouseDownY);
+        if (dist > 15) {
+          cardMouseDownTarget = null;
+          return;
+        }
+      }
 
       const productId = card.getAttribute("data-product-id");
-      if (productId) {
-        addToPosCart(productId);
+      if (!productId) {
+        cardMouseDownTarget = null;
+        return;
       }
+
+      const now = Date.now();
+      // Debounce rapid accidental bounce (< 150ms) on the exact same card
+      if (lastCardClickProductId === productId && (now - lastCardClickTime < 150)) {
+        return;
+      }
+
+      lastCardClickTime = now;
+      lastCardClickProductId = productId;
+      cardMouseDownTarget = null;
+
+      // Intentional single click: add exactly 1 quantity to cart
+      addToPosCart(productId);
     });
   }
 

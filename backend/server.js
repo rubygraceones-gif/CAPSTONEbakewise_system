@@ -577,6 +577,33 @@ async function initializeMysqlSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    // Helper to ensure column exists in MySQL tables
+    const ensureMysqlColumn = async (tableName, colName, colDef) => {
+      try {
+        const [existing] = await mysqlPool.query(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+          [tableName, colName]
+        );
+        if (!existing || existing.length === 0) {
+          await mysqlPool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${colName}\` ${colDef}`);
+        }
+      } catch (colErr) {
+        // Ignore if already added or restricted
+      }
+    };
+
+    await ensureMysqlColumn('bw_products', 'branch_id', 'INT DEFAULT NULL');
+    await ensureMysqlColumn('bw_products', 'unit', "VARCHAR(50) DEFAULT 'pcs'");
+    await ensureMysqlColumn('bw_products', 'status', "VARCHAR(50) DEFAULT 'Active'");
+    await ensureMysqlColumn('bw_products', 'description', 'TEXT');
+
+    await ensureMysqlColumn('bw_inventory', 'unit', "VARCHAR(50) DEFAULT 'pcs'");
+    await ensureMysqlColumn('bw_inventory', 'status', "VARCHAR(50) DEFAULT 'In Stock'");
+    await ensureMysqlColumn('bw_inventory', 'batch_id', 'VARCHAR(100) DEFAULT NULL');
+    await ensureMysqlColumn('bw_inventory', 'production_time', "VARCHAR(20) DEFAULT '06:00:00'");
+    await ensureMysqlColumn('bw_inventory', 'expiry_time', "VARCHAR(20) DEFAULT '18:00:00'");
+    await ensureMysqlColumn('bw_inventory', 'degradation_percent', 'DECIMAL(5,2) DEFAULT 0.00');
   } catch (err) {
     console.warn("MySQL branch extensions notice:", err.message);
   }
@@ -1908,14 +1935,14 @@ app.post('/api/pos/checkout', async (req, res) => {
 
       // B. Deduct Inventory Stock strictly from this branch's inventory records
       const invRows = await queryDb(
-        "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC",
         [pIdStr, altPid, bId]
       );
 
       let remainingToDeduct = qty;
       let totalRemainingStock = 0;
       let initialTotalStock = 0;
-      let itemUnit = 'pcs';
+      let itemUnit = item.unit || (pRes.rows && pRes.rows[0] && pRes.rows[0].unit) || 'pcs';
 
       for (const row of (invRows.rows || [])) {
         const rowStock = parseInt(row.stock_level) || 0;
@@ -1995,13 +2022,13 @@ app.post('/api/pos/void/:id', async (req, res) => {
       const pIdStr = String(item.product_id).trim();
       const altPid = pIdStr.startsWith('p') ? pIdStr.substring(1) : ('p' + pIdStr);
       const invCheck = await queryDb(
-        "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC LIMIT 1",
+        "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3 ORDER BY id ASC LIMIT 1",
         [pIdStr, altPid, tx.branch_id]
       );
       if (invCheck.rows && invCheck.rows.length > 0) {
         const curStock = parseInt(invCheck.rows[0].stock_level);
         const restoredStock = curStock + parseInt(item.quantity);
-        const itemUnit = invCheck.rows[0].unit || 'pcs';
+        const itemUnit = (invCheck.rows[0] && invCheck.rows[0].unit) || item.unit || 'pcs';
         await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [restoredStock, invCheck.rows[0].id]);
 
         // Log movement for void restoration
@@ -2315,7 +2342,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
 
   try {
     const invCheck = await queryDb(
-      "SELECT id, stock_level, unit FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
+      "SELECT id, stock_level FROM bw_inventory WHERE (product_id = $1 OR product_id = $2) AND branch_id = $3",
       [pIdStr, altPid, bId]
     );
 
@@ -2325,7 +2352,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
 
     const currentStock = parseInt(invCheck.rows[0].stock_level) || 0;
     const newStock = Math.max(0, currentStock + adjQty);
-    const unitStr = invCheck.rows[0].unit || 'pcs';
+    const unitStr = (invCheck.rows[0] && invCheck.rows[0].unit) || req.body.unit || 'pcs';
 
     await queryDb("UPDATE bw_inventory SET stock_level = $1 WHERE id = $2", [newStock, invCheck.rows[0].id]);
 

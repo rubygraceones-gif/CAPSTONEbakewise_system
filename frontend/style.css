@@ -3318,6 +3318,10 @@ body.dark-mode .dashboard-ai-insight {
   box-sizing: border-box;
 }
 
+.pos-product-card * {
+  pointer-events: none;
+}
+
 .pos-product-card:hover:not(.disabled-card) {
   border-color: var(--primary-color);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
