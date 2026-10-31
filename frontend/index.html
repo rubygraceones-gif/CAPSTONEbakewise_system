@@ -1387,139 +1387,290 @@
              PANE: SHELF LIFE PREDICTION
              ==================================================================== -->
         <section class="view-pane" id="pane-shelf-life">
-          <div class="shelf-life-grid">
+          <div class="shelf-life-container">
             
-            <!-- Left Side: Parameters -->
-            <div class="panel-card" style="height: fit-content;">
-              <h3 style="margin-bottom: 20px; color: var(--text-primary); font-size: 1.1rem;">Prediction Parameters</h3>
-              
-              <div class="form-group">
-                <label class="form-label">Bread Type</label>
-                <select class="form-input" id="shelf-bread-type">
-                  <!-- Populated dynamically from Product Catalog -->
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Storage Condition</label>
-                <select class="form-input" id="shelf-storage">
-                  <option value="Uncovered Storage">Uncovered Storage</option>
-                  <option value="Sealed Packaging">Sealed Packaging</option>
-                  <option value="Refrigerated Storage">Refrigerated Storage</option>
-                  <option value="Frozen Storage">Frozen Storage</option>
-                  <option value="Display Case Storage">Display Case Storage</option>
-                  <option value="Covered Room-Temperature Storage" selected>Covered Room-Temperature Storage</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" style="display: flex; justify-content: space-between;">
-                  <span>Temperature (°C): <span id="shelf-temp-val" style="color: #ef4444; font-weight: bold;">27</span></span>
-                </label>
-                <input type="range" id="shelf-temp" min="10" max="40" value="27" style="width: 100%; accent-color: #ef4444;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                  <span>10</span><span>40</span>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" style="display: flex; justify-content: space-between;">
-                  <span>Humidity (%): <span id="shelf-humidity-val" style="color: #ef4444; font-weight: bold;">60</span></span>
-                </label>
-                <input type="range" id="shelf-humidity" min="20" max="100" value="60" style="width: 100%; accent-color: #ef4444;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                  <span>20</span><span>100</span>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Production Date</label>
-                <input type="date" class="form-input" id="shelf-date">
-              </div>
-
-              <button class="btn-primary" id="btn-predict-shelf" style="width: 100%; background: linear-gradient(135deg, #dc2626, #b91c1c); margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 8px;">
-                <i data-lucide="activity" style="width: 18px; height: 18px;"></i> Predict Shelf Life
-              </button>
+            <!-- 1. Page Header -->
+            <div class="shelf-life-header" style="margin-bottom: 20px;">
+              <h1 style="font-size: 1.45rem; font-weight: 700; color: var(--text-primary); margin: 0 0 4px 0;">Shelf Life Prediction &amp; Repurposing</h1>
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Monitor product freshness, estimate remaining shelf life, and identify spoilage risks.</p>
             </div>
 
-            <!-- Right Side: Results -->
-            <div class="shelf-life-results">
+            <!-- 2. Two-Column Layout (Left: Settings, Right: Results & Analysis) -->
+            <div class="shelf-life-grid">
               
-              <div class="summary-cards-grid" style="margin-bottom: 24px;">
-                <div class="summary-card" style="text-align: center; padding: 20px;">
-                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                    <i data-lucide="sun" style="color: #eab308; width: 32px; height: 32px;"></i>
-                  </div>
-                  <div class="summary-value" id="res-freshness" style="color: #22c55e;">--%</div>
-                  <div class="summary-label">Freshness Score</div>
-                </div>
-                <div class="summary-card" style="text-align: center; padding: 20px;">
-                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                    <i data-lucide="clock" style="color: #6366f1; width: 32px; height: 32px;"></i>
-                  </div>
-                  <div class="summary-value" id="res-days" style="color: #3b82f6;">-- Days</div>
-                  <div class="summary-label">Remaining Shelf Life</div>
-                </div>
-                <div class="summary-card" style="text-align: center; padding: 20px;">
-                  <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                    <i data-lucide="check-square" id="res-risk-icon" style="color: #22c55e; width: 32px; height: 32px;"></i>
-                  </div>
-                  <div class="summary-value" id="res-risk" style="color: #22c55e;">--</div>
-                  <div class="summary-label">Spoilage Risk</div>
-                </div>
-              </div>
-
-              <div class="panel-card" style="margin-bottom: 24px;">
-                <h3 style="margin-bottom: 20px; color: var(--text-primary); font-size: 1.1rem;">Freshness Scale &mdash; <span id="res-bread-name">Pandesal</span></h3>
-                
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-secondary);">
-                  <span>Current Freshness</span>
-                  <span id="res-freshness-bar-text" style="font-weight: bold; color: #22c55e;">--%</span>
+              <!-- Left Column: Prediction Settings -->
+              <div class="panel-card" style="height: fit-content;">
+                <div class="panel-card-header" style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                  <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary-color);"></i>
+                  <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction Settings</h2>
                 </div>
                 
-                <div style="width: 100%; height: 12px; background-color: var(--bg-secondary); border-radius: 6px; overflow: hidden; margin-bottom: 16px;">
-                  <div id="res-freshness-bar" style="width: 0%; height: 100%; background-color: #22c55e; transition: width 0.5s ease, background-color 0.5s ease;"></div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                    <i data-lucide="cookie" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
+                    <span>Bread Type</span>
+                  </label>
+                  <select class="form-input" id="shelf-bread-type">
+                    <!-- Populated dynamically from Product Catalog -->
+                  </select>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">
-                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#ef4444;"></div> Spoiled (0-25%)</div>
-                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#eab308;"></div> Moderate (25-75%)</div>
-                  <div style="display: flex; align-items: center; gap: 6px;"><div style="width:8px; height:8px; border-radius:50%; background:#22c55e;"></div> Fresh (75-100%)</div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                    <i data-lucide="box" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
+                    <span>Storage Condition</span>
+                  </label>
+                  <select class="form-input" id="shelf-storage">
+                    <option value="Uncovered Storage">Uncovered Storage</option>
+                    <option value="Sealed Packaging">Sealed Packaging</option>
+                    <option value="Refrigerated Storage">Refrigerated Storage</option>
+                    <option value="Frozen Storage">Frozen Storage</option>
+                    <option value="Display Case Storage">Display Case Storage</option>
+                    <option value="Covered Room-Temperature Storage" selected>Covered Room-Temperature Storage</option>
+                  </select>
                 </div>
-              </div>
 
-              <div class="panel-card" style="margin-bottom: 24px;">
-                <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1rem;">Analysis Summary</h3>
-                <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem; color: var(--text-secondary);">
-                  <li style="display: flex; align-items: center; gap: 12px;">
-                    <i data-lucide="thermometer" style="color: #ef4444; width: 18px; height: 18px;"></i>
-                    <span id="res-msg-temp">Awaiting prediction...</span>
-                  </li>
-                  <li style="display: flex; align-items: center; gap: 12px;">
-                    <i data-lucide="droplets" style="color: #3b82f6; width: 18px; height: 18px;"></i>
-                    <span id="res-msg-humid">Awaiting prediction...</span>
-                  </li>
-                  <li style="display: flex; align-items: center; gap: 12px;">
-                    <i data-lucide="package" style="color: #a8a29e; width: 18px; height: 18px;"></i>
-                    <span id="res-msg-storage">Awaiting prediction...</span>
-                  </li>
-                </ul>
-              </div>
-
-              <!-- Environmental & Freshness Notice Callout -->
-              <div class="panel-card" style="background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.25); border-radius: 12px; padding: 16px 20px; display: flex; gap: 14px; align-items: flex-start; margin-bottom: 0;">
-                <i data-lucide="info" style="width: 20px; height: 20px; color: #d97706; flex-shrink: 0; margin-top: 2px;"></i>
-                <div>
-                  <h4 style="margin: 0 0 6px 0; font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">
-                    Environmental &amp; Freshness Notice
-                  </h4>
-                  <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
-                    Predictions are estimates based on standard ambient conditions. Actual shelf life may fluctuate due to real-time changes in local weather, store temperature spikes, humidity shifts, packaging integrity, or direct sunlight exposure. Always verify product quality and aroma before serving or selling.
-                  </p>
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
+                      <i data-lucide="thermometer" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
+                      <span>Temperature (°C)</span>
+                    </label>
+                    <span class="badge" style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color); font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px;">
+                      <span id="shelf-temp-val">27</span>°C
+                    </span>
+                  </div>
+                  <input type="range" id="shelf-temp" min="10" max="40" value="27" class="shelf-slider">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    <span>10°C (Cool)</span>
+                    <span>25°C (Ambient)</span>
+                    <span>40°C (Hot)</span>
+                  </div>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin: 0;">
+                      <i data-lucide="droplets" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
+                      <span>Humidity (%)</span>
+                    </label>
+                    <span class="badge" style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color); font-weight: 700; font-size: 0.82rem; padding: 2px 8px; border-radius: 6px;">
+                      <span id="shelf-humidity-val">60</span>%
+                    </span>
+                  </div>
+                  <input type="range" id="shelf-humidity" min="20" max="100" value="60" class="shelf-slider">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                    <span>20% (Dry)</span>
+                    <span>60% (Optimal)</span>
+                    <span>100% (High)</span>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                  <label class="form-label" style="display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px;">
+                    <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--primary-color);"></i>
+                    <span>Production Date</span>
+                  </label>
+                  <input type="date" class="form-input" id="shelf-date" style="padding-left: 12px; height: 40px;">
+                </div>
+
+                <button class="btn-primary" id="btn-predict-shelf" style="width: 100%; height: 44px; background: var(--primary-color); border: none; border-radius: 8px; font-weight: 600; font-size: 0.92rem; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; color: white;">
+                  <i data-lucide="calculator" style="width: 18px; height: 18px;"></i>
+                  <span>Calculate Shelf Life</span>
+                </button>
               </div>
 
+              <!-- Right Column: Results, Freshness Monitoring, & Prediction Analysis -->
+              <div class="shelf-life-results" style="display: flex; flex-direction: column; gap: 20px;">
+                
+                <!-- 3 Summary Cards: Freshness Score, Remaining Shelf Life, Spoilage Risk -->
+                <div class="shelf-results-grid">
+                  
+                  <!-- Card 1: Freshness Score -->
+                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                    <div style="position: relative; width: 76px; height: 76px; margin-bottom: 10px;">
+                      <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none" stroke="var(--bg-secondary, #f1ede6)" stroke-width="3.5" />
+                        <path id="res-circular-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none" stroke="#22c55e" stroke-width="3.5" stroke-dasharray="100, 100" stroke-linecap="round"
+                          style="transition: stroke-dasharray 0.5s ease, stroke 0.5s ease;" />
+                      </svg>
+                      <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 800; color: #22c55e;" id="res-freshness">--%</div>
+                    </div>
+                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Freshness Score</div>
+                    <span id="res-freshness-status-badge" class="badge" style="background: rgba(34, 197, 94, 0.12); color: #16a34a; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">--</span>
+                  </div>
+
+                  <!-- Card 2: Remaining Shelf Life -->
+                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; color: #3b82f6; margin-bottom: 12px;">
+                      <i data-lucide="clock" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div class="summary-value" id="res-days" style="font-size: 1.45rem; font-weight: 800; color: #3b82f6; margin-bottom: 2px;">-- Days</div>
+                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Remaining Shelf Life</div>
+                    <div id="res-expiry-date" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Estimated Expiry: --</div>
+                  </div>
+
+                  <!-- Card 3: Spoilage Risk -->
+                  <div class="summary-card" style="padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center;">
+                    <div id="res-risk-icon-container" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(34, 197, 94, 0.12); display: flex; align-items: center; justify-content: center; color: #22c55e; margin-bottom: 12px;">
+                      <i data-lucide="check-square" id="res-risk-icon" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div class="summary-value" id="res-risk" style="font-size: 1.4rem; font-weight: 800; color: #22c55e; margin-bottom: 2px;">--</div>
+                    <div class="summary-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px;">Spoilage Risk</div>
+                    <span id="res-risk-subtext" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">Awaiting Calculation</span>
+                  </div>
+
+                </div>
+
+                <!-- Product Freshness Monitoring Card -->
+                <div class="panel-card" style="margin-bottom: 0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                    <div>
+                      <h3 style="margin: 0 0 2px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="activity" style="width: 17px; height: 17px; color: var(--primary-color);"></i>
+                        <span>Product Freshness Monitoring</span>
+                      </h3>
+                      <span style="font-size: 0.82rem; color: var(--text-secondary);">
+                        Evaluating: <strong id="res-bread-name" style="color: var(--text-primary);">Pandesal</strong>
+                      </span>
+                    </div>
+                    <div style="text-align: right;">
+                      <span id="res-freshness-bar-text" style="font-weight: 800; font-size: 1.15rem; color: #22c55e;">--%</span>
+                    </div>
+                  </div>
+
+                  <div style="width: 100%; height: 12px; background-color: var(--bg-secondary, #f1ede6); border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
+                    <div id="res-freshness-bar" style="width: 0%; height: 100%; background-color: #22c55e; transition: width 0.5s ease, background-color 0.5s ease;"></div>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary); padding-top: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+                      <span>Spoiled (0–24%)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+                      <span>Moderate (25–74%)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                      <span>Fresh (75–100%)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Prediction Analysis Card -->
+                <div class="panel-card" style="margin-bottom: 0;">
+                  <div class="panel-card-header" style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="bar-chart-2" style="width: 17px; height: 17px; color: var(--primary-color);"></i>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0;">Prediction Analysis</h3>
+                  </div>
+
+                  <div class="analysis-factors-list">
+                    
+                    <!-- Factor 1: Temperature -->
+                    <div class="factor-row">
+                      <div class="factor-icon-wrap" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                        <i data-lucide="thermometer" style="width: 17px; height: 17px;"></i>
+                      </div>
+                      <div class="factor-body">
+                        <div class="factor-header">
+                          <span class="factor-name">Ambient Temperature</span>
+                          <span class="factor-value" id="res-val-temp">27°C</span>
+                        </div>
+                        <p class="factor-desc" id="res-msg-temp">Awaiting prediction...</p>
+                      </div>
+                    </div>
+
+                    <!-- Factor 2: Humidity -->
+                    <div class="factor-row">
+                      <div class="factor-icon-wrap" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                        <i data-lucide="droplets" style="width: 17px; height: 17px;"></i>
+                      </div>
+                      <div class="factor-body">
+                        <div class="factor-header">
+                          <span class="factor-name">Relative Humidity</span>
+                          <span class="factor-value" id="res-val-humid">60%</span>
+                        </div>
+                        <p class="factor-desc" id="res-msg-humid">Awaiting prediction...</p>
+                      </div>
+                    </div>
+
+                    <!-- Factor 3: Storage Condition -->
+                    <div class="factor-row">
+                      <div class="factor-icon-wrap" style="background: rgba(234, 88, 12, 0.1); color: var(--primary-color);">
+                        <i data-lucide="box" style="width: 17px; height: 17px;"></i>
+                      </div>
+                      <div class="factor-body">
+                        <div class="factor-header">
+                          <span class="factor-name">Storage Condition</span>
+                          <span class="factor-value" id="res-val-storage">Covered Room-Temperature Storage</span>
+                        </div>
+                        <p class="factor-desc" id="res-msg-storage">Awaiting prediction...</p>
+                      </div>
+                    </div>
+
+                    <!-- Factor 4: Product Lifespan -->
+                    <div class="factor-row">
+                      <div class="factor-icon-wrap" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                        <i data-lucide="tag" style="width: 17px; height: 17px;"></i>
+                      </div>
+                      <div class="factor-body">
+                        <div class="factor-header">
+                          <span class="factor-name">Base Product Lifespan</span>
+                          <span class="factor-value" id="res-val-product">3 Days Base</span>
+                        </div>
+                        <p class="factor-desc" id="res-msg-product">Fresh lean-crust bread with daily bake formulation.</p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
             </div>
+
+            <!-- 3. Bottom Section: Recommended Repurposing Options -->
+            <div class="panel-card" style="margin-bottom: 0;">
+              <div class="panel-card-header" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(234, 88, 12, 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
+                    <i data-lucide="refresh-cw" style="width: 17px; height: 17px;"></i>
+                  </div>
+                  <div>
+                    <h2 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Recommended Repurposing Options</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
+                      Safe unsold or near-expiry bakery products can be repurposed into high-value items before quality declines.
+                    </p>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(34, 197, 94, 0.1); color: #16a34a; font-weight: 600; font-size: 0.78rem; padding: 4px 10px; border-radius: 20px;">
+                  Food Safety First
+                </span>
+              </div>
+
+              <div id="shelf-repurpose-container" class="repurpose-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                <!-- Populated dynamically based on evaluated bread & freshness score -->
+              </div>
+            </div>
+
+            <!-- 4. Environmental & Freshness Notice (Compact) -->
+            <div class="panel-card" style="background: var(--bg-primary, #ffffff); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 18px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 0;">
+              <div style="width: 26px; height: 26px; border-radius: 50%; background: rgba(148, 163, 184, 0.15); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; margin-top: 1px;">
+                <i data-lucide="info" style="width: 15px; height: 15px;"></i>
+              </div>
+              <div>
+                <h4 style="margin: 0 0 3px 0; font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">
+                  Prediction Information
+                </h4>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;">
+                  Shelf life estimates are based on the selected product, storage condition, temperature, humidity, and production date. Actual product freshness may vary depending on handling, packaging, and environmental conditions.
+                </p>
+              </div>
+            </div>
+
           </div>
         </section>
 

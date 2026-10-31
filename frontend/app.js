@@ -5389,6 +5389,10 @@ function refreshShelfLifePane() {
           applyShelfLifePredictionResult(pred);
         }
       }
+    } else {
+      if (typeof renderShelfRepurposingOptions === 'function') {
+        renderShelfRepurposingOptions({ freshnessScore: 100, breadName: 'Pandesal' });
+      }
     }
   } catch (e) {
     console.warn("Could not restore last shelf prediction:", e);
@@ -6305,16 +6309,44 @@ function calculateShelfLifePrediction({ breadType, breadName, storage, temp, hum
   let risk = "Low Risk";
   let riskColor = "#22c55e"; // green
   let riskIcon = "check-square";
+  let riskSubtext = "Safe for Retail Sale";
 
-  if (freshnessScore <= 25 || remainingDays <= 0.5) {
+  if (freshnessScore <= 24 || remainingDays <= 0.5) {
     risk = "High Risk";
     riskColor = "#ef4444"; // red
     riskIcon = "alert-triangle";
-  } else if (freshnessScore <= 70 || remainingDays <= 1.5) {
+    riskSubtext = "Spoiled — Mark for Disposal";
+  } else if (freshnessScore <= 74 || remainingDays <= 1.5) {
     risk = "Moderate Risk";
     riskColor = "#eab308"; // yellow
     riskIcon = "alert-circle";
+    riskSubtext = "Approaching Limit — Repurpose";
   }
+
+  // 9. Freshness Status & Expiry Formatting
+  let freshnessStatus = "Fresh";
+  let freshnessStatusColor = "#16a34a"; // Green
+  if (freshnessScore <= 24) {
+    freshnessStatus = "Spoiled";
+    freshnessStatusColor = "#ef4444"; // Red
+  } else if (freshnessScore <= 74) {
+    freshnessStatus = "Moderate";
+    freshnessStatusColor = "#f59e0b"; // Orange/Amber
+  }
+
+  const expiryDate = new Date(pDate.getTime() + totalShelfLife * 24 * 60 * 60 * 1000);
+  const expiryDateStr = expiryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  let remainingDisplay = `${remainingDays.toFixed(1)} Days`;
+  if (remainingDays <= 0) {
+    remainingDisplay = "0 Days (Expired)";
+  } else if (remainingDays < 1.0) {
+    remainingDisplay = `${Math.max(1, Math.round(remainingDays * 24))} Hours`;
+  }
+
+  const productLifespanMsg = targetProduct 
+    ? `${targetProduct.name} baseline (${baseShelfLife} days, ${targetProduct.category || 'Bakery'}).`
+    : `Standard bakery bread baseline (${baseShelfLife} days).`;
 
   return {
     breadType,
@@ -6328,10 +6360,16 @@ function calculateShelfLifePrediction({ breadType, breadName, storage, temp, hum
     baseShelfLife,
     totalShelfLife: Number(totalShelfLife.toFixed(1)),
     remainingDays: Number(remainingDays.toFixed(1)),
+    remainingDisplay,
+    expiryDateStr,
     freshnessScore,
+    freshnessStatus,
+    freshnessStatusColor,
     risk,
     riskColor,
     riskIcon,
+    riskSubtext,
+    productLifespanMsg,
     tempMsg,
     tempColor,
     humidMsg,
@@ -6342,6 +6380,173 @@ function calculateShelfLifePrediction({ breadType, breadName, storage, temp, hum
 }
 window.calculateShelfLifePrediction = calculateShelfLifePrediction;
 
+function renderShelfRepurposingOptions(res) {
+  const container = document.getElementById("shelf-repurpose-container");
+  if (!container) return;
+
+  const score = res ? res.freshnessScore : 100;
+  const breadName = res ? res.breadName : "Pandesal";
+  const bLower = (breadName || "").toLowerCase();
+
+  // Safety Rule: Never recommend repurposing spoiled or moldy items!
+  if (score < 25) {
+    setSafeHtml(container, `
+      <div style="grid-column: 1 / -1; background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; color: #ef4444; flex-shrink: 0;">
+          <i data-lucide="alert-octagon" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div style="flex: 1; min-width: 240px;">
+          <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #ef4444;">Unsafe for Repurposing — Mark for Disposal</h4>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+            <strong>${breadName}</strong> has reached the end of its safe shelf life (Freshness: ${score}%). Mold growth, crumb degradation, or microbial breakdown makes it unsafe for consumption or repurposing. <strong>Do not repurpose.</strong> Mark as spoiled waste in the Waste Tracker for safe disposal.
+          </p>
+        </div>
+        <button class="btn-secondary" onclick="navigateToPane('pane-waste')" style="white-space: nowrap; font-size: 0.85rem; padding: 8px 14px; border-color: #ef4444; color: #ef4444; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Log Waste
+        </button>
+      </div>
+    `);
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: container });
+    return;
+  }
+
+  // Peak Freshness: Repurposing not needed yet
+  if (score >= 75) {
+    setSafeHtml(container, `
+      <div style="grid-column: 1 / -1; background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px;">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.15); display: flex; align-items: center; justify-content: center; color: #16a34a; flex-shrink: 0;">
+          <i data-lucide="check-circle-2" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div>
+          <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700; color: #16a34a;">Peak Freshness — Repurposing Not Required</h4>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+            <strong>${breadName}</strong> is currently at peak freshness (${score}%). Continue regular front-counter retail sales. Recommended repurposing options will activate automatically if unsold stock enters the 25%–74% moderate freshness window.
+          </p>
+        </div>
+      </div>
+    `);
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: container });
+    return;
+  }
+
+  // Moderate Freshness (25% - 74%): Near-expiry, safe and wholesome to repurpose!
+  const recipes = [];
+  if (bLower.includes("pandesal") || bLower.includes("monay") || bLower.includes("roll")) {
+    recipes.push(
+      {
+        recipe: "Garlic Butter Croutons",
+        product: breadName,
+        desc: "Cubed and tossed in melted garlic butter and dried herbs, oven-baked until crunchy. Perfect for soups and salads.",
+        safety: "Freshness 25%–74% • Clean wholesome aroma, dry crumb structure"
+      },
+      {
+        recipe: "Fine Toasted Breadcrumbs",
+        product: breadName,
+        desc: "Slow-baked until golden dry and pulsed fine for savory breading coatings and bakery pastry fillings.",
+        safety: "Freshness 25%–74% • Completely moisture-free crumb"
+      },
+      {
+        recipe: "Toasted Bread Snacks",
+        product: breadName,
+        desc: "Sliced thin, brushed with margarine and sprinkled with sugar, toasted crisp for retail snack packs.",
+        safety: "Freshness 25%–74% • Clean crumb texture"
+      }
+    );
+  } else if (bLower.includes("ensaymada") || bLower.includes("pastr") || bLower.includes("croissant")) {
+    recipes.push(
+      {
+        recipe: "Baked Ensaymada Pudding",
+        product: breadName,
+        desc: "Cubed and baked in a rich vanilla-custard bath with raisins and melted butter. Serves as a premium dessert special.",
+        safety: "Freshness 25%–74% • Kept chilled, wholesome dairy topping"
+      },
+      {
+        recipe: "Brioche-Style French Toast",
+        product: breadName,
+        desc: "Dipped in egg-milk batter and griddled golden for bakery café breakfast pairings.",
+        safety: "Freshness 25%–74% • Intact crumb structure"
+      }
+    );
+  } else if (bLower.includes("sliced") || bLower.includes("loaf")) {
+    recipes.push(
+      {
+        recipe: "Cinnamon Bread Pudding",
+        product: breadName,
+        desc: "Tender baked custard pudding infused with cinnamon, raisins, and caramel syrup.",
+        safety: "Freshness 25%–74% • Wholesome aroma, no discoloration"
+      },
+      {
+        recipe: "French Toast Sliders",
+        product: breadName,
+        desc: "Thick bread slices soaked in sweet egg custard, pan-fried and dusted with powdered sugar.",
+        safety: "Freshness 25%–74% • Sealed packaging prior, intact crust"
+      },
+      {
+        recipe: "Herb Salad Croutons",
+        product: breadName,
+        desc: "Diced into cubes, seasoned with olive oil and Italian seasoning, baked into crunchy salad croutons.",
+        safety: "Freshness 25%–74% • Safe dry crumb"
+      }
+    );
+  } else if (bLower.includes("cake")) {
+    recipes.push(
+      {
+        recipe: "Chocolate Truffle Cake Pops",
+        product: breadName,
+        desc: "Crumbled cake crumb bound with rich dark chocolate ganache, formed into pops and dipped in hard shell chocolate.",
+        safety: "Freshness 25%–74% • Kept chilled, wholesome frosting"
+      },
+      {
+        recipe: "Bakery Trifle Cups",
+        product: breadName,
+        desc: "Layered sponge cake with vanilla pastry cream and fruit preserves in individual dessert cups.",
+        safety: "Freshness 25%–74% • Sweet aroma, clean sponge"
+      }
+    );
+  } else {
+    recipes.push(
+      {
+        recipe: "Classic Bread Pudding",
+        product: breadName,
+        desc: "Baked with sweet custard, vanilla, raisins, and nutmeg for a warm bakery favorite.",
+        safety: "Freshness 25%–74% • Wholesome unsold bread, no spoilage"
+      },
+      {
+        recipe: "Toasted Breadcrumbs",
+        product: breadName,
+        desc: "Oven-dried and pulverized into fine breading for meat cutlets and croquettes.",
+        safety: "Freshness 25%–74% • Zero moisture in crumb"
+      },
+      {
+        recipe: "Toasted Bread Snacks",
+        product: breadName,
+        desc: "Sliced and baked crisp with butter and sugar for crunchy bakery biscotti-style snacks.",
+        safety: "Freshness 25%–74% • Wholesome aroma"
+      }
+    );
+  }
+
+  setSafeHtml(container, recipes.map(r => `
+    <div class="shelf-repurpose-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <h4 class="recipe-title">${r.recipe}</h4>
+        <span class="product-tag">${r.product}</span>
+      </div>
+      <p class="recipe-desc">${r.desc}</p>
+      <div class="safety-req">
+        <i data-lucide="shield-check" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+        <span>${r.safety}</span>
+      </div>
+      <button class="btn-primary" onclick="if(typeof showToast === 'function') showToast('Repurposing workflow initiated for ${r.recipe}.', 'success');" style="margin-top: 4px; padding: 7px 12px; font-size: 0.8rem; background: var(--primary-color); border: none; border-radius: 6px; color: white; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+        <i data-lucide="check" style="width: 14px; height: 14px;"></i> Use Recipe
+      </button>
+    </div>
+  `).join(''));
+
+  if (window.lucide && window.lucide.createIcons) window.lucide.createIcons({ root: container });
+}
+window.renderShelfRepurposingOptions = renderShelfRepurposingOptions;
+
 function applyShelfLifePredictionResult(res) {
   if (!res) return;
 
@@ -6351,13 +6556,40 @@ function applyShelfLifePredictionResult(res) {
   const freshnessEl = document.getElementById("res-freshness");
   if (freshnessEl) {
     freshnessEl.textContent = `${res.freshnessScore}%`;
-    freshnessEl.style.color = res.riskColor;
+    freshnessEl.style.color = res.freshnessStatusColor || res.riskColor;
+  }
+
+  const circularCircle = document.getElementById("res-circular-progress");
+  if (circularCircle) {
+    circularCircle.setAttribute("stroke-dasharray", `${res.freshnessScore}, 100`);
+    circularCircle.style.stroke = res.freshnessStatusColor || res.riskColor;
+  }
+
+  const freshnessBadge = document.getElementById("res-freshness-status-badge");
+  if (freshnessBadge) {
+    const status = res.freshnessStatus || (res.freshnessScore >= 75 ? "Fresh" : res.freshnessScore >= 25 ? "Moderate" : "Spoiled");
+    freshnessBadge.textContent = status;
+    if (status === "Fresh") {
+      freshnessBadge.style.background = "rgba(34, 197, 94, 0.12)";
+      freshnessBadge.style.color = "#16a34a";
+    } else if (status === "Moderate") {
+      freshnessBadge.style.background = "rgba(245, 158, 11, 0.12)";
+      freshnessBadge.style.color = "#d97706";
+    } else {
+      freshnessBadge.style.background = "rgba(239, 68, 68, 0.12)";
+      freshnessBadge.style.color = "#ef4444";
+    }
   }
 
   const daysEl = document.getElementById("res-days");
   if (daysEl) {
-    daysEl.textContent = `${Number(res.remainingDays).toFixed(1)} Days`;
+    daysEl.textContent = res.remainingDisplay || `${Number(res.remainingDays).toFixed(1)} Days`;
     daysEl.style.color = res.riskColor === "#ef4444" ? "#ef4444" : "#3b82f6";
+  }
+
+  const expiryEl = document.getElementById("res-expiry-date");
+  if (expiryEl && res.expiryDateStr) {
+    expiryEl.textContent = `Estimated Expiry: ${res.expiryDateStr}`;
   }
 
   const riskEl = document.getElementById("res-risk");
@@ -6372,17 +6604,37 @@ function applyShelfLifePredictionResult(res) {
     riskIconEl.style.color = res.riskColor;
   }
 
+  const riskContainer = document.getElementById("res-risk-icon-container");
+  if (riskContainer) {
+    riskContainer.style.color = res.riskColor;
+    if (res.risk === "High Risk") {
+      riskContainer.style.background = "rgba(239, 68, 68, 0.12)";
+    } else if (res.risk === "Moderate Risk") {
+      riskContainer.style.background = "rgba(245, 158, 11, 0.12)";
+    } else {
+      riskContainer.style.background = "rgba(34, 197, 94, 0.12)";
+    }
+  }
+
+  const riskSubtextEl = document.getElementById("res-risk-subtext");
+  if (riskSubtextEl && res.riskSubtext) {
+    riskSubtextEl.textContent = res.riskSubtext;
+  }
+
   const barTextEl = document.getElementById("res-freshness-bar-text");
   if (barTextEl) {
     barTextEl.textContent = `${res.freshnessScore}%`;
-    barTextEl.style.color = res.riskColor;
+    barTextEl.style.color = res.freshnessStatusColor || res.riskColor;
   }
 
   const barEl = document.getElementById("res-freshness-bar");
   if (barEl) {
     barEl.style.width = `${res.freshnessScore}%`;
-    barEl.style.backgroundColor = res.riskColor;
+    barEl.style.backgroundColor = res.freshnessStatusColor || res.riskColor;
   }
+
+  const tempValEl = document.getElementById("res-val-temp");
+  if (tempValEl) tempValEl.textContent = `${res.temp}°C`;
 
   const tempMsgEl = document.getElementById("res-msg-temp");
   if (tempMsgEl) {
@@ -6390,16 +6642,34 @@ function applyShelfLifePredictionResult(res) {
     tempMsgEl.style.color = res.tempColor;
   }
 
+  const humidValEl = document.getElementById("res-val-humid");
+  if (humidValEl) humidValEl.textContent = `${res.humid}%`;
+
   const humidMsgEl = document.getElementById("res-msg-humid");
   if (humidMsgEl) {
     humidMsgEl.textContent = res.humidMsg;
     humidMsgEl.style.color = res.humidColor;
   }
 
+  const storageValEl = document.getElementById("res-val-storage");
+  if (storageValEl) storageValEl.textContent = res.storageCondition;
+
   const storageMsgEl = document.getElementById("res-msg-storage");
   if (storageMsgEl) {
     storageMsgEl.textContent = res.storageMsg;
     storageMsgEl.style.color = res.storageColor;
+  }
+
+  const productValEl = document.getElementById("res-val-product");
+  if (productValEl) productValEl.textContent = `${res.baseShelfLife} Days Base`;
+
+  const productMsgEl = document.getElementById("res-msg-product");
+  if (productMsgEl && res.productLifespanMsg) {
+    productMsgEl.textContent = res.productLifespanMsg;
+  }
+
+  if (typeof renderShelfRepurposingOptions === 'function') {
+    renderShelfRepurposingOptions(res);
   }
 
   if (window.lucide && window.lucide.createIcons) {
