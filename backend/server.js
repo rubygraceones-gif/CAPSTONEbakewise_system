@@ -361,9 +361,15 @@ async function queryDb(sql, params = []) {
   }
   if (activeDbDriver === 'mysql' && mysqlPool) {
     // Convert PostgreSQL $1, $2 placeholders to MySQL ? placeholders
+    // And properly map repeated positional parameters to the correct ? slots
     // And remove any RETURNING ... clause which is unsupported in MySQL
-    const mysqlSql = sql.replace(/\$\d+/g, '?').replace(/RETURNING\s+[^;]+/gi, '');
-    const [rows] = await mysqlPool.query(mysqlSql, params);
+    const paramIndices = [];
+    const mysqlSql = sql.replace(/\$(\d+)/g, (_, num) => {
+      paramIndices.push(parseInt(num) - 1);
+      return '?';
+    }).replace(/RETURNING\s+[^;]+/gi, '');
+    const mappedParams = paramIndices.length > 0 ? paramIndices.map(idx => params[idx]) : params;
+    const [rows] = await mysqlPool.query(mysqlSql, mappedParams);
 
     // Normalize INSERT RETURNING behavior for MySQL
     if (sql.trim().toUpperCase().startsWith("INSERT")) {
@@ -1034,24 +1040,24 @@ async function healOrphanedBranchRecords() {
       );
     } catch (e) { console.warn("Notice: Tibungco users deletion:", e.message); }
 
-    // 3. Ensure Catalina Kato is registered in bw_users as Sales Staff for Lasang
-    const catalinaHash = bcrypt.hashSync('password123', 10);
-    const emailsToEnsure = ['catalina.kato@bakewise.com', 'catalinekato@bakewise.com'];
-    for (const em of emailsToEnsure) {
+    // 3. Ensure exactly one Catalina Kato account is registered in bw_users as Sales Staff for Lasang (remove duplicates)
+    try {
+      await queryDb("DELETE FROM bw_users WHERE email = 'catalinekato@bakewise.com' OR (name = 'Catalina Kato' AND id != 86 AND email != 'catalina.kato@bakewise.com')");
+      const catalinaHash = bcrypt.hashSync('password123', 10);
       try {
         await queryDb(
           "INSERT INTO bw_users (email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5) ON DUPLICATE KEY UPDATE name = 'Catalina Kato', role = 'sales', branch_id = $6",
-          [em, catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
+          ['catalina.kato@bakewise.com', catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
         );
       } catch (e) {
         try {
           await queryDb(
             "INSERT INTO bw_users (email, password, name, role, branch_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO UPDATE SET name = 'Catalina Kato', role = 'sales', branch_id = $6",
-            [em, catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
+            ['catalina.kato@bakewise.com', catalinaHash, 'Catalina Kato', 'sales', lasangId, lasangId]
           );
         } catch (e2) {}
       }
-    }
+    } catch (e) { console.warn("Notice: Catalina Kato deduplication:", e.message); }
 
     // 4. Permanently delete all Tibungco data across all database tables
     try {
@@ -1077,6 +1083,34 @@ async function healOrphanedBranchRecords() {
     try {
       await queryDb(`DELETE FROM bw_products WHERE id = 'p11' OR (LOWER(name) = 'pandesal' AND id != 'p1')`);
     } catch (e) { console.warn("Notice: p11 cleanup:", e.message); }
+
+    // 6B. Ensure Coke (Beverages / Drinks) is registered in bw_products and assigned Lasang inventory
+    try {
+      try {
+        await queryDb(`
+          INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id, unit, status)
+          VALUES ('p7', 'Coke', 'Drinks', 25.00, 12.00, 90, 'N/A', NULL, 'pcs', 'Active')
+          ON DUPLICATE KEY UPDATE name = 'Coke', category = 'Drinks', price = 25.00, cost = 12.00, shelf_life_days = 90
+        `);
+      } catch (eSql) {
+        await queryDb(`
+          INSERT INTO bw_products (id, name, category, price, cost, shelf_life_days, repurpose_recipe, branch_id, unit, status)
+          VALUES ('p7', 'Coke', 'Drinks', 25.00, 12.00, 90, 'N/A', NULL, 'pcs', 'Active')
+          ON CONFLICT (id) DO UPDATE SET name = 'Coke', category = 'Drinks', price = 25.00, cost = 12.00, shelf_life_days = 90
+        `).catch(() => {});
+      }
+
+      // Ensure Coke inventory exists for Lasang
+      const cokeInvCheck = await queryDb("SELECT id FROM bw_inventory WHERE product_id = 'p7' AND branch_id = $1", [lasangId]);
+      if (!cokeInvCheck.rows || cokeInvCheck.rows.length === 0) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const expDateStr = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        await queryDb(
+          "INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id, unit, status, batch_id) VALUES ($1, $2, $3, $4, $5, 'pcs', 'In Stock', $6)",
+          ['p7', 50, todayStr, expDateStr, lasangId, 'BAT-B212-p7-' + todayStr.replace(/-/g, '')]
+        );
+      }
+    } catch (e) { console.warn("Notice: Coke catalog registration:", e.message); }
 
     // 7. Synchronize bw_waste cost to standard product unit costs
     try {
@@ -1828,22 +1862,23 @@ app.post('/api/products', async (req, res) => {
       [prodId, name, category, numPrice, numCost, shelfDays, repurpose_recipe || '', targetBranchId, prodUnit, prodStatus, description || '']
     );
 
-    // Initial stock injection if provided
+    // Initial stock injection if provided (assign to target branch or Lasang)
     const initQty = parseInt(initial_stock) || 0;
-    if (initQty > 0 && targetBranchId) {
+    if (initQty > 0) {
+      const activeBranchId = targetBranchId || (await queryDb("SELECT id FROM bw_branches WHERE status = 'Active' ORDER BY id ASC LIMIT 1")).rows[0]?.id || 212;
       const todayStr = new Date().toISOString().split('T')[0];
       const expDateStr = new Date(Date.now() + shelfDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       await queryDb(
         `INSERT INTO bw_inventory (product_id, stock_level, production_date, expiry_date, branch_id, unit, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'In Stock')`,
-        [prodId, initQty, todayStr, expDateStr, targetBranchId, prodUnit]
+        [prodId, initQty, todayStr, expDateStr, activeBranchId, prodUnit]
       );
 
       await queryDb(
         `INSERT INTO bw_inventory_movements (movement_type, branch_id, product_id, quantity, previous_stock, new_stock, unit, reason, performed_by, status)
          VALUES ('Stock In', $1, $2, $3, 0, $3, $4, 'Initial Product Stock', $5, 'Completed')`,
-        [targetBranchId, prodId, initQty, prodUnit, req.user ? (req.user.name || req.user.email) : 'System']
+        [activeBranchId, prodId, initQty, prodUnit, req.user ? (req.user.name || req.user.email) : 'System']
       );
     }
 

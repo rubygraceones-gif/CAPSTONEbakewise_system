@@ -340,14 +340,14 @@ window.clearLoginCredentials = clearLoginCredentials;
 class BakeWiseStore {
   constructor() {
     // One-time data wipe as requested by user
-    if (!localStorage.getItem('bakewise_v2_data_cleared_v41')) {
+    if (!localStorage.getItem('bakewise_v2_data_cleared_v42')) {
       localStorage.removeItem("bakewise_v2_sales");
       localStorage.removeItem("bakewise_v2_inventory");
       localStorage.removeItem("bakewise_v2_production");
       localStorage.removeItem("bakewise_v2_waste");
       localStorage.removeItem("bakewise_v2_products");
       localStorage.removeItem("bakewise_v2_branches");
-      localStorage.setItem('bakewise_v2_data_cleared_v41', 'true');
+      localStorage.setItem('bakewise_v2_data_cleared_v42', 'true');
     }
     this.products = this.load("bakewise_v2_products", DEFAULT_PRODUCTS);
     this._sales = this.load("bakewise_v2_sales", DEFAULT_SALES);
@@ -762,9 +762,19 @@ class BakeWiseStore {
     }
   }
 
+  getDefaultBranchId() {
+    if (this.currentUser && this.currentUser.branch_id) {
+      return parseInt(this.currentUser.branch_id);
+    }
+    if (this.branches && this.branches.length > 0) {
+      return parseInt(this.branches[0].id);
+    }
+    return 212; // Lasang branch
+  }
+
   getSelectedBranchId() {
     if (this.currentUser && this.currentUser.role !== 'admin') {
-      return this.currentUser.branch_id || 1;
+      return this.currentUser.branch_id || this.getDefaultBranchId();
     }
     const select = document.getElementById("branch-switcher-select");
     if (select && select.value) return select.value;
@@ -1013,7 +1023,7 @@ class BakeWiseStore {
     if (!product) return false;
     const parsedQty = parseInt(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) return false;
-    const branchId = this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId());
+    const branchId = this.getSelectedBranchId() === 'all' ? this.getDefaultBranchId() : parseInt(this.getSelectedBranchId());
 
     if (this.isBackendOnline) {
       try {
@@ -1173,7 +1183,7 @@ class BakeWiseStore {
     const parsedActual = parseInt(actual);
     if (isNaN(parsedPlanned) || isNaN(parsedActual)) return false;
 
-    const branchId = this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId());
+    const branchId = this.getSelectedBranchId() === 'all' ? this.getDefaultBranchId() : parseInt(this.getSelectedBranchId());
     const randCode = "B-" + date.replace(/-/g, '').substring(2) + "-" + Math.floor(Math.random() * 90 + 10);
 
     if (this.isBackendOnline) {
@@ -1207,7 +1217,7 @@ class BakeWiseStore {
 
     const parsedQty = parseInt(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) return false;
-    const branchId = this.getSelectedBranchId() === 'all' ? 1 : parseInt(this.getSelectedBranchId());
+    const branchId = this.getSelectedBranchId() === 'all' ? this.getDefaultBranchId() : parseInt(this.getSelectedBranchId());
 
     if (this.isBackendOnline) {
       try {
@@ -2937,9 +2947,9 @@ function setupInventoryModal() {
       if (store.currentUser.role === 'admin') {
         branchSelect.disabled = false;
         const currentBranch = store.getSelectedBranchId();
-        branchSelect.value = currentBranch === 'all' ? 1 : currentBranch;
+        branchSelect.value = currentBranch === 'all' ? store.getDefaultBranchId() : currentBranch;
       } else {
-        branchSelect.value = store.currentUser.branch_id || 1;
+        branchSelect.value = store.currentUser.branch_id || store.getDefaultBranchId();
         branchSelect.disabled = true;
       }
     }
@@ -4104,7 +4114,7 @@ function getPosEffectiveBranchId() {
     return currentPosSelectedBranchId;
   }
 
-  return 2;
+  return store.getDefaultBranchId ? store.getDefaultBranchId() : 212;
 }
 window.getPosEffectiveBranchId = getPosEffectiveBranchId;
 
@@ -4984,7 +4994,7 @@ async function refreshPosHistory() {
 
     // Filter locally (strictly isolating branch sales for non-admins)
     transactions = transactions.filter(tx => {
-      const txBranchId = parseInt(tx.branch_id || tx.branchId || 1);
+      const txBranchId = parseInt(tx.branch_id || tx.branchId || (store.getDefaultBranchId ? store.getDefaultBranchId() : 212));
       const matchBranch = isAdmin 
         ? (effectiveBranchId === 'all' || parseInt(effectiveBranchId) === txBranchId)
         : (txBranchId === userBranchId);

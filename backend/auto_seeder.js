@@ -258,8 +258,7 @@ async function runAutoSeeder(queryDb, force = false) {
     { name: 'Elena Santos', email: 'elena.santos@bakewise.com', role: 'manager', branchId: lasangId },
     { name: 'Danilo Cruz', email: 'danilo.cruz@bakewise.com', role: 'inventory', branchId: lasangId },
     { name: 'Marco Reyes', email: 'marco.reyes@bakewise.com', role: 'production', branchId: lasangId },
-    { name: 'Catalina Kato', email: 'catalina.kato@bakewise.com', role: 'sales', branchId: lasangId },
-    { name: 'Catalina Kato', email: 'catalinekato@bakewise.com', role: 'sales', branchId: lasangId }
+    { name: 'Catalina Kato', email: 'catalina.kato@bakewise.com', role: 'sales', branchId: lasangId }
   ];
 
   for (const s of staffToEnsure) {
