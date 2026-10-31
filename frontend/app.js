@@ -3340,13 +3340,16 @@ function removeFromPosCart(productId) {
 window.removeFromPosCart = removeFromPosCart;
 
 function clearPosCart() {
+  if (posCart.length === 0) return;
+  const prevItems = [...posCart];
   posCart = [];
   const discountInput = document.getElementById("pos-discount-input");
   if (discountInput) discountInput.value = "0.00";
   const tenderedInput = document.getElementById("pos-tendered-input");
   if (tenderedInput) tenderedInput.value = "";
   updatePosCartUI();
-  renderPosProducts();
+  prevItems.forEach(i => updateProductCardCartState(i.productId));
+  showToast("Current order cleared", "info");
 }
 window.clearPosCart = clearPosCart;
 

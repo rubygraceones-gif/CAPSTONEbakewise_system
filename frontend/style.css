@@ -3126,7 +3126,9 @@ body.dark-mode .dashboard-ai-insight {
   gap: 14px;
   max-height: 520px;
   overflow-y: auto;
-  padding-right: 4px;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding: 6px;
 }
 
 .pos-product-card {
@@ -3140,11 +3142,12 @@ body.dark-mode .dashboard-ai-insight {
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   position: relative;
+  box-sizing: border-box;
 }
 
 .pos-product-card:hover:not(.disabled-card) {
   border-color: var(--primary-color);
-  box-shadow: 0 4px 14px rgba(224, 138, 59, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .pos-product-card.disabled-card {
@@ -3163,9 +3166,10 @@ body.dark-mode .dashboard-ai-insight {
 .pos-product-card.disabled-card:hover .pos-product-add-btn {
   pointer-events: none !important;
   cursor: not-allowed !important;
-  background-color: var(--card-bg) !important;
+  background-color: var(--border-color) !important;
   border-color: var(--border-color) !important;
   color: var(--text-muted) !important;
+  opacity: 0.6 !important;
 }
 
 .pos-product-icon {
@@ -3218,11 +3222,11 @@ body.dark-mode .dashboard-ai-insight {
 .pos-product-add-btn {
   margin-top: 10px;
   width: 100%;
-  padding: 8px;
+  padding: 8px 12px;
   border-radius: 8px;
-  background-color: var(--card-bg);
+  background-color: var(--primary-color);
   border: 1px solid var(--primary-color);
-  color: var(--primary-color);
+  color: #ffffff;
   font-weight: 700;
   font-size: 0.85rem;
   display: flex;
@@ -3230,12 +3234,17 @@ body.dark-mode .dashboard-ai-insight {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
-.pos-product-card:not(.disabled-card):hover .pos-product-add-btn:not(:disabled),
+.pos-product-add-btn * {
+  pointer-events: none;
+}
+
 .pos-product-add-btn:hover:not(:disabled) {
-  background-color: var(--primary-color);
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
   color: #ffffff;
 }
 

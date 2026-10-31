@@ -1888,7 +1888,7 @@ app.use(express.static(frontendDir, {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     } else if (filePath.match(/\.(css|js)$/)) {
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     } else if (filePath.match(/\.(png|jpg|jpeg|svg|woff2?|ico)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=86400');
     }
