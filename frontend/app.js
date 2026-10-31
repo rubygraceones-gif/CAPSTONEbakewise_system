@@ -897,18 +897,27 @@ class BakeWiseStore {
     return true;
   }
 
+  async syncFromBackend() {
+    return this.syncWithBackend();
+  }
+
   async deleteBranch(id) {
     const branchIdStr = id.toString();
 
     if (this.isBackendOnline) {
       try {
-        await fetch(`/api/branches/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/branches/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server deletion failed (${res.status})`);
+        }
       } catch (e) {
         console.error("Backend branch delete failed:", e);
+        throw e;
       }
     }
 
-    // 1. Remove branch itself
+    // 1. Remove branch itself from local memory
     this.branches = this.branches.filter(b => b.id.toString() !== branchIdStr);
     this.save("bakewise_v2_branches", this.branches);
 
@@ -932,12 +941,13 @@ class BakeWiseStore {
     this._waste = this._waste.filter(w => w.branch_id?.toString() !== branchIdStr);
     this.save("bakewise_v2_waste", this._waste);
 
-    // Re-sync from backend to refresh client tables with clean database state
+    // Commit all local changes and re-sync with backend
+    this.commitAll();
     if (this.isBackendOnline) {
-      await this.syncFromBackend();
+      await this.syncWithBackend();
     }
 
-    this.logActivity(`Deleted branch ID ${id} and all associated data (users, sales, inventory, production, waste)`);
+    this.logActivity(`Deleted branch ID ${id} and all associated data`);
     return true;
   }
 
@@ -5202,15 +5212,23 @@ async function refreshAdminBranchesPane() {
     document.querySelectorAll(".delete-branch-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-id");
-        if (await showConfirmModal("Are you sure you want to permanently delete this branch? ALL associated branch data including staff user accounts, sales records, inventory stock, and production batches will also be deleted from the system.")) {
-          await store.deleteBranch(id);
-          populateSelectDropdowns();
-          await refreshAdminBranchesPane();
-          if (typeof refreshAdminUsersPane === 'function') await refreshAdminUsersPane();
-          if (typeof refreshInventoryPane === 'function') await refreshInventoryPane();
-          if (typeof refreshSalesPane === 'function') await refreshSalesPane();
-          if (typeof refreshDashboardPane === 'function') await refreshDashboardPane();
-          showToast("Branch and all associated records deleted.", "info");
+        const bObj = (store.branches || []).find(b => b.id.toString() === id.toString());
+        const bName = bObj ? bObj.name : `Branch #${id}`;
+
+        if (await showConfirmModal(`Are you sure you want to permanently delete branch "${bName}"? ALL associated branch data including staff user accounts, sales records, inventory stock, and production batches will also be deleted from the system.`)) {
+          try {
+            await store.deleteBranch(id);
+            populateSelectDropdowns();
+            await refreshAdminBranchesPane();
+            if (typeof refreshAdminUsersPane === 'function') await refreshAdminUsersPane();
+            if (typeof refreshInventoryPane === 'function') await refreshInventoryPane();
+            if (typeof refreshSalesPane === 'function') await refreshSalesPane();
+            if (typeof refreshDashboardPane === 'function') await refreshDashboardPane();
+            showToast(`Branch "${bName}" and all associated records deleted successfully.`, "success");
+          } catch (err) {
+            console.error("Branch deletion error:", err);
+            showToast(err.message || "Failed to delete branch.", "error");
+          }
         }
       });
     });

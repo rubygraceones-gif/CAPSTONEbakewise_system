@@ -1149,36 +1149,29 @@ app.delete('/api/branches/:id', async (req, res) => {
   }
 
   try {
-    // 1. Delete associated POS transaction items
-    const txRows = await queryDb("SELECT id FROM bw_pos_transactions WHERE branch_id = $1", [branchId]);
-    if (txRows.rows && txRows.rows.length > 0) {
-      for (const t of txRows.rows) {
-        if (t.id) {
-          await queryDb("DELETE FROM bw_pos_transaction_items WHERE transaction_id = $1", [t.id]);
-        }
-      }
-    }
+    // High-performance parallel cascading deletion of associated branch records
+    await Promise.all([
+      // 1. Delete associated POS transaction items in 1 query
+      queryDb(
+        "DELETE FROM bw_pos_transaction_items WHERE transaction_id IN (SELECT id FROM bw_pos_transactions WHERE branch_id = $1)",
+        [branchId]
+      ).catch(() => {}),
+      // 2. Delete associated sales records
+      queryDb("DELETE FROM bw_sales WHERE branch_id = $1", [branchId]),
+      // 3. Delete associated inventory stock
+      queryDb("DELETE FROM bw_inventory WHERE branch_id = $1", [branchId]),
+      // 4. Delete associated production batches
+      queryDb("DELETE FROM bw_production WHERE branch_id = $1", [branchId]),
+      // 5. Delete associated waste logs
+      queryDb("DELETE FROM bw_waste WHERE branch_id = $1", [branchId]),
+      // 6. Delete associated repurpose logs
+      queryDb("DELETE FROM bw_repurpose_logs WHERE branch_id = $1", [branchId]),
+      // 7. Delete associated staff accounts (protect system administrators whose role='admin' or branch_id is null)
+      queryDb("DELETE FROM bw_users WHERE branch_id = $1 AND role != 'admin'", [branchId])
+    ]);
 
-    // 2. Delete associated POS transactions
+    // 8. Delete associated POS transactions
     await queryDb("DELETE FROM bw_pos_transactions WHERE branch_id = $1", [branchId]);
-
-    // 3. Delete associated sales records
-    await queryDb("DELETE FROM bw_sales WHERE branch_id = $1", [branchId]);
-
-    // 4. Delete associated inventory stock
-    await queryDb("DELETE FROM bw_inventory WHERE branch_id = $1", [branchId]);
-
-    // 5. Delete associated production batches
-    await queryDb("DELETE FROM bw_production WHERE branch_id = $1", [branchId]);
-
-    // 6. Delete associated waste logs
-    await queryDb("DELETE FROM bw_waste WHERE branch_id = $1", [branchId]);
-
-    // 7. Delete associated repurpose logs
-    await queryDb("DELETE FROM bw_repurpose_logs WHERE branch_id = $1", [branchId]);
-
-    // 8. Delete associated staff/user accounts (protect system administrators whose role='admin' or branch_id is null)
-    await queryDb("DELETE FROM bw_users WHERE branch_id = $1 AND role != 'admin'", [branchId]);
 
     // 9. Finally, delete the branch itself
     await queryDb("DELETE FROM bw_branches WHERE id = $1", [branchId]);
